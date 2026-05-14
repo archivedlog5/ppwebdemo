@@ -80,9 +80,15 @@ payment-playground/
 | admin-console | React + Vite | Node.js + Express | Supabase | — |
 
 **Supabase usage:**
-- demo-hub: API key/config storage
+- demo-hub: Reads product display config at startup (display_name, description, enabled, sort_order); API credential references
 - store-fashion: User authentication (Auth), simple order management
-- admin-console: Payment channel configuration, on/off status, channel ordering per site
+- admin-console: Manages demo-hub product display config (`demo_hub_products` table); payment channel config, on/off status, channel ordering per e-commerce site
+
+**admin-console → demo-hub config relationship:**
+- admin-console writes to the Supabase `demo_hub_products` table (display_name, description, enabled, sort_order)
+- demo-hub reads this table once at startup to determine which products appear on the homepage, their names, and their order
+- Config changes take effect after restarting demo-hub (read once at startup, cached in memory)
+- `product_key` (route slug) is bound to code routes — admin-console can read but not modify it
 
 ---
 

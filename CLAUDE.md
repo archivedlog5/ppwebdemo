@@ -80,9 +80,15 @@ payment-playground/
 | admin-console | React + Vite | Node.js + Express | Supabase | — |
 
 **Supabase 用途：**
-- demo-hub：API 密钥/配置存储
+- demo-hub：启动时读取产品展示配置（display_name、description、enabled、sort_order），API 密钥/凭证引用
 - store-fashion：用户登录（Auth）、简单订单管理
-- admin-console：支付渠道配置、上下架状态、各网站渠道排序
+- admin-console：demo-hub 产品展示配置管理（`demo_hub_products` 表）、支付渠道配置、上下架状态、各电商网站渠道排序
+
+**admin-console → demo-hub 配置关系：**
+- admin-console 写入 Supabase `demo_hub_products` 表（display_name、description、enabled、sort_order）
+- demo-hub 启动时从该表读取配置，决定首页展示哪些产品、名称、顺序
+- 配置变更后重启 demo-hub 即生效（启动时读取一次，缓存在内存中）
+- `product_key`（路由 slug）与代码路由绑定，admin 只读不可修改
 
 ---
 
