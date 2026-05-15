@@ -89,6 +89,8 @@ payment-playground/
 - demo-hub reads this table once at startup to determine which products appear on the homepage, their names, and their order
 - Config changes take effect after restarting demo-hub (read once at startup, cached in memory)
 - `product_key` (route slug) is bound to code routes — admin-console can read but not modify it
+- In-memory Map key format: `provider/sdk_version/product_key` (e.g. `paypal/jssdk-v5/spb-ecm`)
+- Unique constraint: `UNIQUE(provider, sdk_version, product_key)` (three-field composite)
 
 ---
 
@@ -199,29 +201,43 @@ After phase: run find-skills → search "monitoring / deployment / docs" skills 
 
 ## Routing Conventions
 
-### demo-hub — One Route File Per Payment Product
+### demo-hub — Three-Level Route Structure (all providers)
 
-Each payment product must have its own Express router file, mounted at the corresponding path:
+Route format: `/{provider}/{sdk_version}/{product_key}`
+
+Each payment product must have its own Express router file. File path mirrors the URL exactly:
 
 ```
-/paypal/jssdk-v5          → routes/paypal/jssdk-v5.js
-/paypal/jssdk-v6          → routes/paypal/jssdk-v6.js
-/paypal/acdc              → routes/paypal/acdc.js
-/paypal/applepay          → routes/paypal/applepay.js
-/paypal/googlepay         → routes/paypal/googlepay.js
-/paypal/vault             → routes/paypal/vault.js
-/paypal/apm               → routes/paypal/apm.js
-/paypal/invoice           → routes/paypal/invoice.js
-/braintree/dropin-ui      → routes/braintree/dropin-ui.js
-/braintree/hosted-fields  → routes/braintree/hosted-fields.js
-/stripe/<product>         → routes/stripe/<product>.js
-/adyen/<product>          → routes/adyen/<product>.js
+/paypal/jssdk-v6/paypal-button  → routes/paypal/jssdk-v6/paypal-button.js
+/paypal/jssdk-v6/paylater       → routes/paypal/jssdk-v6/paylater.js
+/paypal/jssdk-v6/venmo          → routes/paypal/jssdk-v6/venmo.js
+/paypal/jssdk-v6/bcdc           → routes/paypal/jssdk-v6/bcdc.js
+/paypal/jssdk-v6/acdc           → routes/paypal/jssdk-v6/acdc.js
+/paypal/jssdk-v6/apple-pay      → routes/paypal/jssdk-v6/apple-pay.js
+/paypal/jssdk-v6/google-pay     → routes/paypal/jssdk-v6/google-pay.js
+/paypal/jssdk-v6/vault          → routes/paypal/jssdk-v6/vault.js
+/paypal/jssdk-v5/paypal-button  → routes/paypal/jssdk-v5/paypal-button.js
+/paypal/jssdk-v5/acdc           → routes/paypal/jssdk-v5/acdc.js
+/braintree/web-sdk/dropin-ui    → routes/braintree/web-sdk/dropin-ui.js
+/braintree/web-sdk/hosted-fields→ routes/braintree/web-sdk/hosted-fields.js
+/braintree/graphql/<product>    → routes/braintree/graphql/<product>.js (reserved)
+/stripe/stripe-js/<product>     → routes/stripe/stripe-js/<product>.js (reserved)
+/adyen/web-components/<product> → routes/adyen/web-components/<product>.js (reserved)
 ```
+
+**Naming conventions:**
+
+| Level | Rule | Example |
+|-------|------|---------|
+| provider | lowercase, no hyphens | `paypal`, `braintree` |
+| sdk_version | lowercase + kebab-case | `jssdk-v6`, `web-sdk`, `graphql` |
+| product_key | lowercase + kebab-case | `paypal-button`, `acdc`, `apple-pay` |
 
 Rules:
 - Each router file handles exactly one product's logic — **cross-product sharing is not allowed**
-- Router filenames must match the URL path segment (kebab-case)
-- Each product has its own EJS views directory: `views/paypal/jssdk-v5/`
+- Filename = `product_key` (e.g. `acdc.js`, `apple-pay.js`)
+- Each product has its own EJS views directory: `views/paypal/jssdk-v6/acdc.ejs`
+- Supabase `demo_hub_products` uses `(provider, sdk_version, product_key)` as the unique composite key
 
 ### E-commerce Sites — Isolated Route Prefix Per Site
 
@@ -338,6 +354,21 @@ See `docs/pending.md` for details. The following apps require requirements discu
 | store-travel | Custom travel | Pending |
 
 Every app must complete the full New App Launch Checklist before coding begins.
+
+---
+
+## Git Rules
+
+### Only commit when explicitly instructed
+**Do NOT auto-commit after completing any task.** Only run `git commit` and `git push` when the user explicitly says "commit", "git commit", "push", or equivalent. Never commit proactively.
+
+### .gitignore conventions
+The following must not be tracked in version control:
+- Playwright screenshots (`*.png`, `*.jpeg`, `.playwright-mcp/`, `playwright-report/`)
+- Environment variable files (`.env`, `.env.local`)
+- `node_modules/`, `dist/`, `build/`
+- Temporary mockup files (`/tmp/*.html`)
+- OS files (`.DS_Store`)
 
 ---
 

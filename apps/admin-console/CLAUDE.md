@@ -45,22 +45,25 @@ apps/admin-console/
 
 ### `demo_hub_products` — demo-hub 产品展示配置
 
+路由三层结构：`/{provider}/{sdk_version}/{product_key}`
+
 ```sql
 id           uuid        PRIMARY KEY DEFAULT gen_random_uuid()
 provider     text        NOT NULL  -- 'paypal' | 'braintree' | 'stripe' | 'adyen'
-product_key  text        NOT NULL  -- 路由 slug（与代码路由绑定，admin 只读）
+sdk_version  text        NOT NULL  -- 'jssdk-v6' | 'jssdk-v5' | 'web-sdk' | 'graphql' 等
+product_key  text        NOT NULL  -- 叶子产品 slug，如 'acdc' | 'paypal-button'
 display_name text        NOT NULL  -- 首页和产品页显示名称（可编辑）
 description  text                  -- 首页卡片描述（可编辑）
-enabled      boolean     NOT NULL DEFAULT true  -- 是否在首页展示
-sort_order   integer     NOT NULL DEFAULT 0     -- 同一 provider 内排序
+enabled      boolean     NOT NULL DEFAULT true
+sort_order   integer     NOT NULL DEFAULT 0
 created_at   timestamptz NOT NULL DEFAULT now()
 updated_at   timestamptz NOT NULL DEFAULT now()
 
-UNIQUE(provider, product_key)
+UNIQUE(provider, sdk_version, product_key)  -- 三字段联合唯一
 ```
 
 **admin-console 可操作字段：** `display_name`、`description`、`enabled`、`sort_order`
-**只读字段：** `provider`、`product_key`（与代码路由绑定）
+**只读字段：** `provider`、`sdk_version`、`product_key`（三者共同绑定代码路由）
 
 ### `payment_channels`（待设计）— 电商网站支付渠道配置
 

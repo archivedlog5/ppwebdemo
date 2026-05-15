@@ -25,9 +25,12 @@ apps/demo-hub/
 ├── DESIGN.md                    # UI/UX 设计系统（由 /design-consultation 生成）
 ├── docs/
 │   ├── req/                     # 需求文档
-│   │   └── 2026-05-15-req-demo-hub.md
+│   │   ├── 2026-05-15-req-demo-hub.md
+│   │   └── 2026-05-15-req-jssdk-v5.md
 │   ├── design/                  # 设计文档（fe/be/db 分开）
+│   │   └── 2026-05-15-design-be-routing.md
 │   ├── plans/                   # 实现计划
+│   │   └── 2026-05-15-plan-jssdk-v5-v1.md
 │   ├── todos.md                 # 任务清单
 │   ├── context.md               # App 目标与关键决策
 │   ├── progress.md              # 进度日志
@@ -36,30 +39,24 @@ apps/demo-hub/
 ├── src/
 │   ├── app.js                   # Express 入口，启动时从 Supabase 加载产品配置
 │   ├── config/
-│   │   └── products.js          # 内存中的产品配置 Map（启动时填充）
+│   │   ├── products.js          # 内存 Map（启动时从 Supabase 填充）
+│   │   └── paypal.js            # Access token helper（CN + US，8h TTL 缓存）
 │   ├── routes/
 │   │   ├── index.js             # GET / → 首页产品目录
-│   │   ├── paypal/
-│   │   │   ├── jssdk-v5.js
-│   │   │   ├── jssdk-v6.js
-│   │   │   ├── acdc.js
-│   │   │   ├── applepay.js
-│   │   │   ├── googlepay.js
-│   │   │   ├── vault.js
-│   │   │   ├── apm.js
-│   │   │   └── invoice.js
-│   │   ├── braintree/
-│   │   │   ├── dropin-ui.js
-│   │   │   └── hosted-fields.js
-│   │   ├── stripe/              # 待扩展
-│   │   └── adyen/               # 待扩展
+│   │   └── paypal/
+│   │       └── jssdk-v5/
+│   │           ├── _factory.js  # createStandardRoute + createVaultWithPurchaseRoute
+│   │           ├── spb-ecm.js   # 工厂路由示例
+│   │           ├── buttons.js   # 自定义（双 SDK：CN + US）
+│   │           └── ...          # 其余 12 个产品路由
 │   ├── views/
-│   │   ├── layout.ejs           # 共享布局（含 Tab 栏预留）
+│   │   ├── partials/
+│   │   │   ├── header.ejs       # HTML head + topbar + sidebar open
+│   │   │   ├── footer.ejs       # 关闭 sidebar + body + html
+│   │   │   └── sidebar.ejs      # 左侧产品列表
 │   │   ├── index.ejs            # 首页产品目录（动态渲染）
-│   │   ├── paypal/
-│   │   ├── braintree/
-│   │   ├── stripe/
-│   │   └── adyen/
+│   │   └── paypal/
+│   │       └── jssdk-v5/        # 每产品独立 EJS 文件
 │   └── public/
 │       ├── css/
 │       └── js/
@@ -70,60 +67,98 @@ apps/demo-hub/
 
 ## 路由规范
 
-**每个支付产品必须有独立路由文件，不允许跨产品共用。**
+**三层路由结构（所有 provider 统一）：`/{provider}/{sdk_version}/{product_key}`**
+
+每个支付产品必须有独立路由文件，文件路径与 URL 完全对应，不允许跨产品共用。
 
 ```
-GET /                            → 首页（从内存配置动态渲染）
-GET /paypal/jssdk-v5
-GET /paypal/jssdk-v6
-GET /paypal/acdc
-GET /paypal/applepay
-GET /paypal/googlepay
-GET /paypal/vault
-GET /paypal/apm
-GET /paypal/invoice
-GET /braintree/dropin-ui
-GET /braintree/hosted-fields
-GET /stripe/<product>            # 待扩展
-GET /adyen/<product>             # 待扩展
+GET /                                           → 首页（动态渲染）
+GET /paypal/jssdk-v5/spb-ecm
+GET /paypal/jssdk-v5/spb-ecs
+GET /paypal/jssdk-v5/buttons                    # 双 SDK（CN + US）
+GET /paypal/jssdk-v5/acdc
+GET /paypal/jssdk-v5/applepay-ecm
+GET /paypal/jssdk-v5/vault-paypal-with-purchase
+GET /paypal/jssdk-v5/vault-paypal-setup-only
+GET /paypal/jssdk-v5/vault-return
+...（共 14 个 JSSDK v5 demo）
+GET /braintree/web-sdk/dropin-ui
+GET /braintree/web-sdk/hosted-fields
+GET /braintree/graphql/<product>                # 预留
+GET /stripe/stripe-js/<product>                 # 预留
+GET /adyen/web-components/<product>             # 预留
 
-POST /api/paypal/create-order
-POST /api/paypal/capture-order
-POST /api/braintree/client-token
+POST /paypal/jssdk-v5/api/spb-ecm/create-order
+POST /paypal/jssdk-v5/api/spb-ecm/capture-order
 ... 每个产品有对应的后端 API 路由
+```
+
+**命名规范：** provider 小写无连字符 / sdk_version + product_key 均为 kebab-case
+
+**Vault 命名规范：**
+- `-with-purchase`：首次购买同时完成 Vault 签约
+- `-setup-only`：纯 Vault 签约，无购买（setup token）
+- `-return`：已签约回头买家体验
+
+## 路由工厂模式
+
+大多数标准产品路由通过工厂函数创建，避免重复代码：
+
+```js
+// _factory.js 提供的工厂函数：
+createStandardRoute({ productKey, sdkParams, view, orderBody?, extraScripts? })
+  // 适用：spb-ecm/ecs, applepay-ecm/ecs, googlepay-ecm/ecs
+  // extraScripts 用于 Google Pay（需加载额外 JS 库）
+
+createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSource })
+  // 适用：vault-paypal/acdc/applepay-with-purchase
+
+// 需要自定义实现的路由：
+// buttons.js           — 双 SDK（CN + US），Venmo 需美国账户
+// acdc.js              — CardFields SDK，前端逻辑不同
+// vault-*-setup-only.js — /v3/vault/setup-tokens API
+// vault-return.js      — 用户提供 vault token，纯服务端
 ```
 
 ## Supabase 产品配置
 
 demo-hub 与 admin-console 通过 Supabase `demo_hub_products` 表交互：
 
+**表结构关键字段：** `provider`, `sdk_version`, `product_key`, `display_name`, `description`, `enabled`, `sort_order`
+
 ```
 启动时：
   SELECT * FROM demo_hub_products ORDER BY provider, sort_order
-  → 存入内存 Map：{ 'paypal/acdc': { displayName, description, enabled, sortOrder } }
+  → 存入内存 Map：
+    key = 'paypal/jssdk-v5/spb-ecm'   (provider/sdk_version/product_key)
+    value = { displayName, description, enabled, sortOrder, ... }
 
 首页渲染：
-  读内存 Map → 只展示 enabled=true 的产品
+  读内存 Map → 只展示 enabled=true 的产品，按 provider → sdk_version → sort_order 分组
 
 产品页标题：
-  读内存 Map → 用 display_name 作标题（找不到则用 product_key fallback）
+  getProduct('paypal', 'jssdk-v5', 'spb-ecm') → display_name（找不到则 fallback product_key）
 ```
+
+**Access token 缓存：** `config/paypal.js` 中 CN 和 US 账户的 token 各自缓存 8 小时，避免每次 API 调用重新获取。
 
 **配置变更后需重启 demo-hub 生效。**
 
 ## 页面设计原则
 
-- **极简沙盒风格**：白色背景，只有支付 widget + 测试金额，无电商 UI 元素
-- **Tab 结构预留**：`[ Demo ] [ Code ] [ Logs ]`，现阶段只激活 Demo Tab
+- **极简沙盒风格**：只有支付 widget + 测试金额，无电商 UI 元素
+- **EJS 布局**：每个产品视图 include `partials/header.ejs`（开头）和 `partials/footer.ejs`（结尾），中间写正常 HTML/JS，不使用 `layout.ejs` 模式
+- **Tab 结构预留**：`[ Demo ] [ Code ] [ Logs ]`，现阶段只激活 Demo Tab（在 header.ejs 中定义）
 - 页面标题来自 Supabase `display_name` 字段
 
 ## 关键开发规则
 
 1. 每个路由文件只处理一个产品，不跨产品共用逻辑
 2. 凭证/密钥从 `.env` 环境变量读取，绝不 hardcode
-3. Tab 结构在 `layout.ejs` 中定义，产品页只填充 widget 内容
-4. `product_key` 必须与路由 slug 完全对应（`/paypal/acdc` → `product_key: 'acdc'`）
-5. 新增产品：写路由代码 → 在 Supabase 插入行 → 重启 app
+3. EJS 视图结构：`<%- include('../partials/header', vars) %>` + 内容 + `<%- include('../partials/footer') %>`
+4. `product_key` 与路由 slug 完全对应（`/paypal/jssdk-v5/spb-ecm` → `product_key: 'spb-ecm'`）
+5. 新增产品：写路由代码 → 在 Supabase 插入行（含 sdk_version） → 重启 app
+6. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
 
 ## 记忆恢复（Memory Compaction 后）
 

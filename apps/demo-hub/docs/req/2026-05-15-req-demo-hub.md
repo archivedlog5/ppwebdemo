@@ -75,52 +75,46 @@ POST /api/braintree/client-token → 生成 Braintree Client Token（后端）
 
 ## 技术架构
 
-### 选定方案：共享 EJS Layout + 每产品独立路由
+### 选定方案：EJS Partials + 三层路由 + 工厂函数
 
 ```
 apps/demo-hub/
 ├── src/
 │   ├── app.js                   # Express 入口，挂载所有路由
+│   ├── config/
+│   │   ├── products.js          # 内存 Map（启动时从 Supabase 填充）
+│   │   └── paypal.js            # Access token helper（CN+US，8h TTL 缓存）
 │   ├── routes/
 │   │   ├── index.js             # GET / → 首页
-│   │   ├── paypal/
-│   │   │   ├── jssdk-v5.js
-│   │   │   ├── jssdk-v6.js
-│   │   │   ├── acdc.js
-│   │   │   ├── applepay.js
-│   │   │   ├── googlepay.js
-│   │   │   ├── vault.js
-│   │   │   ├── apm.js
-│   │   │   └── invoice.js
-│   │   ├── braintree/
-│   │   │   ├── dropin-ui.js
-│   │   │   └── hosted-fields.js
-│   │   ├── stripe/              # 待扩展
-│   │   └── adyen/               # 待扩展
+│   │   └── paypal/
+│   │       └── jssdk-v5/
+│   │           ├── _factory.js  # createStandardRoute + createVaultWithPurchaseRoute
+│   │           ├── spb-ecm.js   # 工厂路由示例
+│   │           └── ...          # 共 14 个产品路由
 │   ├── views/
-│   │   ├── layout.ejs           # 共享布局（Tab 栏在此）
+│   │   ├── partials/
+│   │   │   ├── header.ejs       # HTML head + topbar + sidebar（含 Tab 栏预留）
+│   │   │   ├── footer.ejs       # 关闭标签
+│   │   │   └── sidebar.ejs      # 左侧产品列表
 │   │   ├── index.ejs            # 首页产品目录
-│   │   ├── paypal/
-│   │   │   ├── jssdk-v5.ejs
-│   │   │   ├── acdc.ejs
-│   │   │   └── ...
-│   │   ├── braintree/
-│   │   │   └── ...
+│   │   └── paypal/
+│   │       └── jssdk-v5/        # 每产品一个 EJS 文件
 │   └── public/
 │       ├── css/
 │       └── js/
-├── .env                         # 本地环境变量（不提交 git）
-├── .env.example                 # 示例配置文件
+├── .env
+├── .env.example
 ├── package.json
-└── docs/                        # 本文件所在目录
+└── docs/
 ```
 
 ### 关键设计原则
 
 1. **一个路由文件 = 一个支付产品**，不允许跨产品共用路由逻辑
-2. **凭证/密钥从环境变量读取**，通过 `.env` 文件管理，绝不 hardcode
-3. **Tab 结构在 layout.ejs 中定义**，产品页只填充 widget 内容
-4. **每个产品路由包含：** 页面渲染 + 该产品所需的后端 API（create order、capture、client token 等）
+2. **凭证/密钥从环境变量读取**，通过 `.env` 管理，绝不 hardcode
+3. **EJS 布局**：`<%- include('../partials/header') %>` + 内容 + `<%- include('../partials/footer') %>`（不使用单一 layout.ejs）
+4. **工厂函数**：`createStandardRoute` / `createVaultWithPurchaseRoute` 统一 GET + POST 路由逻辑
+5. **每个产品路由包含：** 页面渲染 + 该产品所需的后端 API
 
 ---
 
@@ -192,10 +186,12 @@ UNIQUE(provider, product_key)
 
 ```
 app.js 启动
-  → 从 Supabase 查询所有产品配置
-  → 存入内存 Map：{ 'paypal/acdc': { displayName, description, enabled, sortOrder } }
-  → 首页渲染：只展示 enabled=true 的产品，按 sortOrder 排序
-  → 产品页标题：读 displayName（找不到则 fallback 到 product_key）
+  → 从 Supabase 查询所有产品配置（含 sdk_version 字段）
+  → 存入内存 Map：
+    key = 'paypal/jssdk-v5/spb-ecm'  (provider/sdk_version/product_key)
+    value = { displayName, description, enabled, sortOrder, ... }
+  → 首页渲染：只展示 enabled=true 的产品，按 provider → sdk_version → sortOrder 分组
+  → 产品页标题：getProduct(provider, sdkVersion, productKey) → displayName
 ```
 
 ### 配置变更生效方式

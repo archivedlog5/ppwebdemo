@@ -89,6 +89,8 @@ payment-playground/
 - demo-hub 启动时从该表读取配置，决定首页展示哪些产品、名称、顺序
 - 配置变更后重启 demo-hub 即生效（启动时读取一次，缓存在内存中）
 - `product_key`（路由 slug）与代码路由绑定，admin 只读不可修改
+- 内存 Map key 格式：`provider/sdk_version/product_key`（如 `paypal/jssdk-v5/spb-ecm`）
+- 唯一约束：`UNIQUE(provider, sdk_version, product_key)`（三字段联合）
 
 ---
 
@@ -199,29 +201,43 @@ frontend-design      → 审查 UI/UX 模式，生成高质量前端设计规范
 
 ## 路由规范
 
-### demo-hub — 每个支付产品独立路由
+### demo-hub — 三层路由结构（所有 provider 统一）
 
-每个支付产品必须有独立的 Express 路由文件，挂载到对应路径：
+路由格式：`/{provider}/{sdk_version}/{product_key}`
+
+每个支付产品必须有独立的 Express 路由文件，文件路径与 URL 完全对应：
 
 ```
-/paypal/jssdk-v5          → routes/paypal/jssdk-v5.js
-/paypal/jssdk-v6          → routes/paypal/jssdk-v6.js
-/paypal/acdc              → routes/paypal/acdc.js
-/paypal/applepay          → routes/paypal/applepay.js
-/paypal/googlepay         → routes/paypal/googlepay.js
-/paypal/vault             → routes/paypal/vault.js
-/paypal/apm               → routes/paypal/apm.js
-/paypal/invoice           → routes/paypal/invoice.js
-/braintree/dropin-ui      → routes/braintree/dropin-ui.js
-/braintree/hosted-fields  → routes/braintree/hosted-fields.js
-/stripe/<product>         → routes/stripe/<product>.js
-/adyen/<product>          → routes/adyen/<product>.js
+/paypal/jssdk-v6/paypal-button  → routes/paypal/jssdk-v6/paypal-button.js
+/paypal/jssdk-v6/paylater       → routes/paypal/jssdk-v6/paylater.js
+/paypal/jssdk-v6/venmo          → routes/paypal/jssdk-v6/venmo.js
+/paypal/jssdk-v6/bcdc           → routes/paypal/jssdk-v6/bcdc.js
+/paypal/jssdk-v6/acdc           → routes/paypal/jssdk-v6/acdc.js
+/paypal/jssdk-v6/apple-pay      → routes/paypal/jssdk-v6/apple-pay.js
+/paypal/jssdk-v6/google-pay     → routes/paypal/jssdk-v6/google-pay.js
+/paypal/jssdk-v6/vault          → routes/paypal/jssdk-v6/vault.js
+/paypal/jssdk-v5/paypal-button  → routes/paypal/jssdk-v5/paypal-button.js
+/paypal/jssdk-v5/acdc           → routes/paypal/jssdk-v5/acdc.js
+/braintree/web-sdk/dropin-ui    → routes/braintree/web-sdk/dropin-ui.js
+/braintree/web-sdk/hosted-fields→ routes/braintree/web-sdk/hosted-fields.js
+/braintree/graphql/<product>    → routes/braintree/graphql/<product>.js（预留）
+/stripe/stripe-js/<product>     → routes/stripe/stripe-js/<product>.js（预留）
+/adyen/web-components/<product> → routes/adyen/web-components/<product>.js（预留）
 ```
+
+**命名规范：**
+
+| 层级 | 规则 | 示例 |
+|------|------|------|
+| provider | 小写，无连字符 | `paypal`, `braintree` |
+| sdk_version | 小写 + kebab-case | `jssdk-v6`, `web-sdk`, `graphql` |
+| product_key | 小写 + kebab-case | `paypal-button`, `acdc`, `apple-pay` |
 
 规则：
 - 每个路由文件只处理一个产品的逻辑，**不允许跨产品共用路由文件**
-- 路由文件名与 URL 路径段保持一致（kebab-case）
-- 每个产品有独立的 EJS 视图目录：`views/paypal/jssdk-v5/`
+- 文件名 = `product_key`（如 `acdc.js`、`apple-pay.js`）
+- 每个产品有独立的 EJS 视图目录：`views/paypal/jssdk-v6/acdc.ejs`
+- Supabase `demo_hub_products` 表用 `(provider, sdk_version, product_key)` 三字段唯一标识每个产品
 
 ### 电商网站 — 每个网站独立路由前缀
 
@@ -338,6 +354,21 @@ frontend-design      → 审查 UI/UX 模式，生成高质量前端设计规范
 | store-travel | 旅游定制化 | 待启动 |
 
 每个 app 启动前必须完整走一遍"新 App 启动检查清单"。
+
+---
+
+## Git 规则
+
+### 只在用户明确要求时才 commit
+**不要在每次完成任务后自动 git commit。** 只有当用户明确说"帮我 commit"、"git commit"、"提交一下"等指令时，才执行 commit 和 push 操作。
+
+### .gitignore 规范
+以下内容不进入版本控制：
+- Playwright 截图（`*.png`、`*.jpeg`、`.playwright-mcp/`、`playwright-report/`）
+- 环境变量文件（`.env`、`.env.local`）
+- `node_modules/`、`dist/`、`build/`
+- 临时 mockup 文件（`/tmp/*.html`）
+- OS 文件（`.DS_Store`）
 
 ---
 
