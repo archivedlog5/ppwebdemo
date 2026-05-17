@@ -14,7 +14,6 @@ app.use(express.static(path.join(__dirname, 'public')))
 // ── Routes ──────────────────────────────────────────────────────────
 app.use('/', require('./routes/index'))
 
-// PayPal JSSDK v5
 const v5 = '/paypal/jssdk-v5'
 app.use(v5, require('./routes/paypal/jssdk-v5/spb-ecm'))
 app.use(v5, require('./routes/paypal/jssdk-v5/spb-ecs'))
@@ -31,21 +30,17 @@ app.use(v5, require('./routes/paypal/jssdk-v5/vault-acdc-setup-only'))
 app.use(v5, require('./routes/paypal/jssdk-v5/vault-applepay-with-purchase'))
 app.use(v5, require('./routes/paypal/jssdk-v5/vault-return'))
 
-// ── 404 handler ──────────────────────────────────────────────────────
-app.use((req, res) => {
-  res.status(404).send('Route not found')
-})
+app.use((req, res) => res.status(404).send('Route not found'))
 
-// ── Start ─────────────────────────────────────────────────────────────
-async function start() {
-  await loadProductConfig()
-  const port = process.env.PORT || 3000
-  app.listen(port, () => {
-    console.log(`demo-hub running at http://localhost:${port}`)
-  })
+// ── 导出供 gateway 复用 ──────────────────────────────────────────────
+module.exports = { app, loadProductConfig }
+
+// ── 独立运行（开发模式：node/nodemon src/app.js）────────────────────
+if (require.main === module) {
+  loadProductConfig()
+    .then(() => {
+      const port = process.env.PORT || 3000
+      app.listen(port, () => console.log(`demo-hub running at http://localhost:${port}`))
+    })
+    .catch(err => { console.error('Startup failed:', err); process.exit(1) })
 }
-
-start().catch(err => {
-  console.error('Startup failed:', err)
-  process.exit(1)
-})

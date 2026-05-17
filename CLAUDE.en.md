@@ -269,6 +269,31 @@ Rules:
 - Backend API routes are strictly isolated by prefix
 - Payment channel config is written to Supabase via admin-console and read at runtime by each site
 
+## Development vs Production
+
+### Development (each app on its own port for easy debugging)
+
+| App | Command | Port |
+|-----|---------|------|
+| demo-hub | `npm run dev:demo-hub` | 3000 |
+| store-fashion | `npm run dev:fashion` | 5173 (Vite) |
+| admin-console | `npm run dev:admin` | 5174 (Vite) |
+
+### Production (single gateway, one port)
+
+Root `server.js` is the unified entry point mounting all apps:
+
+```
+node server.js  (PORT=443 or behind reverse proxy)
+  /            → demo-hub (EJS)
+  /fashion/*   → store-fashion React dist + API
+  /admin       → admin-console (always deployed separately)
+```
+
+To add a new store: add one `app.use('/xxx', express.static(dist))` block in `server.js`.
+
+**React app note**: set `base: '/fashion/'` in Vite config and `basename="/fashion"` in React Router.
+
 ---
 
 ## New App Launch Checklist

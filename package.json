@@ -1,0 +1,14 @@
+{
+  "name": "payment-playground",
+  "version": "1.0.0",
+  "description": "Payment demo hub + cross-border e-commerce platform",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev:demo-hub": "cd apps/demo-hub && npm run dev",
+    "dev:fashion": "cd apps/store-fashion && npm run dev",
+    "dev:admin": "cd apps/admin-console && npm run dev",
+    "build:fashion": "cd apps/store-fashion && npm run build",
+    "build:admin": "cd apps/admin-console && npm run build"
+  }
+}

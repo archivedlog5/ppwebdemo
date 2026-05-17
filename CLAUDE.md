@@ -269,6 +269,31 @@ frontend-design      → 审查 UI/UX 模式，生成高质量前端设计规范
 - 各网站后端 API 路由通过前缀严格隔离
 - 支付渠道配置通过 admin-console 写入 Supabase，各网站运行时从 Supabase 读取
 
+## 开发 vs 生产运行方式
+
+### 开发（各 app 独立端口，方便调试）
+
+| App | 命令 | 端口 |
+|-----|------|------|
+| demo-hub | `npm run dev:demo-hub` | 3000 |
+| store-fashion | `npm run dev:fashion` | 5173 (Vite) |
+| admin-console | `npm run dev:admin` | 5174 (Vite) |
+
+### 生产（单一 gateway，同一端口）
+
+根目录 `server.js` 是统一入口，挂载所有 app：
+
+```
+node server.js  (PORT=443 或反向代理)
+  /            → demo-hub (EJS)
+  /fashion/*   → store-fashion React dist + API
+  /admin 或独立 → admin-console（始终独立部署）
+```
+
+新增电商站时，在 `server.js` 按同样模式加一段 `app.use('/xxx', express.static(dist))`。
+
+**React 应用注意**：需在 Vite 配置中设 `base: '/fashion/'`，React Router 设 `basename="/fashion"`。
+
 ---
 
 ## 新 App 启动检查清单
