@@ -160,6 +160,131 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 5. 新增产品：写路由代码 → 在 Supabase 插入行（含 sdk_version） → 重启 app
 6. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
 
+## 开发命令
+
+```bash
+# 在 apps/demo-hub/ 目录下
+npm install        # 安装依赖（首次）
+npm run dev        # 独立运行，http://localhost:3000
+
+# 或在根目录
+npm run dev:demo-hub
+```
+
+nodemon 监听文件变更自动重启。修改路由/视图后终端会显示重启信息。
+
+## 新增支付产品 Demo 完整步骤
+
+### 1. 创建路由文件
+
+**工厂模式（标准产品，推荐）：**
+```js
+// src/routes/<provider>/<sdk>/<product>.js
+const { createStandardRoute } = require('./_factory')
+module.exports = createStandardRoute({
+  productKey: '<product>',
+  sdkParams:  'components=buttons&currency=USD',
+  view:       '<provider>/<sdk>/<product>',
+  // orderBody: {} 可选，合并进 create-order body
+  // extraScripts: [] 可选，如 Google Pay 需要额外 JS
+})
+```
+
+**Vault with-purchase（带购买的 Vault）：**
+```js
+const { createVaultWithPurchaseRoute } = require('./_factory')
+module.exports = createVaultWithPurchaseRoute({
+  productKey: 'vault-xxx-with-purchase',
+  sdkParams:  'components=buttons&vault=true&currency=USD',
+  view:       'paypal/jssdk-v5/vault-xxx-with-purchase',
+  paymentSource: { paypal: { attributes: { vault: { store_in_vault: 'ON_SUCCESS' } } } }
+})
+```
+
+**自定义路由**（CardFields、双SDK、Vault Setup-only、Return Buyer）：参考 `acdc.js`、`buttons.js`、`vault-paypal-setup-only.js`、`vault-return.js`。
+
+### 2. 创建 EJS 视图
+
+在 `src/views/<provider>/<sdk>/<product>.ejs` 创建：
+```ejs
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar, sdkUrl
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
+    <h1><%= title %></h1>
+    <p>产品描述</p>
+  </div>
+  <div class="sandbox-card">
+    <div class="amount-display">
+      <div class="amount-label">Test Amount</div>
+      <div class="amount-value">$1.00</div>
+      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
+    </div>
+
+    <%# SDK loading spinner %>
+    <div id="paypal-button-container" class="sdk-loading">
+      <div class="sdk-spinner"></div>
+      <span>Loading PayPal...</span>
+    </div>
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+  window.addEventListener('load', function () {
+    document.getElementById('paypal-button-container').classList.remove('sdk-loading')
+    document.getElementById('paypal-button-container').innerHTML = ''
+    paypalSDK.Buttons({
+      createOrder: () => fetch('/paypal/jssdk-v5/api/<product>/create-order', { method: 'POST' })
+        .then(r => r.json()).then(d => d.id),
+      onApprove: (data) => fetch('/paypal/jssdk-v5/api/<product>/capture-order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderID: data.orderID })
+      }).then(r => r.json()).then(o => {
+        const el = document.getElementById('result')
+        el.className = 'result-msg success'
+        el.textContent = '✓ Captured: ' + o.id
+      }),
+      onError: e => {
+        const el = document.getElementById('result')
+        el.className = 'result-msg error'
+        el.textContent = '✗ ' + (e.message || String(e))
+      }
+    }).render('#paypal-button-container')
+  })
+</script>
+
+<%- include('../../partials/footer', { showSidebar }) %>
+```
+
+### 3. 挂载路由（`src/app.js`）
+
+```js
+// 在对应 SDK 块下加一行
+app.use(v5, require('./routes/paypal/jssdk-v5/<product>'))
+```
+
+### 4. 插入 Supabase 数据
+
+```sql
+INSERT INTO demohub.products
+  (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
+VALUES
+  ('paypal', 'jssdk-v5', '<product>', '显示名称', '一句话描述', true, <排序号>);
+```
+
+### 5. 重启并验证
+
+```bash
+npm run dev        # 或在已启动的 nodemon 中输入 rs
+```
+
+打开 `http://localhost:3000` → 首页自动出现新产品卡片 → 点击进入 demo 页验证。
+
 ## 记忆恢复（Memory Compaction 后）
 
 1. 读 `docs/context.md`
@@ -170,4 +295,7 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 ## 参考文档
 
 - 需求：`docs/req/2026-05-15-req-demo-hub.md`
+- JSSDK v5 产品：`docs/req/2026-05-15-req-jssdk-v5.md`
+- 实现计划：`docs/plans/2026-05-15-plan-jssdk-v5-v1.md`
+- 路由设计：`docs/design/2026-05-15-design-be-routing.md`
 - 根项目指南：`../../CLAUDE.md`

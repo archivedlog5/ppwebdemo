@@ -256,12 +256,10 @@ frontend-design      → 审查 UI/UX 模式，生成高质量前端设计规范
 前端路由（React Router）：
 /fashion/*         → store-fashion 的所有页面
 /electronics/*     → store-electronics 的所有页面（待启动）
-...
 
 后端 API 路由（Express）：
 /api/fashion/*     → store-fashion 的所有 API
 /api/electronics/* → store-electronics 的所有 API（待启动）
-...
 ```
 
 规则：
@@ -269,30 +267,179 @@ frontend-design      → 审查 UI/UX 模式，生成高质量前端设计规范
 - 各网站后端 API 路由通过前缀严格隔离
 - 支付渠道配置通过 admin-console 写入 Supabase，各网站运行时从 Supabase 读取
 
-## 开发 vs 生产运行方式
+---
 
-### 开发（各 app 独立端口，方便调试）
+## 运行架构
 
-| App | 命令 | 端口 |
-|-----|------|------|
-| demo-hub | `npm run dev:demo-hub` | 3000 |
-| store-fashion | `npm run dev:fashion` | 5173 (Vite) |
-| admin-console | `npm run dev:admin` | 5174 (Vite) |
+### 开发模式（各 app 独立端口，方便调试）
 
-### 生产（单一 gateway，同一端口）
-
-根目录 `server.js` 是统一入口，挂载所有 app：
-
-```
-node server.js  (PORT=443 或反向代理)
-  /            → demo-hub (EJS)
-  /fashion/*   → store-fashion React dist + API
-  /admin 或独立 → admin-console（始终独立部署）
+```bash
+npm run dev:demo-hub    # → http://localhost:3000
+npm run dev:fashion     # → http://localhost:5173  (Vite HMR)
+npm run dev:admin       # → http://localhost:5174  (Vite HMR)
 ```
 
-新增电商站时，在 `server.js` 按同样模式加一段 `app.use('/xxx', express.static(dist))`。
+各 app 完全独立运行，互不影响。React 的 Vite dev server 支持热更新（HMR）。
 
-**React 应用注意**：需在 Vite 配置中设 `base: '/fashion/'`，React Router 设 `basename="/fashion"`。
+### 生产模式（统一 gateway，单一端口）
+
+根目录 `server.js` 是唯一入口，挂载所有 app 到同一端口（443 或反向代理后的内网端口）：
+
+```
+node server.js   (PORT=3000 本地 / PORT=443 生产)
+  /              → demo-hub（EJS 服务端渲染）
+  /fashion/*     → store-fashion React dist 静态文件 + /api/fashion/* API
+  /electronics/* → store-electronics（未来，结构相同）
+  ...
+```
+
+**admin-console 始终独立部署**，不进入 gateway（内部工具，单独域名或端口）。
+
+生产部署流程：
+```bash
+# 1. 构建所有 React app
+npm run build:fashion    # → apps/store-fashion/dist/
+npm run build:admin      # → apps/admin-console/dist/
+
+# 2. 启动统一 gateway
+npm start                # node server.js
+```
+
+### 架构图
+
+```
+开发模式                          生产模式
+─────────────────────────────     ────────────────────────────────────
+localhost:3000  demo-hub          PORT:3000/443  server.js (gateway)
+localhost:5173  store-fashion  →    /            demo-hub EJS routes
+localhost:5174  admin-console       /fashion/*   store-fashion dist/
+                                    /api/fashion/ store-fashion API
+                                  [另部署] admin-console
+```
+
+---
+
+## 新增电商网站流程
+
+每次新增一个电商站（如 `store-electronics`），按以下步骤完整执行：
+
+### 第一步：规划与设计（先讨论再动手）
+- [ ] 调用 `/office-hours` + `/brainstorming` 讨论需求
+- [ ] 调用 `ui-ux-pro-max` + `/design-consultation` 设计 UI/UX
+- [ ] 调用 `/writing-plans` 生成实现计划
+- [ ] 创建 `apps/store-<name>/docs/` 下的 req/design/plans/todos 文件
+
+### 第二步：创建 React 项目
+```bash
+cd apps
+npm create vite@latest store-<name> -- --template react
+cd store-<name> && npm install
+```
+
+在 `vite.config.js` 设置路径前缀（**关键，否则生产环境资源路径错误**）：
+```js
+export default { base: '/<name>/' }
+```
+
+在 React Router 设置 basename：
+```jsx
+<BrowserRouter basename="/<name>">
+```
+
+### 第三步：Supabase Schema
+在 Supabase SQL Editor 执行：
+```sql
+CREATE SCHEMA IF NOT EXISTS <name>;
+CREATE TABLE <name>.profiles ( ... );  -- 参考 docs/design/2026-05-15-design-db-supabase.md
+CREATE TABLE <name>.orders ( ... );
+-- 设置 RLS
+ALTER TABLE <name>.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE <name>.orders FORCE ROW LEVEL SECURITY;
+CREATE POLICY "own_orders" ON <name>.orders FOR ALL USING ((select auth.uid()) = user_id);
+-- 在 Supabase Dashboard → Settings → API → Exposed schemas 加入 <name>
+-- 运行 GRANT 权限 SQL（参考 demohub 的做法）
+INSERT INTO admin.stores (store_type, display_name, enabled) VALUES ('<name>', '显示名称', true);
+```
+
+### 第四步：挂载到 gateway（`server.js`）
+```js
+// 加在对应位置
+const <name>Dist = path.join(__dirname, 'apps/store-<name>/dist')
+if (fs.existsSync(<name>Dist)) {
+  app.use('/api/<name>', require('./apps/store-<name>/src/routes'))
+  app.use('/<name>', express.static(<name>Dist))
+  app.get('/<name>/*', (req, res) => res.sendFile(path.join(<name>Dist, 'index.html')))
+}
+```
+
+在根 `package.json` 加脚本：
+```json
+"dev:<name>": "cd apps/store-<name> && npm run dev",
+"build:<name>": "cd apps/store-<name> && npm run build"
+```
+
+### 第五步：验证
+```bash
+# 开发验证
+npm run dev:<name>          # 独立跑，http://localhost:5173
+
+# 生产验证
+npm run build:<name>
+npm start                   # http://localhost:3000/<name>/
+```
+
+---
+
+## 新增支付产品 Demo 流程
+
+每次向 demo-hub 新增一个支付产品 demo（如 JSSDK v6 的新产品）：
+
+### 第一步：写路由文件
+```bash
+# 工厂模式（标准产品，推荐）
+# 在 apps/demo-hub/src/routes/<provider>/<sdk>/<product>.js
+const { createStandardRoute } = require('./_factory')
+module.exports = createStandardRoute({
+  productKey: '<product>',
+  sdkParams:  'components=buttons&currency=USD',
+  view:       '<provider>/<sdk>/<product>',
+})
+```
+
+非标准产品（CardFields、双SDK、Vault Setup-only 等）参考已有的自定义路由文件。
+
+### 第二步：写 EJS 视图
+在 `apps/demo-hub/src/views/<provider>/<sdk>/<product>.ejs` 创建视图，
+参考 `views/paypal/jssdk-v5/spb-ecm.ejs` 作为模板。
+
+### 第三步：挂载路由（`app.js`）
+```js
+// 在 apps/demo-hub/src/app.js 对应 sdk 块下添加
+app.use(v5, require('./routes/paypal/jssdk-v5/<product>'))
+```
+
+### 第四步：插入 Supabase 数据
+```sql
+INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
+VALUES ('<provider>', '<sdk>', '<product>', '显示名称', '一句话描述', true, <排序号>);
+```
+
+### 第五步：重启 demo-hub
+```bash
+npm run dev:demo-hub     # nodemon 会自动重启，或手动 rs
+```
+
+首页会自动出现新产品卡片（Supabase 配置读取）。
+
+---
+
+## 新增整个 Provider（如 Braintree GraphQL）流程
+
+1. 创建目录：`apps/demo-hub/src/routes/braintree/graphql/`
+2. 在 `app.js` 添加：`app.use('/braintree/graphql', require('./routes/braintree/graphql/index'))`
+3. 建 `views/braintree/graphql/` 视图目录
+4. 在 Supabase 插入对应 `sdk_version='graphql'` 的产品行
+5. 重启即可，首页自动分组展示
 
 ---
 

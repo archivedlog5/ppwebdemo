@@ -269,30 +269,166 @@ Rules:
 - Backend API routes are strictly isolated by prefix
 - Payment channel config is written to Supabase via admin-console and read at runtime by each site
 
-## Development vs Production
+---
 
-### Development (each app on its own port for easy debugging)
+## Runtime Architecture
 
-| App | Command | Port |
-|-----|---------|------|
-| demo-hub | `npm run dev:demo-hub` | 3000 |
-| store-fashion | `npm run dev:fashion` | 5173 (Vite) |
-| admin-console | `npm run dev:admin` | 5174 (Vite) |
+### Development mode (each app on its own port)
 
-### Production (single gateway, one port)
-
-Root `server.js` is the unified entry point mounting all apps:
-
-```
-node server.js  (PORT=443 or behind reverse proxy)
-  /            → demo-hub (EJS)
-  /fashion/*   → store-fashion React dist + API
-  /admin       → admin-console (always deployed separately)
+```bash
+npm run dev:demo-hub    # → http://localhost:3000
+npm run dev:fashion     # → http://localhost:5173  (Vite HMR)
+npm run dev:admin       # → http://localhost:5174  (Vite HMR)
 ```
 
-To add a new store: add one `app.use('/xxx', express.static(dist))` block in `server.js`.
+Each app runs fully independently. Vite dev server provides hot module replacement (HMR) for React apps.
 
-**React app note**: set `base: '/fashion/'` in Vite config and `basename="/fashion"` in React Router.
+### Production mode (unified gateway, single port)
+
+Root `server.js` is the only entry point, mounting all apps on one port (443 or internal port behind a reverse proxy):
+
+```
+node server.js   (PORT=3000 local / PORT=443 production)
+  /              → demo-hub (EJS server-rendered)
+  /fashion/*     → store-fashion React dist static + /api/fashion/* API
+  /electronics/* → store-electronics (future, same pattern)
+```
+
+**admin-console is always deployed separately** — it's an internal tool on its own domain or port, never included in this gateway.
+
+Production deploy flow:
+```bash
+npm run build:fashion    # → apps/store-fashion/dist/
+npm start                # node server.js
+```
+
+### Architecture diagram
+
+```
+Development                       Production
+─────────────────────────────     ────────────────────────────────────
+localhost:3000  demo-hub          PORT:3000/443  server.js (gateway)
+localhost:5173  store-fashion  →    /            demo-hub EJS routes
+localhost:5174  admin-console       /fashion/*   store-fashion dist/
+                                    /api/fashion/ store-fashion API
+                                  [separate]  admin-console
+```
+
+---
+
+## Adding a New E-commerce Store
+
+Follow these steps every time a new store is added (e.g., `store-electronics`):
+
+### Step 1: Plan & Design (discuss before coding)
+- [ ] Run `/office-hours` + `/brainstorming` for requirements
+- [ ] Run `ui-ux-pro-max` + `/design-consultation` for UI/UX
+- [ ] Run `/writing-plans` for implementation plan
+- [ ] Create `apps/store-<name>/docs/` req/design/plans/todos files
+
+### Step 2: Create React project
+```bash
+cd apps
+npm create vite@latest store-<name> -- --template react
+cd store-<name> && npm install
+```
+
+Set path prefix in `vite.config.js` (**critical — wrong base breaks production assets**):
+```js
+export default { base: '/<name>/' }
+```
+
+Set basename in React Router:
+```jsx
+<BrowserRouter basename="/<name>">
+```
+
+### Step 3: Supabase schema
+```sql
+CREATE SCHEMA IF NOT EXISTS <name>;
+CREATE TABLE <name>.profiles ( ... );  -- see docs/design/2026-05-15-design-db-supabase.md
+CREATE TABLE <name>.orders ( ... );
+ALTER TABLE <name>.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE <name>.orders FORCE ROW LEVEL SECURITY;
+CREATE POLICY "own_orders" ON <name>.orders FOR ALL USING ((select auth.uid()) = user_id);
+-- Dashboard → Settings → API → Exposed schemas: add <name>
+-- Run GRANT SQL (same pattern as demohub)
+INSERT INTO admin.stores (store_type, display_name, enabled) VALUES ('<name>', 'Display Name', true);
+```
+
+### Step 4: Mount in gateway (`server.js`)
+```js
+const <name>Dist = path.join(__dirname, 'apps/store-<name>/dist')
+if (fs.existsSync(<name>Dist)) {
+  app.use('/api/<name>', require('./apps/store-<name>/src/routes'))
+  app.use('/<name>', express.static(<name>Dist))
+  app.get('/<name>/*', (req, res) => res.sendFile(path.join(<name>Dist, 'index.html')))
+}
+```
+
+Add scripts to root `package.json`:
+```json
+"dev:<name>": "cd apps/store-<name> && npm run dev",
+"build:<name>": "cd apps/store-<name> && npm run build"
+```
+
+### Step 5: Verify
+```bash
+npm run dev:<name>          # standalone: http://localhost:5173
+npm run build:<name>
+npm start                   # via gateway: http://localhost:3000/<name>/
+```
+
+---
+
+## Adding a New Payment Demo
+
+Every time a new payment product is added to demo-hub:
+
+### Step 1: Route file
+```js
+// apps/demo-hub/src/routes/<provider>/<sdk>/<product>.js
+const { createStandardRoute } = require('./_factory')
+module.exports = createStandardRoute({
+  productKey: '<product>',
+  sdkParams:  'components=buttons&currency=USD',
+  view:       '<provider>/<sdk>/<product>',
+})
+```
+
+Custom products (CardFields, dual-SDK, Vault setup-only) — reference existing custom route files.
+
+### Step 2: EJS view
+Create `apps/demo-hub/src/views/<provider>/<sdk>/<product>.ejs`.
+Use `views/paypal/jssdk-v5/spb-ecm.ejs` as template.
+
+### Step 3: Mount route in `app.js`
+```js
+app.use(v5, require('./routes/paypal/jssdk-v5/<product>'))
+```
+
+### Step 4: Insert Supabase row
+```sql
+INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
+VALUES ('<provider>', '<sdk>', '<product>', 'Display Name', 'Short description', true, <order>);
+```
+
+### Step 5: Restart demo-hub
+```bash
+npm run dev:demo-hub     # nodemon auto-restarts, or type 'rs'
+```
+
+The homepage will automatically show the new product card.
+
+---
+
+## Adding a New Provider (e.g., Braintree GraphQL)
+
+1. Create: `apps/demo-hub/src/routes/braintree/graphql/`
+2. Add in `app.js`: `app.use('/braintree/graphql', require('./routes/braintree/graphql/index'))`
+3. Create view directory: `views/braintree/graphql/`
+4. Insert rows in Supabase with `sdk_version='graphql'`
+5. Restart — homepage auto-groups the new provider
 
 ---
 

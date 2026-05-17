@@ -29,6 +29,23 @@
 - [x] apps/demo-hub/CLAUDE.md、apps/admin-console/CLAUDE.md 创建
 - [x] 所有文档同步更新
 
+## 2026-05-18
+
+### 完成
+- [x] Supabase 多 schema 数据库设计 → `docs/design/2026-05-15-design-db-supabase.md`
+- [x] demohub schema 建表 + 14 条 JSSDK v5 seed 数据（已在 Supabase 执行）
+- [x] demo-hub 前端全栈实现（CSS、EJS partials、首页、14 个路由 + 工厂函数）
+- [x] 生产 gateway 架构（`server.js`）：所有 app 合并到同一端口
+- [x] 开发/生产架构文档化（CLAUDE.md、demo-hub/CLAUDE.md）
+- [x] Design Review 完成（6/10 → 9/10）：删搜索框、移动端水平 tabs、SDK loading spinner
+
 ### 当前状态
-- demo-hub JSSDK v5 计划：CEO + Eng Review 全部 CLEAR，可以开始实现
-- 计划路径：`apps/demo-hub/docs/plans/2026-05-15-plan-jssdk-v5-v1.md`
+- demo-hub 基础框架已跑通（`npm run dev:demo-hub` → http://localhost:3000）
+- Supabase 连接正常，14 个产品从 demohub.products 加载
+- 14 个路由文件全部创建；spb-ecm 视图完整实现，其余 13 个为占位符
+- 生产 gateway `server.js` 就绪，`npm start` 可启动
+
+### 下一步
+- [ ] 补完 13 个产品 EJS 视图的真实 SDK 逻辑
+- [ ] 在浏览器验证 SPB ECM 完整支付流程
+- [ ] 讨论 store-fashion 需求
