@@ -158,7 +158,15 @@ Desktop (> 1024px):  4-column product grid, full layout
 
 ---
 
+## Resolved Design Decisions (plan-design-review 2026-05-18)
+
+| 决定 | 结论 |
+|------|------|
+| 移动端侧边栏 | **水平滚动 tabs** — 可完全自定义样式，与 Dark OLED 设计语言一致 |
+| 首页搜索框 | **删除** — 无搜索逻辑支撑，装饰性搜索框损耗用户信任 |
+| SDK 加载状态 | **简单 spinner 占位** — 按钮容器内显示 spinner + "Loading..." 文字，SDK ready 后替换 |
+| 支付成功/失败消息 | 保持现有 `.result-msg.success` / `.result-msg.error` 样式（已在 sandbox.css 定义）|
+
 ## Open Design Decisions (deferred)
 - Pay button color: provider brand vs platform accent green — decide per product
 - Light mode specific color palette refinement
-- Mobile sidebar on product pages: dropdown vs horizontal scroll tabs

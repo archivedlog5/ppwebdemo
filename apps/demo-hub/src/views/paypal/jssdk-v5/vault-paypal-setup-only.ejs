@@ -1,0 +1,26 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar, sdkUrl: typeof sdkUrl !== 'undefined' ? sdkUrl : ''
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
+    <h1><%= title %></h1>
+    <p>Demo implementation in progress.</p>
+  </div>
+  <div class="sandbox-card">
+    <div class="amount-display">
+      <div class="amount-label">Test Amount</div>
+      <div class="amount-value">.00</div>
+      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
+    </div>
+    <div id="paypal-button-container" class="sdk-loading">
+      <div class="sdk-spinner"></div>
+      <span>Loading...</span>
+    </div>
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<%- include('../../partials/footer', { showSidebar }) %>

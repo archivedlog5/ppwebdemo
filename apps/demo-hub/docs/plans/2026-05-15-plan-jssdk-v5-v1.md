@@ -8,6 +8,90 @@
 
 **Tech Stack:** Node.js 20+, Express 4, EJS 3, dotenv, @supabase/supabase-js 2, native CSS (no framework)
 
+## Design Review Decisions (2026-05-18)
+
+| # | 决定 | 结论 |
+|---|------|------|
+| R1 | 首页搜索框 | **删除** — 无逻辑支撑，装饰性控件损耗信任度 |
+| R2 | 移动端侧边栏 | **水平滚动 tabs** — `overflow-x: auto` + `white-space: nowrap`，可定制样式 |
+| R3 | SDK 加载状态 | 按钮容器内显示 spinner + "Loading..." 文字，SDK ready 后 `.innerHTML` 替换 |
+
+### R2 — 移动端水平滚动 tabs 规格
+
+```css
+/* 在 layout.css 中添加 */
+.sidebar-mobile {
+  display: none;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  gap: 4px;
+}
+.sidebar-mobile-tab {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  color: var(--fg-muted);
+  background: var(--surface2);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 150ms;
+}
+.sidebar-mobile-tab.active {
+  background: rgba(34,197,94,0.1);
+  color: var(--accent);
+}
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .sidebar-mobile { display: flex; }
+}
+```
+
+### R3 — SDK Loading spinner 规格
+
+```js
+// 在每个产品 EJS 文件中，按钮容器默认显示 spinner
+// SDK 加载完成后替换内容
+```
+```html
+<!-- 按钮容器初始状态 -->
+<div id="paypal-button-container" class="sdk-loading">
+  <div class="sdk-spinner"></div>
+  <span class="sdk-loading-text">Loading PayPal...</span>
+</div>
+```
+```css
+/* 在 sandbox.css 中添加 */
+.sdk-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-family: 'Fira Sans', sans-serif;
+}
+.sdk-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+```
+```js
+// SDK onInit 回调或 DOMContentLoaded 后清除 loading 状态
+document.getElementById('paypal-button-container').classList.remove('sdk-loading')
+```
+
 ## CEO Review Decisions (2026-05-15)
 
 | # | Decision | Choice | Impact |

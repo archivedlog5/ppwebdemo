@@ -1,0 +1,8 @@
+<%# Close page-layout and main-content divs (opened in header.ejs when showSidebar=true) %>
+<% if (typeof showSidebar !== 'undefined' && showSidebar) { %>
+  </div><%# /main-content %>
+</div><%# /page-layout %>
+<% } %>
+
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> — payment_playground</title>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/sandbox.css">
+  <script src="/js/theme.js"></script>
+  <%# Primary PayPal SDK (single account) %>
+  <% if (typeof sdkUrl !== 'undefined' && sdkUrl) { %>
+    <script src="<%= sdkUrl %>" data-namespace="paypalSDK"></script>
+  <% } %>
+  <%# Extra scripts (e.g. Google Pay needs pay.google.com/gp/p/js/pay.js) %>
+  <% if (typeof extraScripts !== 'undefined' && extraScripts.length > 0) { %>
+    <% extraScripts.forEach(function(s) { %>
+      <script src="<%= s.url %>"<% if (s.namespace) { %> data-namespace="<%= s.namespace %>"<% } %>></script>
+    <% }) %>
+  <% } %>
+  <%# Dual SDK: CN account + US account (buttons page — Venmo) %>
+  <% if (typeof cnSdkUrl !== 'undefined' && cnSdkUrl) { %>
+    <script src="<%= cnSdkUrl %>" data-namespace="paypalCN"></script>
+  <% } %>
+  <% if (typeof usSdkUrl !== 'undefined' && usSdkUrl) { %>
+    <script src="<%= usSdkUrl %>" data-namespace="paypalUS"></script>
+  <% } %>
+</head>
+<body>
+
+<nav class="topbar" role="navigation" aria-label="Main navigation">
+  <a href="/" class="topbar-logo" aria-label="payment_playground home">
+    payment<span class="accent">_</span>playground
+    <span class="env-badge">SANDBOX</span>
+  </a>
+  <button
+    class="theme-toggle"
+    id="theme-toggle"
+    type="button"
+    aria-label="Switch to light mode">
+    ☀ Light
+  </button>
+</nav>
+
+<% if (typeof showSidebar !== 'undefined' && showSidebar) { %>
+
+<%# Mobile horizontal scroll tabs (Design Review R2) %>
+<div class="sidebar-mobile" role="navigation" aria-label="Product navigation">
+  <% if (typeof sidebarProducts !== 'undefined') { %>
+    <% Object.entries(sidebarProducts).forEach(function([sdkVer, products]) { %>
+      <% products.forEach(function(p) { %>
+        <a href="/<%= provider %>/<%= sdkVer %>/<%= p.productKey %>"
+           class="sidebar-mobile-tab <%= (p.productKey === currentProductKey && sdkVer === currentSdkVersion) ? 'active' : '' %>"
+           aria-current="<%= (p.productKey === currentProductKey && sdkVer === currentSdkVersion) ? 'page' : 'false' %>">
+          <%= p.displayName %>
+        </a>
+      <% }) %>
+    <% }) %>
+  <% } %>
+</div>
+
+<div class="page-layout">
+
+  <%# Desktop sidebar %>
+  <aside class="sidebar" aria-label="Product list">
+    <% if (typeof sidebarProducts !== 'undefined') { %>
+      <div class="sidebar-provider"><%= provider %></div>
+      <% Object.entries(sidebarProducts).forEach(function([sdkVer, products]) { %>
+        <div class="sidebar-sdk"><%= sdkVer %></div>
+        <% products.forEach(function(p) { %>
+          <a href="/<%= provider %>/<%= sdkVer %>/<%= p.productKey %>"
+             class="sidebar-item <%= (p.productKey === currentProductKey && sdkVer === currentSdkVersion) ? 'active' : '' %>"
+             aria-current="<%= (p.productKey === currentProductKey && sdkVer === currentSdkVersion) ? 'page' : 'false' %>">
+            <%= p.displayName %>
+          </a>
+        <% }) %>
+      <% }) %>
+    <% } %>
+  </aside>
+
+  <div class="main-content">
+
+    <%# Breadcrumb %>
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+      <a href="/">Home</a>
+      <span class="sep" aria-hidden="true">/</span>
+      <a href="#"><%- provider %></a>
+      <span class="sep" aria-hidden="true">/</span>
+      <span><%= sdkVersion %></span>
+      <span class="sep" aria-hidden="true">/</span>
+      <span aria-current="page"><%= title %></span>
+    </nav>
+
+    <%# Tab bar %>
+    <div class="tab-bar" role="tablist">
+      <div class="tab active" role="tab" aria-selected="true">▶ Demo</div>
+      <div class="tab disabled" role="tab" aria-selected="false" aria-disabled="true">
+        &lt;/&gt; Code <span class="tab-badge">SOON</span>
+      </div>
+      <div class="tab disabled" role="tab" aria-selected="false" aria-disabled="true">
+        ≋ Logs <span class="tab-badge">SOON</span>
+      </div>
+    </div>
+
+<% } %>

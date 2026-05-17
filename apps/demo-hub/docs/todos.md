@@ -10,40 +10,29 @@
 
 ### 基础设施
 
-- [ ] **Task 1** — 项目脚手架（package.json、.env.example、目录结构、依赖安装）
-- [ ] **Task 0A** — PayPal Access Token 缓存（`config/paypal.js`，CN + US，8h TTL）
-- [ ] **Task 0B** — 路由工厂函数（`routes/paypal/jssdk-v5/_factory.js`）
-  - `createStandardRoute({ productKey, sdkParams, view, orderBody?, extraScripts? })`
-  - `createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSource })`
-- [ ] **Task 2** — Supabase 产品配置加载（`config/products.js`，Map key: `provider/sdk_version/product_key`）
-- [ ] **Task 3** — Express 入口（`app.js`，挂载所有路由，启动时加载配置）
-- [ ] **Task 4** — 共享 CSS（`base.css`、`layout.css`、`sandbox.css`，Dark/Light 变量）
-- [ ] **Task 5** — EJS Partials（`header.ejs`、`footer.ejs`、`sidebar.ejs`）
-- [ ] **Task 6** — 首页路由 + 视图（`routes/index.js`、`views/index.ejs`，动态渲染产品目录）
-- [ ] **Task 17** — Supabase 建表 + 14 条 seed 数据
+- [x] **Task 1** — 项目脚手架（package.json、.env.example、目录结构）
+- [x] **Task 0A** — PayPal Access Token 缓存（`config/paypal.js`，CN + US，8h TTL）
+- [x] **Task 0B** — 路由工厂函数（`routes/paypal/jssdk-v5/_factory.js`）
+- [x] **Task 2** — Supabase 产品配置加载（`config/products.js`）
+- [x] **Task 3** — Express 入口（`app.js`，挂载所有路由）
+- [x] **Task 4** — 共享 CSS（`base.css`、`layout.css`、`sandbox.css`）
+- [x] **Task 5** — EJS Partials（`header.ejs`、`footer.ejs`，mobile tabs）
+- [x] **Task 6** — 首页路由 + 视图（`routes/index.js`、`views/index.ejs`）
+- [ ] **Task 17** — Supabase 建表 + 14 条 seed 数据（需要 Supabase 项目配置后执行）
+- [ ] `npm install` — 安装依赖（在 apps/demo-hub 目录）
 
-### PayPal JSSDK v5 — 标准按钮
+### PayPal JSSDK v5 — 路由已实现，视图待完善
 
-- [ ] **Task 8** — SPB ECM（`/paypal/jssdk-v5/spb-ecm`）
-- [ ] **Task 9** — SPB ECS（`/paypal/jssdk-v5/spb-ecs`）
-- [ ] **Task 10** — 独立按钮（`/paypal/jssdk-v5/buttons`）— PayPal/PayLater/BCDC(CN) + Venmo(US)
-- [ ] **Task 11** — ACDC（`/paypal/jssdk-v5/acdc`）— CardFields，自定义实现
-
-### PayPal JSSDK v5 — Apple Pay / Google Pay
-
-- [ ] **Task 12** — Apple Pay ECM（`/paypal/jssdk-v5/applepay-ecm`）
-- [ ] **Task 12** — Apple Pay ECS（`/paypal/jssdk-v5/applepay-ecs`）
-- [ ] **Task 13** — Google Pay ECM（`/paypal/jssdk-v5/googlepay-ecm`，需 extraScripts）
-- [ ] **Task 13** — Google Pay ECS（`/paypal/jssdk-v5/googlepay-ecs`，需 extraScripts）
-
-### PayPal JSSDK v5 — Vault
-
-- [ ] **Task 14** — PayPal Vault with-purchase（`/paypal/jssdk-v5/vault-paypal-with-purchase`）
-- [ ] **Task 14** — ACDC Vault with-purchase（`/paypal/jssdk-v5/vault-acdc-with-purchase`）
-- [ ] **Task 14** — Apple Pay Vault with-purchase（`/paypal/jssdk-v5/vault-applepay-with-purchase`）
-- [ ] **Task 15** — PayPal Vault setup-only（`/paypal/jssdk-v5/vault-paypal-setup-only`）
-- [ ] **Task 15** — ACDC Vault setup-only（`/paypal/jssdk-v5/vault-acdc-setup-only`）
-- [ ] **Task 16** — Vault return buyer（`/paypal/jssdk-v5/vault-return`）
+- [x] 路由文件全部创建（工厂 + 自定义）
+- [x] **Task 8** — SPB ECM 视图完整实现（参考模板）
+- [ ] **Task 9** — SPB ECS 视图（占位符已创建，待补充真实 SDK 逻辑）
+- [ ] **Task 10** — 独立按钮视图（CN+US 双 SDK）
+- [ ] **Task 11** — ACDC 视图（CardFields SDK）
+- [ ] **Task 12** — Apple Pay ECM + ECS 视图
+- [ ] **Task 13** — Google Pay ECM + ECS 视图
+- [ ] **Task 14** — Vault with-purchase 视图（PayPal + ACDC + ApplePay）
+- [ ] **Task 15** — Vault setup-only 视图（PayPal + ACDC）
+- [ ] **Task 16** — Vault return buyer 视图
 
 ---
 

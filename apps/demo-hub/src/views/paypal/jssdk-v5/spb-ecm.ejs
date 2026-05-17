@@ -1,0 +1,65 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar, sdkUrl
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · ECM</span>
+    <h1><%= title %></h1>
+    <p>Smart Payment Button — Express Checkout Mini flow</p>
+  </div>
+
+  <div class="sandbox-card">
+    <div class="amount-display">
+      <div class="amount-label">Test Amount</div>
+      <div class="amount-value">$1.00</div>
+      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
+    </div>
+
+    <%# SDK loading state (Design Review R3) %>
+    <div id="paypal-button-container" class="sdk-loading">
+      <div class="sdk-spinner"></div>
+      <span>Loading PayPal...</span>
+    </div>
+
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+  window.addEventListener('load', function () {
+    // Remove loading state once SDK is ready
+    const container = document.getElementById('result-container') || document.getElementById('paypal-button-container')
+    document.getElementById('paypal-button-container').classList.remove('sdk-loading')
+    document.getElementById('paypal-button-container').innerHTML = ''
+
+    paypalSDK.Buttons({
+      createOrder: function () {
+        return fetch('/paypal/jssdk-v5/api/spb-ecm/create-order', { method: 'POST' })
+          .then(function (r) { return r.json() })
+          .then(function (d) { return d.id })
+      },
+      onApprove: function (data) {
+        return fetch('/paypal/jssdk-v5/api/spb-ecm/capture-order', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ orderID: data.orderID }),
+        })
+          .then(function (r) { return r.json() })
+          .then(function (order) {
+            var el = document.getElementById('result')
+            el.className = 'result-msg success'
+            el.textContent = '✓ Payment captured · Order ID: ' + order.id
+          })
+      },
+      onError: function (err) {
+        var el = document.getElementById('result')
+        el.className = 'result-msg error'
+        el.textContent = '✗ ' + (err.message || String(err))
+      },
+    }).render('#paypal-button-container')
+  })
+</script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

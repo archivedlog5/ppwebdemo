@@ -1,0 +1,127 @@
+/* ─────────────────────────────────────────────
+   BASE — CSS Variables + Reset
+   payment_playground / demo-hub
+   ───────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Fira+Sans:wght@300;400;500;600&display=swap');
+
+/* Dark theme (default) */
+:root {
+  --bg:           #0F172A;
+  --bg-deep:      #020617;
+  --surface:      #1E293B;
+  --surface2:     #272F42;
+  --border:       #334155;
+  --border-hi:    #475569;
+  --fg:           #F8FAFC;
+  --fg-muted:     #94A3B8;
+  --fg-subtle:    #64748B;
+  --accent:       #22C55E;
+  --accent-dim:   #16A34A;
+  --accent-glow:  rgba(34, 197, 94, 0.15);
+  --error:        #EF4444;
+  --error-bg:     rgba(239, 68, 68, 0.08);
+  --warning:      #F59E0B;
+
+  /* Provider brand colors */
+  --paypal-blue:     #003087;
+  --paypal-light:    #009CDE;
+  --braintree:       #7B2FBE;
+  --braintree-light: #A855F7;
+  --stripe:          #635BFF;
+  --stripe-light:    #818CF8;
+  --adyen:           #0ABF53;
+  --adyen-light:     #22C55E;
+
+  /* Typography */
+  --font-mono: 'Space Mono', 'Courier New', monospace;
+  --font-sans: 'Fira Sans', system-ui, sans-serif;
+
+  /* Spacing */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* Radius */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+
+  /* Transitions */
+  --t-fast: 120ms ease-out;
+  --t-base: 150ms ease-out;
+  --t-slow: 250ms ease-out;
+
+  /* Shadows */
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --bg:        #F8FAFC;
+  --bg-deep:   #F1F5F9;
+  --surface:   #FFFFFF;
+  --surface2:  #F1F5F9;
+  --border:    #E2E8F0;
+  --border-hi: #CBD5E1;
+  --fg:        #0F172A;
+  --fg-muted:  #64748B;
+  --fg-subtle: #94A3B8;
+  --accent-glow: rgba(34, 197, 94, 0.1);
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-card-hover: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+/* Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-weight: 400;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100dvh;
+  line-height: 1.6;
+  transition: background var(--t-slow), color var(--t-slow);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover { text-decoration: underline; }
+
+/* Focus styles — keyboard nav */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Scrollbar — dark theme */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
