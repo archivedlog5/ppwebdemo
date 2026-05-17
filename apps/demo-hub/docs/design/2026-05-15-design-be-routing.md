@@ -108,21 +108,21 @@ src/views/
 
 ---
 
-## Supabase `demo_hub_products` 表更新
+## Supabase `demohub.products` 表更新
 
 ### Schema 变更
 
 ```sql
 -- 新增 sdk_version 字段（NOT NULL，所有产品必填）
-ALTER TABLE demo_hub_products
+ALTER TABLE demohub.products
   ADD COLUMN sdk_version text NOT NULL DEFAULT '';
 
 -- 重建唯一约束（三字段组合唯一）
-ALTER TABLE demo_hub_products
-  DROP CONSTRAINT demo_hub_products_provider_product_key_key;
+ALTER TABLE demohub.products
+  DROP CONSTRAINT demohub.products_provider_product_key_key;
 
-ALTER TABLE demo_hub_products
-  ADD CONSTRAINT demo_hub_products_unique
+ALTER TABLE demohub.products
+  ADD CONSTRAINT demohub.products_unique
     UNIQUE (provider, sdk_version, product_key);
 ```
 
@@ -236,7 +236,7 @@ app.use('/braintree/web-sdk', require('./routes/braintree/web-sdk'))
 
 ## admin-console 影响
 
-`demo_hub_products` 表新增 `sdk_version` 字段，admin-console 产品列表页需要：
+`demohub.products` 表新增 `sdk_version` 字段，admin-console 产品列表页需要：
 - 按 `provider → sdk_version → product_key` 三级分组展示
 - `sdk_version` 对用户可见（展示为分组标题），但与 `product_key` 一样**不可编辑**
 - 可编辑字段仍只有：`display_name`、`description`、`enabled`、`sort_order`

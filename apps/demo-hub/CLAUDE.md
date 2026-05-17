@@ -122,13 +122,13 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSource })
 
 ## Supabase 产品配置
 
-demo-hub 与 admin-console 通过 Supabase `demo_hub_products` 表交互：
+demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 
 **表结构关键字段：** `provider`, `sdk_version`, `product_key`, `display_name`, `description`, `enabled`, `sort_order`
 
 ```
 启动时：
-  SELECT * FROM demo_hub_products ORDER BY provider, sort_order
+  SELECT * FROM demohub.products ORDER BY provider, sort_order
   → 存入内存 Map：
     key = 'paypal/jssdk-v5/spb-ecm'   (provider/sdk_version/product_key)
     value = { displayName, description, enabled, sortOrder, ... }

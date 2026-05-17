@@ -382,7 +382,7 @@ git commit -m "feat(demo-hub): init project scaffolding for jssdk-v5"
 **Files:**
 - Create: `apps/demo-hub/src/config/products.js`
 
-This module loads `demo_hub_products` from Supabase at startup and exposes helper functions used by every route.
+This module loads `demohub.products` from Supabase at startup and exposes helper functions used by every route.
 
 - [ ] **Step 1: Create `src/config/products.js`**
 
@@ -399,7 +399,8 @@ let productConfig = new Map()
 
 async function loadProductConfig() {
   const { data, error } = await supabase
-    .from('demo_hub_products')
+    .schema('demohub')
+    .from('products')
     .select('*')
     .order('provider')
     .order('sort_order')
@@ -2424,12 +2425,21 @@ git commit -m "feat(demo-hub): add Vault return buyer demo (/paypal/jssdk-v5/vau
 
 ## Task 17: Supabase Seed Data
 
-Insert the 14 products into `demo_hub_products`.
+Insert the 14 products into `demohub.products`.
 
 - [ ] **Step 1: Open Supabase SQL editor and run**
 
 ```sql
-CREATE TABLE IF NOT EXISTS demo_hub_products (
+-- 先建 schema（若尚未建立）
+CREATE SCHEMA IF NOT EXISTS demohub;
+
+-- 共享工具函数（若尚未建立）
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = now(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+
+CREATE TABLE IF NOT EXISTS demohub.products (
   id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   provider     text        NOT NULL,
   sdk_version  text        NOT NULL,
@@ -2443,7 +2453,14 @@ CREATE TABLE IF NOT EXISTS demo_hub_products (
   UNIQUE(provider, sdk_version, product_key)
 );
 
-INSERT INTO demo_hub_products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
+CREATE TRIGGER demohub_products_updated_at
+  BEFORE UPDATE ON demohub.products
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+ALTER TABLE demohub.products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_read" ON demohub.products FOR SELECT USING (true);
+
+INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
 VALUES
   ('paypal','jssdk-v5','spb-ecm',                    'SPB ECM Flow',               'Smart Payment Button — Express Checkout Mini',        true,  1),
   ('paypal','jssdk-v5','spb-ecs',                    'SPB ECS Flow',               'Smart Payment Button — Express Checkout Standard',    true,  2),
@@ -2460,6 +2477,8 @@ VALUES
   ('paypal','jssdk-v5','vault-applepay-with-purchase','Apple Pay Vault (w/ Purchase)','Apple Pay Vault 签约 + 首次购买',                  true, 13),
   ('paypal','jssdk-v5','vault-return',               'Vault Return Buyer',         'Vault 回头买家体验（已签约后的支付流程）',              true, 14)
 ON CONFLICT (provider, sdk_version, product_key) DO NOTHING;
+
+-- 最后：在 Supabase Dashboard → Settings → API → Exposed schemas 里开启 demohub schema
 ```
 
 - [ ] **Step 2: Restart demo-hub and verify all 14 products load**

@@ -246,7 +246,7 @@ frontend-design      → 审查 UI/UX 模式，生成高质量前端设计规范
 - 每个路由文件只处理一个产品的逻辑，**不允许跨产品共用路由文件**
 - 文件名 = `product_key`（如 `acdc.js`、`apple-pay.js`）
 - 每个产品有独立的 EJS 视图目录：`views/paypal/jssdk-v6/acdc.ejs`
-- Supabase `demo_hub_products` 表用 `(provider, sdk_version, product_key)` 三字段唯一标识每个产品
+- Supabase `demohub.products` 表用 `(provider, sdk_version, product_key)` 三字段唯一标识每个产品
 
 ### 电商网站 — 每个网站独立路由前缀
 

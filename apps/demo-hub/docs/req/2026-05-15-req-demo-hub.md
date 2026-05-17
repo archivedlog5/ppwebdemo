@@ -164,7 +164,7 @@ apps/demo-hub/
 
 ## admin-console 配置集成（已确认）
 
-admin-console 通过 Supabase `demo_hub_products` 表控制 demo-hub 的首页展示内容。
+admin-console 通过 Supabase `demohub.products` 表控制 demo-hub 的首页展示内容。
 
 ### 数据表结构
 
@@ -201,7 +201,7 @@ admin-console 修改 → 写入 Supabase → **重启 demo-hub** → 生效
 ### 新增产品完整流程
 
 1. 开发者写路由文件（`routes/paypal/new-product.js`）和视图（`views/paypal/new-product.ejs`）
-2. 在 Supabase `demo_hub_products` 插入一行（`product_key` = 路由 slug）
+2. 在 Supabase `demohub.products` 插入一行（`product_key` = 路由 slug）
 3. 重启 demo-hub
 4. admin-console 中可见并可配置该产品的展示内容
 

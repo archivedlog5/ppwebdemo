@@ -246,7 +246,7 @@ Rules:
 - Each router file handles exactly one product's logic — **cross-product sharing is not allowed**
 - Filename = `product_key` (e.g. `acdc.js`, `apple-pay.js`)
 - Each product has its own EJS views directory: `views/paypal/jssdk-v6/acdc.ejs`
-- Supabase `demo_hub_products` uses `(provider, sdk_version, product_key)` as the unique composite key
+- Supabase `demohub.products` uses `(provider, sdk_version, product_key)` as the unique composite key
 
 ### E-commerce Sites — Isolated Route Prefix Per Site
 
