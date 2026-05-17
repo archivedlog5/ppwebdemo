@@ -1,26 +1,37 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl: typeof sdkUrl !== 'undefined' ? sdkUrl : ''
+  sidebarProducts, showSidebar, cnSdkUrl, usSdkUrl
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
-    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · Buttons</span>
     <h1><%= title %></h1>
-    <p>Demo implementation in progress.</p>
+    <p>PayPal / PayLater / BCDC use CN account &nbsp;·&nbsp; Venmo uses US account</p>
   </div>
   <div class="sandbox-card">
     <div class="amount-display">
       <div class="amount-label">Test Amount</div>
-      <div class="amount-value">.00</div>
+      <div class="amount-value">$1.00</div>
       <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
     </div>
-    <div id="paypal-button-container" class="sdk-loading">
-      <div class="sdk-spinner"></div>
-      <span>Loading...</span>
-    </div>
+    <div class="btn-slot"><div class="btn-slot-label">PayPal</div><div id="btn-paypal"></div></div>
+    <div class="btn-slot"><div class="btn-slot-label">PayLater</div><div id="btn-paylater"></div></div>
+    <div class="btn-slot"><div class="btn-slot-label">BCDC (Basic Card)</div><div id="btn-bcdc"></div></div>
+    <div class="btn-slot"><div class="btn-slot-label">Venmo (US Account)</div><div id="btn-venmo"></div></div>
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
   </div>
 </div>
+
+<script>
+  window.DEMO = {
+    urls: {
+      createOrder:   '/paypal/jssdk-v5/api/buttons/create-order',
+      createOrderUs: '/paypal/jssdk-v5/api/buttons/create-order-us',
+      captureOrder:  '/paypal/jssdk-v5/api/buttons/capture-order',
+    }
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/buttons.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>

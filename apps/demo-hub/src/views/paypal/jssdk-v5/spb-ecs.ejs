@@ -1,26 +1,39 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl: typeof sdkUrl !== 'undefined' ? sdkUrl : ''
+  sidebarProducts, showSidebar, sdkUrl
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
-    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · ECS</span>
     <h1><%= title %></h1>
-    <p>Demo implementation in progress.</p>
+    <p>Smart Payment Button — Express Checkout Standard flow</p>
   </div>
+
   <div class="sandbox-card">
     <div class="amount-display">
       <div class="amount-label">Test Amount</div>
-      <div class="amount-value">.00</div>
+      <div class="amount-value">$1.00</div>
       <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
     </div>
+
     <div id="paypal-button-container" class="sdk-loading">
       <div class="sdk-spinner"></div>
-      <span>Loading...</span>
+      <span>Loading PayPal...</span>
     </div>
+
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
   </div>
 </div>
+
+<script>
+  window.DEMO = {
+    urls: {
+      createOrder:  '/paypal/jssdk-v5/api/spb-ecs/create-order',
+      captureOrder: '/paypal/jssdk-v5/api/spb-ecs/capture-order',
+    }
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/spb.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>

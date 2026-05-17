@@ -1,26 +1,39 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl: typeof sdkUrl !== 'undefined' ? sdkUrl : ''
+  sidebarProducts, showSidebar
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
-    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · Vault Return</span>
     <h1><%= title %></h1>
-    <p>Demo implementation in progress.</p>
+    <p>Enter a Payment Token ID to charge $1.00 server-side — no buyer interaction.</p>
   </div>
   <div class="sandbox-card">
     <div class="amount-display">
       <div class="amount-label">Test Amount</div>
-      <div class="amount-value">.00</div>
-      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
+      <div class="amount-value">$1.00</div>
+      <span class="sandbox-mode-badge">⚡ Server-side Vault Charge</span>
     </div>
-    <div id="paypal-button-container" class="sdk-loading">
-      <div class="sdk-spinner"></div>
-      <span>Loading...</span>
+    <div class="field-group">
+      <label class="field-label" for="payment-token-input">Payment Token ID</label>
+      <input id="payment-token-input" class="token-input" type="text" placeholder="e.g. PAYMENT-TOKEN-xxxx" aria-label="Payment Token ID" />
     </div>
+    <button id="vault-return-btn" class="pay-btn" style="background:var(--accent);color:#0F172A;margin-top:8px" type="button">
+      Charge $1.00 with Vaulted Method
+    </button>
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+    <div class="test-hint">Get a Payment Token ID from the Vault Setup demos above.</div>
   </div>
 </div>
+
+<script>
+  window.DEMO = {
+    urls: {
+      createAndCapture: '/paypal/jssdk-v5/api/vault-return/create-and-capture',
+    }
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/vault-return.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>

@@ -1,26 +1,35 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl: typeof sdkUrl !== 'undefined' ? sdkUrl : ''
+  sidebarProducts, showSidebar, sdkUrl
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
-    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · Vault</span>
     <h1><%= title %></h1>
-    <p>Demo implementation in progress.</p>
+    <p>Complete $1.00 purchase and vault the payment method in one step.</p>
   </div>
   <div class="sandbox-card">
     <div class="amount-display">
       <div class="amount-label">Test Amount</div>
-      <div class="amount-value">.00</div>
-      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
+      <div class="amount-value">$1.00</div>
+      <span class="sandbox-mode-badge">⚡ Sandbox Mode · Vault ON_SUCCESS</span>
     </div>
     <div id="paypal-button-container" class="sdk-loading">
-      <div class="sdk-spinner"></div>
-      <span>Loading...</span>
+      <div class="sdk-spinner"></div><span>Loading PayPal...</span>
     </div>
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
   </div>
 </div>
+
+<script>
+  window.DEMO = {
+    urls: {
+      createOrder:  '/paypal/jssdk-v5/api/vault-paypal-with-purchase/create-order',
+      captureOrder: '/paypal/jssdk-v5/api/vault-paypal-with-purchase/capture-order',
+    }
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/spb.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>

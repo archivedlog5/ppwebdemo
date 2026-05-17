@@ -1,26 +1,35 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl: typeof sdkUrl !== 'undefined' ? sdkUrl : ''
+  sidebarProducts, showSidebar, sdkUrl
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
-    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · Vault Setup</span>
     <h1><%= title %></h1>
-    <p>Demo implementation in progress.</p>
+    <p>Pure vault enrollment — no purchase. Creates a setup token, buyer approves, confirms to payment token.</p>
   </div>
   <div class="sandbox-card">
     <div class="amount-display">
-      <div class="amount-label">Test Amount</div>
-      <div class="amount-value">.00</div>
-      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
+      <div class="amount-label">Payment</div>
+      <div class="amount-value" style="font-size:22px">Setup Only</div>
+      <span class="sandbox-mode-badge">⚡ Zero-Dollar Auth</span>
     </div>
     <div id="paypal-button-container" class="sdk-loading">
-      <div class="sdk-spinner"></div>
-      <span>Loading...</span>
+      <div class="sdk-spinner"></div><span>Loading PayPal...</span>
     </div>
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
   </div>
 </div>
+
+<script>
+  window.DEMO = {
+    urls: {
+      createSetupToken:  '/paypal/jssdk-v5/api/vault-paypal-setup-only/create-setup-token',
+      confirmSetupToken: '/paypal/jssdk-v5/api/vault-paypal-setup-only/confirm-setup-token',
+    }
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/vault-setup.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>

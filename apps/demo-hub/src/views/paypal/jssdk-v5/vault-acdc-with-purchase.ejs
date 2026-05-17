@@ -1,26 +1,50 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl: typeof sdkUrl !== 'undefined' ? sdkUrl : ''
+  sidebarProducts, showSidebar, sdkUrl
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
-    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · ACDC Vault</span>
     <h1><%= title %></h1>
-    <p>Demo implementation in progress.</p>
+    <p>ACDC Vault with purchase — card is saved when payment completes.</p>
   </div>
   <div class="sandbox-card">
     <div class="amount-display">
       <div class="amount-label">Test Amount</div>
-      <div class="amount-value">.00</div>
-      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
+      <div class="amount-value">$1.00</div>
+      <span class="sandbox-mode-badge">⚡ Sandbox Mode · Vault ON_SUCCESS</span>
     </div>
-    <div id="paypal-button-container" class="sdk-loading">
-      <div class="sdk-spinner"></div>
-      <span>Loading...</span>
+    <div class="field-group">
+      <label class="field-label">Card Number</label>
+      <div class="field-host sdk-loading" id="card-number-container">
+        <div class="sdk-spinner"></div><span>Loading...</span>
+      </div>
     </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Expiry</label>
+        <div class="field-host" id="card-expiry-container"></div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">CVV</label>
+        <div class="field-host" id="card-cvv-container"></div>
+      </div>
+    </div>
+    <button id="acdc-pay-btn" class="pay-btn pay-btn-paypal" type="button">Pay $1.00 &amp; Vault Card</button>
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+    <div class="test-hint">Test card: <strong>4111 1111 1111 1111</strong> · Any future date · Any CVV</div>
   </div>
 </div>
+
+<script>
+  window.DEMO = {
+    urls: {
+      createOrder:  '/paypal/jssdk-v5/api/vault-acdc-with-purchase/create-order',
+      captureOrder: '/paypal/jssdk-v5/api/vault-acdc-with-purchase/capture-order',
+    }
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/acdc.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>
