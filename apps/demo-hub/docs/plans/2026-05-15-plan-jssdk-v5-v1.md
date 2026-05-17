@@ -4,9 +4,51 @@
 
 **Goal:** Build 14 interactive PayPal JSSDK v5 demo pages under `/paypal/jssdk-v5/*`, each loading a real sandbox SDK and completing an actual payment flow.
 
-**Architecture:** Express + EJS monolith. Shared `header.ejs` + `footer.ejs` partials provide the tab bar (Demo|Code|Logs) and left sidebar — each product view is a plain EJS file with normal HTML/JS. Route logic is shared via `createStandardRoute(config)` and `createVaultRoute(config)` factory functions — each of the 14 product route files becomes a 5-line config declaration. Access tokens are cached in memory with 8h TTL. Product display config is read from Supabase at startup and cached. Two PayPal sandbox accounts: CN for all products, US for Venmo.
+**Architecture:** Express + EJS monolith. Shared `header.ejs` + `footer.ejs` partials provide the tab bar and left sidebar. **EJS/JS 分离模式**：EJS 文件只负责 HTML 结构和 `window.DEMO` 配置注入，SDK 逻辑全部放在静态 JS 文件（`src/public/js/paypal/jssdk-v5/*.js`），多产品可复用同一 JS 文件。Route factory pattern: `createStandardRoute` + `createVaultWithPurchaseRoute`. Access tokens cached 8h TTL. Supabase `demohub` schema for config.
 
-**Tech Stack:** Node.js 20+, Express 4, EJS 3, dotenv, @supabase/supabase-js 2, native CSS (no framework)
+**Tech Stack:** Node.js 20+, Express 4, EJS 3, dotenv, @supabase/supabase-js 2, ws (Node 20 WebSocket), native CSS (no framework)
+
+## Implementation Notes (2026-05-18)
+
+### EJS/JS 分离重构（与原计划的差异）
+
+原计划：JS 逻辑写在 EJS `<script>` 标签内。
+实际实现：JS 逻辑抽离为静态文件，EJS 只注入配置。
+
+**window.DEMO 模式（每个 EJS 文件）：**
+```html
+<script>
+  window.DEMO = {
+    urls: {
+      createOrder:  '/paypal/jssdk-v5/api/<product>/create-order',
+      captureOrder: '/paypal/jssdk-v5/api/<product>/capture-order',
+    }
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/spb.js"></script>
+```
+
+**静态 JS 文件与产品对应表：**
+
+| JS 文件 | 使用的产品 |
+|---------|-----------|
+| `spb.js` | spb-ecm, spb-ecs, vault-paypal-with-purchase, vault-applepay-with-purchase |
+| `acdc.js` | acdc, vault-acdc-with-purchase, vault-acdc-setup-only |
+| `buttons.js` | buttons（双 SDK：CN + US） |
+| `vault-setup.js` | vault-paypal-setup-only |
+| `vault-return.js` | vault-return |
+| `applepay.js` | applepay-ecm, applepay-ecs（待实现） |
+| `googlepay.js` | googlepay-ecm, googlepay-ecs（待实现） |
+
+### 实际完成状态（2026-05-18）
+
+- ✅ 全部 14 个路由文件（工厂 + 自定义）
+- ✅ 全部静态 JS 文件（5 个已完成，2 个待实现）
+- ✅ 全部 14 个 EJS 视图（window.DEMO 模式）
+- ✅ Supabase demohub schema 已建表 + seed 数据
+- ✅ 生产 gateway（根目录 server.js）
+- ⏳ applepay.js / googlepay.js 待实现（需测试 Apple/Google Pay sandbox 环境）
+- ⏳ 浏览器验证各产品支付流程
 
 ## Design Review Decisions (2026-05-18)
 
@@ -2626,4 +2668,4 @@ Open `http://localhost:3000` — JSSDK v5 section shows 14 product cards.
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
 
-**VERDICT:** CEO + ENG CLEARED — ready to implement.
+**VERDICT:** CEO + ENG + DESIGN CLEARED — 已实现，持续迭代中。

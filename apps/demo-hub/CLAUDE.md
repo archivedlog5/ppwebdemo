@@ -155,10 +155,58 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 
 1. 每个路由文件只处理一个产品，不跨产品共用逻辑
 2. 凭证/密钥从 `.env` 环境变量读取，绝不 hardcode
-3. EJS 视图结构：`<%- include('../partials/header', vars) %>` + 内容 + `<%- include('../partials/footer') %>`
-4. `product_key` 与路由 slug 完全对应（`/paypal/jssdk-v5/spb-ecm` → `product_key: 'spb-ecm'`）
-5. 新增产品：写路由代码 → 在 Supabase 插入行（含 sdk_version） → 重启 app
-6. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
+3. EJS 视图结构：`<%- include('../partials/header', vars) %>` + HTML + `<%- include('../partials/footer') %>`
+4. **EJS/JS 分离模式**（重要）：EJS 只负责 HTML 结构和配置注入，所有 SDK 逻辑放静态 JS 文件
+5. `product_key` 与路由 slug 完全对应（`/paypal/jssdk-v5/spb-ecm` → `product_key: 'spb-ecm'`）
+6. 新增产品：写路由代码 → 在 Supabase 插入行（含 sdk_version） → 重启 app
+7. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
+
+## EJS/JS 分离模式
+
+**核心原则**：EJS 文件不写业务 JS，只注入配置到 `window.DEMO`，然后引入静态 JS 文件。
+
+```
+EJS 文件职责：
+  1. HTML 结构（sandbox-card、amount-display 等）
+  2. window.DEMO 配置注入（API URL、client ID 等）
+  3. <script src="/js/..."> 引入静态 JS 文件
+
+静态 JS 文件职责：
+  1. PayPal SDK 初始化（Buttons、CardFields、Applepay 等）
+  2. fetch 调用后端 API（create-order、capture-order 等）
+  3. 结果展示（showResult('✓ ...', 'success')）
+```
+
+**EJS 注入示例：**
+```html
+<script>
+  window.DEMO = {
+    urls: {
+      createOrder:  '/paypal/jssdk-v5/api/<product>/create-order',
+      captureOrder: '/paypal/jssdk-v5/api/<product>/capture-order',
+    }
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/spb.js"></script>
+```
+
+**静态 JS 文件位置与对应关系：**
+
+| JS 文件 | 使用的产品 EJS |
+|---------|--------------|
+| `public/js/paypal/jssdk-v5/spb.js` | spb-ecm, spb-ecs, vault-paypal-with-purchase, vault-applepay-with-purchase |
+| `public/js/paypal/jssdk-v5/acdc.js` | acdc, vault-acdc-with-purchase, vault-acdc-setup-only |
+| `public/js/paypal/jssdk-v5/buttons.js` | buttons（双 SDK：cnSdkUrl + usSdkUrl） |
+| `public/js/paypal/jssdk-v5/vault-setup.js` | vault-paypal-setup-only |
+| `public/js/paypal/jssdk-v5/vault-return.js` | vault-return |
+| `public/js/paypal/jssdk-v5/applepay.js` | applepay-ecm, applepay-ecs（待实现） |
+| `public/js/paypal/jssdk-v5/googlepay.js` | googlepay-ecm, googlepay-ecs（待实现） |
+
+**新增 JS 文件时的规范：**
+- 用 IIFE 包裹（`(function() { 'use strict'; ... })()`）
+- 从 `window.DEMO.urls` 读取 API 端点
+- 导出函数用于复用（如 `showResult`、`clearLoading`）
+- 不写 ES6 模块语法，保持浏览器直接运行兼容
 
 ## 开发命令
 
@@ -203,9 +251,54 @@ module.exports = createVaultWithPurchaseRoute({
 
 **自定义路由**（CardFields、双SDK、Vault Setup-only、Return Buyer）：参考 `acdc.js`、`buttons.js`、`vault-paypal-setup-only.js`、`vault-return.js`。
 
-### 2. 创建 EJS 视图
+### 2. 创建（或复用）静态 JS 文件
 
-在 `src/views/<provider>/<sdk>/<product>.ejs` 创建：
+先看是否能复用已有 JS 文件（参考上方"EJS/JS 分离模式"对应关系表）。
+
+**如需新建 JS 文件**（`src/public/js/<provider>/<sdk>/<product>.js`）：
+```js
+;(function () {
+  'use strict'
+
+  function showResult(text, type) {
+    var el = document.getElementById('result')
+    if (!el) return
+    el.className = 'result-msg ' + type
+    el.textContent = text
+  }
+
+  window.addEventListener('load', function () {
+    if (typeof paypalSDK === 'undefined') {
+      showResult('✗ PayPal SDK failed to load', 'error'); return
+    }
+    var container = document.getElementById('paypal-button-container')
+    container.classList.remove('sdk-loading')
+    container.innerHTML = ''
+
+    var urls = window.DEMO && window.DEMO.urls
+
+    paypalSDK.Buttons({
+      createOrder: function () {
+        return fetch(urls.createOrder, { method: 'POST' })
+          .then(function (r) { return r.json() }).then(function (d) { return d.id })
+      },
+      onApprove: function (data) {
+        return fetch(urls.captureOrder, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderID: data.orderID })
+        }).then(function (r) { return r.json() }).then(function (o) {
+          showResult('✓ Captured: ' + o.id, 'success')
+        })
+      },
+      onError: function (e) { showResult('✗ ' + (e.message || String(e)), 'error') }
+    }).render('#paypal-button-container')
+  })
+})()
+```
+
+### 3. 创建 EJS 视图
+
+在 `src/views/<provider>/<sdk>/<product>.ejs` 创建（**只写 HTML + window.DEMO 注入**）：
 ```ejs
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
@@ -224,8 +317,6 @@ module.exports = createVaultWithPurchaseRoute({
       <div class="amount-value">$1.00</div>
       <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
     </div>
-
-    <%# SDK loading spinner %>
     <div id="paypal-button-container" class="sdk-loading">
       <div class="sdk-spinner"></div>
       <span>Loading PayPal...</span>
@@ -234,41 +325,28 @@ module.exports = createVaultWithPurchaseRoute({
   </div>
 </div>
 
+<%# 注入 API 端点配置，然后引入静态 JS 文件 %>
 <script>
-  window.addEventListener('load', function () {
-    document.getElementById('paypal-button-container').classList.remove('sdk-loading')
-    document.getElementById('paypal-button-container').innerHTML = ''
-    paypalSDK.Buttons({
-      createOrder: () => fetch('/paypal/jssdk-v5/api/<product>/create-order', { method: 'POST' })
-        .then(r => r.json()).then(d => d.id),
-      onApprove: (data) => fetch('/paypal/jssdk-v5/api/<product>/capture-order', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderID: data.orderID })
-      }).then(r => r.json()).then(o => {
-        const el = document.getElementById('result')
-        el.className = 'result-msg success'
-        el.textContent = '✓ Captured: ' + o.id
-      }),
-      onError: e => {
-        const el = document.getElementById('result')
-        el.className = 'result-msg error'
-        el.textContent = '✗ ' + (e.message || String(e))
-      }
-    }).render('#paypal-button-container')
-  })
+  window.DEMO = {
+    urls: {
+      createOrder:  '/paypal/jssdk-v5/api/<product>/create-order',
+      captureOrder: '/paypal/jssdk-v5/api/<product>/capture-order',
+    }
+  }
 </script>
+<script src="/js/paypal/jssdk-v5/<product-or-shared>.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>
 ```
 
-### 3. 挂载路由（`src/app.js`）
+### 4. 挂载路由（`src/app.js`）
 
 ```js
 // 在对应 SDK 块下加一行
 app.use(v5, require('./routes/paypal/jssdk-v5/<product>'))
 ```
 
-### 4. 插入 Supabase 数据
+### 5. 插入 Supabase 数据
 
 ```sql
 INSERT INTO demohub.products
@@ -277,7 +355,7 @@ VALUES
   ('paypal', 'jssdk-v5', '<product>', '显示名称', '一句话描述', true, <排序号>);
 ```
 
-### 5. 重启并验证
+### 6. 重启并验证
 
 ```bash
 npm run dev        # 或在已启动的 nodemon 中输入 rs

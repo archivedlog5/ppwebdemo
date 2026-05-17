@@ -39,13 +39,19 @@
 - [x] 开发/生产架构文档化（CLAUDE.md、demo-hub/CLAUDE.md）
 - [x] Design Review 完成（6/10 → 9/10）：删搜索框、移动端水平 tabs、SDK loading spinner
 
+- [x] EJS/JS 分离重构：静态 JS 文件模式（window.DEMO 注入 + spb/acdc/buttons/vault-setup/vault-return.js）
+- [x] 全部 14 个 EJS 视图更新为新模式（Apple Pay + Google Pay 结构完成，JS 文件待实现）
+- [x] 生产 gateway 架构（server.js，开发独立端口，生产单端口）
+- [x] 所有 CLAUDE.md 同步更新（EJS/JS 模式、运行架构、新增流程文档化）
+
 ### 当前状态
-- demo-hub 基础框架已跑通（`npm run dev:demo-hub` → http://localhost:3000）
-- Supabase 连接正常，14 个产品从 demohub.products 加载
-- 14 个路由文件全部创建；spb-ecm 视图完整实现，其余 13 个为占位符
-- 生产 gateway `server.js` 就绪，`npm start` 可启动
+- demo-hub 全栈完成：CSS、EJS partials、首页、14 个路由、工厂函数、静态 JS 文件
+- Supabase 连接正常，14 个产品已加载，`npm run dev:demo-hub` → http://localhost:3000
+- SPB ECM 完整实现（spb.js 复用）；ACDC 完整实现（acdc.js）；Vault 完整实现
+- 待实现：applepay.js / googlepay.js（需要 Apple/Google Pay sandbox 环境）
 
 ### 下一步
-- [ ] 补完 13 个产品 EJS 视图的真实 SDK 逻辑
-- [ ] 在浏览器验证 SPB ECM 完整支付流程
+- [ ] 浏览器测试 SPB ECM / ACDC / Vault 完整支付流程
+- [ ] 实现 applepay.js（需 Safari + Apple Wallet）
+- [ ] 实现 googlepay.js（需 Chrome + Google Pay card）
 - [ ] 讨论 store-fashion 需求

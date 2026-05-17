@@ -245,8 +245,9 @@ Each payment product must have its own Express router file. File path mirrors th
 Rules:
 - Each router file handles exactly one product's logic — **cross-product sharing is not allowed**
 - Filename = `product_key` (e.g. `acdc.js`, `apple-pay.js`)
-- Each product has its own EJS views directory: `views/paypal/jssdk-v6/acdc.ejs`
+- Each product has its own EJS view: `views/paypal/jssdk-v5/acdc.ejs`
 - Supabase `demohub.products` uses `(provider, sdk_version, product_key)` as the unique composite key
+- **EJS/JS separation**: EJS injects `window.DEMO = { urls: {...} }` only; SDK logic lives in `public/js/<provider>/<sdk>/<product>.js`, shareable across multiple products
 
 ### E-commerce Sites — Isolated Route Prefix Per Site
 
