@@ -79,13 +79,22 @@ payment-playground/
 | store-fashion | React + Vite | Node.js + Express | Supabase | — |
 | admin-console | React + Vite | Node.js + Express | Supabase | — |
 
-**Supabase usage:**
-- demo-hub: Reads product display config at startup (display_name, description, enabled, sort_order); API credential references
-- store-fashion: User authentication (Auth), simple order management
-- admin-console: Manages demo-hub product display config (`demo_hub_products` table); payment channel config, on/off status, channel ordering per e-commerce site
+**Supabase config: single project, multi-schema isolation**
+
+Supabase free plan is limited to 2 projects. All data lives in one project, isolated by PostgreSQL schema:
+
+| Schema | Owner | Key tables |
+|--------|-------|-----------|
+| `demohub` | demo-hub | `products` (display config) |
+| `admin` | admin-console | `stores`, `payment_channels` |
+| `fashion` | store-fashion | `profiles`, `orders` |
+| `auth` | Supabase built-in | `users` (shared across all apps) |
+| `public` | Shared | `update_updated_at()` helper function |
+
+See: `docs/design/2026-05-15-design-db-supabase.md`
 
 **admin-console → demo-hub config relationship:**
-- admin-console writes to the Supabase `demo_hub_products` table (display_name, description, enabled, sort_order)
+- admin-console writes to the `demohub.products` table (display_name, description, enabled, sort_order)
 - demo-hub reads this table once at startup to determine which products appear on the homepage, their names, and their order
 - Config changes take effect after restarting demo-hub (read once at startup, cached in memory)
 - `product_key` (route slug) is bound to code routes — admin-console can read but not modify it

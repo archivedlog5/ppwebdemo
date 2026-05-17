@@ -43,7 +43,9 @@ apps/admin-console/
 
 ## Supabase 数据表职责
 
-### `demo_hub_products` — demo-hub 产品展示配置
+### `demohub.products` — demo-hub 产品展示配置
+
+> 原名 `public.demo_hub_products`，已迁移至 `demohub` schema。
 
 路由三层结构：`/{provider}/{sdk_version}/{product_key}`
 
