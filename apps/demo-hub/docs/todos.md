@@ -49,11 +49,27 @@
 - [ ] **Task 12** — applepay-ecm, applepay-ecs（等 `applepay.js` 实现）
 - [ ] **Task 13** — googlepay-ecm, googlepay-ecs（等 `googlepay.js` 实现）
 
-### 动态金额 + 常量文件（新需求）
+### 动态金额 + 常量文件 + 币种选择器
 
 > 设计文档：`docs/design/2026-05-18-design-be-dynamic-amount-and-constants.md`
+> 币种设计：`docs/design/2026-05-18-design-be-currency-selector.md`
 
-- [ ] **新建** `src/config/constants.js`（INTENT、CURRENCY、DEMO_ITEM、SANDBOX_SHIPPING、SANDBOX_BILLING、buildOrderBody）
+- [x] **新建** `src/config/constants.js`（INTENT、CURRENCY、DEMO_ITEM、SANDBOX_SHIPPING、SANDBOX_BILLING、buildOrderBody、validateAmount）
+- [x] 更新 `_factory.js`、`buttons.js`、`acdc.js`、`vault-return.js`：用 `buildOrderBody` + 读 `req.body.amount`
+- [x] 更新前端 JS：金额输入框 + validateAmount（$1–$30,000）
+- [x] 更新 EJS 视图：金额输入框 UI + sandbox.css 样式
+
+#### 待实现：币种选择器
+
+- [ ] `constants.js` 加 `SUPPORTED_CURRENCIES`（30 种）、`ZERO_DECIMAL_CURRENCIES`、`isZeroDecimal`
+- [ ] 更新 `buildOrderBody`：按币种格式化金额（零小数位取整）
+- [ ] 更新 `validateAmount`：接收 `currency` 参数，零小数位特殊校验
+- [ ] `_factory.js` GET handler：读 `req.query.currency`，传给 EJS + SDK URL
+- [ ] `_factory.js` POST handler：读 `req.body.currency`，传给 `buildOrderBody`
+- [ ] `buttons.js`、`acdc.js`、`vault-return.js` 同上
+- [ ] 所有有购买 EJS 视图：加 `<select id="demo-currency">` 30 种货币，`window.DEMO.currency`
+- [ ] 前端 JS（spb/acdc/buttons/vault-return.js）：`getCurrency()`、`isZeroDecimal()`、`change` 事件刷新（携带 amount+currency 到 URL）、`createOrder` 带 currency
+- [ ] `sandbox.css`：`.amount-row`、`.currency-group`、`.currency-select` 并排布局
 - [ ] 更新 `_factory.js`：POST handler 读 `req.body.amount`，调用 `buildOrderBody`
 - [ ] 更新 `buttons.js`、`acdc.js`、`vault-return.js`：改用 `buildOrderBody`
 - [ ] 更新前端 JS（spb/acdc/buttons/vault-return.js）：`createOrder` 读输入框 amount 传给后端

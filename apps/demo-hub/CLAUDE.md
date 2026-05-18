@@ -162,7 +162,9 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 7. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
 8. **API 常量**：所有 PayPal order body 参数从 `config/constants.js` 引用，不在路由文件硬编码
 9. **Order body 组装**：统一调用 `buildOrderBody(amount, overrides)` 而非手写 body 对象
-10. **金额动态传递**：前端从 `#demo-amount` 输入框读值 → 放入 fetch body `{ amount }` → 后端从 `req.body.amount` 读取
+10. **金额动态传递**：前端从 `#demo-amount` 读值 → fetch body `{ amount, currency }` → 后端 `req.body.amount` / `req.body.currency`
+11. **币种选择**：`#demo-currency` 下拉框切换时刷新页面（`?currency=EUR&amount=xxx`）；服务端读 `req.query.currency` 并注入 SDK URL；零小数位货币（JPY/KRW/TWD/CLP/IDR）金额自动取整
+12. **币种校验**：后端用 `SUPPORTED_CURRENCIES` 白名单校验，无效则 fallback 到 `DEFAULT_CURRENCY`
 
 ## EJS/JS 分离模式
 
