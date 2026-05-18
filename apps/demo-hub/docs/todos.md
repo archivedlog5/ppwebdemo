@@ -63,14 +63,14 @@
 
 #### 待迁移：所有工厂路由改用 `buildBody`（参考 spb-ecm.js）
 
-- [ ] `spb-ecs.js`
-- [ ] `applepay-ecm.js`
-- [ ] `applepay-ecs.js`
-- [ ] `googlepay-ecm.js`
-- [ ] `googlepay-ecs.js`
-- [ ] `vault-paypal-with-purchase.js`
-- [ ] `vault-acdc-with-purchase.js`
-- [ ] `vault-applepay-with-purchase.js`
+- [x] `spb-ecs.js`
+- [x] `applepay-ecm.js`
+- [x] `applepay-ecs.js`
+- [x] `googlepay-ecm.js`
+- [x] `googlepay-ecs.js`
+- [x] `vault-paypal-with-purchase.js`
+- [x] `vault-acdc-with-purchase.js`
+- [x] `vault-applepay-with-purchase.js`
 
 #### 待实现：币种选择器
 
