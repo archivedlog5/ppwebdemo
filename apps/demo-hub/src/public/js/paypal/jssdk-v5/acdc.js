@@ -77,21 +77,6 @@
     if (errEl) errEl.textContent = ''
     input.classList.remove('amount-input--error')
     return true
-  })?$/.test(val)) {
-      err = 'Please enter a valid number (e.g. 100.00)'
-    } else if (num < MIN_AMOUNT) {
-      err = 'Minimum amount is $' + MIN_AMOUNT.toFixed(2)
-    } else if (num > MAX_AMOUNT) {
-      err = 'Maximum amount is $' + MAX_AMOUNT.toLocaleString('en-US', { minimumFractionDigits: 2 })
-    }
-    if (err) {
-      if (errEl) errEl.textContent = err
-      input.classList.add('amount-input--error')
-      return false
-    }
-    if (errEl) errEl.textContent = ''
-    input.classList.remove('amount-input--error')
-    return true
   }
 
   function clearLoading(id) {
