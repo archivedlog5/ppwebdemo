@@ -160,19 +160,17 @@ Output: `docs/req/YYYY-MM-DD-req-<topic>.md`
 ### Phase 2 — UI/UX Design
 **All pages must go through the UI/UX skills process. This step cannot be skipped.**
 ```
+frontend-design      → Review UI/UX patterns and produce high-quality frontend design specs (invoke first — sets design direction)
 ui-ux-pro-max        → Act as UI/UX expert to design pages (50+ styles, 161 palettes, 57 font pairings)
 /design-consultation → Create the app's design system and DESIGN.md (first time per app)
 /design-shotgun      → Generate multiple design variants for comparison
-/plan-design-review  → Review UI/UX plan from a designer's perspective
-frontend-design      → Review UI/UX patterns and produce high-quality frontend design specs
 ```
 After phase: run find-skills → search "UI/UX / design system / frontend" skills → evaluate → install → **invoke installed skills to improve design output**
 Output: `docs/design/YYYY-MM-DD-design-fe-<topic>.md`, `DESIGN.md` (in each app root)
 
 ### Phase 3 — Backend & Database Design
 ```
-/plan-eng-review     → Review architecture from an engineering perspective
-/plan-ceo-review     → Review plan from a product/business perspective
+/brainstorming       → Explore backend architecture options, API design, DB schema decisions
 ```
 After phase: run find-skills → search "backend / Supabase / API / database" skills → evaluate → install → **invoke installed skills to optimize API design and DB schema**
 Output: `docs/design/YYYY-MM-DD-design-be-<topic>.md`, `docs/design/YYYY-MM-DD-design-db-<topic>.md`
@@ -180,7 +178,13 @@ Output: `docs/design/YYYY-MM-DD-design-be-<topic>.md`, `docs/design/YYYY-MM-DD-d
 ### Phase 4 — Planning
 ```
 /writing-plans       → Generate a step-by-step implementation plan
-/autoplan            → Auto-run the full review gauntlet
+```
+After writing the plan, run reviews in order (or use `/autoplan` to run all automatically):
+```
+/plan-ceo-review     → Review from product/business perspective: direction, scope, product decisions
+/plan-eng-review     → Review from engineering perspective: architecture, feasibility, edge cases (⚠️ requires a plan file to exist)
+/plan-design-review  → Review from design perspective: UI/UX completeness, interaction states, responsive (⚠️ requires a plan file to exist)
+/autoplan            → Auto-run the full review gauntlet (CEO + Eng + Design) in one command
 ```
 After phase: run find-skills → search "planning / task breakdown / implementation" skills → evaluate → install → **invoke installed skills to refine the implementation plan**
 Output: `docs/plans/YYYY-MM-DD-plan-<topic>-v<n>.md`
@@ -444,16 +448,15 @@ Run this checklist in order every time a new app is started (e.g., `store-fashio
 - [ ] Run find-skills: search domain-relevant skills → evaluate → install → **invoke to refine requirements**
 
 **UI/UX Design Phase (mandatory for all pages)**
+- [ ] Invoke `frontend-design` to set UI/UX design direction and specs (first)
 - [ ] Invoke `ui-ux-pro-max` to design UI/UX style, color palette, and typography for all pages
 - [ ] Invoke `/design-consultation` to create `DESIGN.md` (first time per app)
 - [ ] Invoke `/design-shotgun` to generate multiple design variants
-- [ ] Invoke `frontend-design` to produce frontend design specifications
 - [ ] Create `docs/design/YYYY-MM-DD-design-fe-<app>.md`
 - [ ] Run find-skills: search design/UI skills → evaluate → install → **invoke to improve design output**
 
 **Backend & Database Design Phase**
-- [ ] Invoke `/plan-eng-review` to review architecture
-- [ ] Invoke `/plan-ceo-review` to review product direction
+- [ ] Invoke `/brainstorming` to discuss backend architecture, API design, DB schema
 - [ ] Create `docs/design/YYYY-MM-DD-design-be-<app>.md`
 - [ ] Create `docs/design/YYYY-MM-DD-design-db-<app>.md`
 - [ ] Run find-skills: search backend/Supabase/API skills → evaluate → install → **invoke to optimize API and DB design**
@@ -461,6 +464,9 @@ Run this checklist in order every time a new app is started (e.g., `store-fashio
 **Planning & Todo Phase**
 - [ ] Invoke `/writing-plans` to generate implementation plan
 - [ ] Create `docs/plans/YYYY-MM-DD-plan-<app>-v1.md`
+- [ ] Invoke `/plan-ceo-review` to review direction (requires plan file)
+- [ ] Invoke `/plan-eng-review` to review architecture (requires plan file)
+- [ ] Invoke `/plan-design-review` to review UI/UX completeness (requires plan file)
 - [ ] Populate `docs/todos.md` from the plan (categorized checkboxes)
 - [ ] Run find-skills: search implementation/testing skills → evaluate → install → **invoke to assist project initialization**
 
@@ -530,8 +536,11 @@ Every app must complete the full New App Launch Checklist before coding begins.
 
 ## Git Rules
 
-### Only commit when explicitly instructed
-**Do NOT auto-commit after completing any task.** Only run `git commit` and `git push` when the user explicitly says "commit", "git commit", "push", or equivalent. Never commit proactively.
+### Commit and Push are separate — each requires its own explicit instruction
+
+**Commit**: Only run `git commit` when the user explicitly says "commit", "git commit", or equivalent. Never auto-commit after completing a task.
+
+**Push**: Only run `git push` when the user explicitly says "git push", "push it", or equivalent. **Never auto-push after a commit**, even if the user just said "commit". The two steps are independent — each needs its own instruction.
 
 ### .gitignore conventions
 The following must not be tracked in version control:
