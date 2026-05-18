@@ -53,8 +53,12 @@
 - [x] 更正 CLAUDE.md 中 superpowers/gstack skills 各阶段归属（plan-review 系列必须在有 plan 后才调用）
 - [x] 设计动态金额输入 + API 常量文件 → `docs/design/2026-05-18-design-be-dynamic-amount-and-constants.md`
 
+- [x] 重构 `_factory.js`：`buildBody(amount, currency)` 模式，产品 API 参数集中在路由文件
+- [x] 币种选择器（30 种货币，零小数位处理，URL 参数刷新）
+- [x] 修复 validateAmount 函数残片 syntax error
+
 ### 下一步
-- [ ] 实现 `config/constants.js` + `buildOrderBody`
+- [ ] 各产品路由按需迁移到 `buildBody` 模式（spb-ecm 已完成作为参考）
 - [ ] 更新 `_factory.js` + 各自定义路由读 `req.body.amount`
 - [ ] 更新前端 JS 读输入框 amount
 - [ ] 更新 EJS 视图加金额输入框 + sandbox.css 加样式

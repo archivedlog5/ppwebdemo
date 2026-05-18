@@ -419,143 +419,128 @@ spb.js onApprove callback 收到结果
 
 ## Order Body 定制指南
 
-每个 demo 的 PayPal `create-order` 请求 body 参数不同。根据路由类型选择修改方式：
+每个 demo 的 PayPal `create-order` body 参数不同。**推荐用 `buildBody` 模式**，所有参数在产品路由文件一个地方定义。
 
-### 工厂路由产品（改 `<product>.js` 的 `orderBody`）
+### `buildBody(amount, currency)` — 推荐模式
 
-适用：spb-ecm, spb-ecs, applepay-ecm/ecs, googlepay-ecm/ecs, vault-*-with-purchase
+适用：所有工厂路由产品（spb-ecm/ecs、applepay、googlepay、vault-with-purchase 等）
 
 ```js
 // routes/paypal/jssdk-v5/<product>.js
+const { createStandardRoute } = require('./_factory')
+const C = require('../../../config/constants')  // 整个文件引入，用 C.xxx 引用
+
 module.exports = createStandardRoute({
   productKey: 'spb-ecm',
-  sdkParams:  'components=buttons&currency=USD',
+  sdkParams:  'components=buttons',
   view:       'paypal/jssdk-v5/spb-ecm',
-  orderBody: {
-    // 此对象会 spread 合并到基础 body（同名字段会覆盖默认值）
-    // 默认 body：{ intent:'CAPTURE', purchase_units:[{ amount:{ currency_code:'USD', value:'1.00' } }] }
 
-    // 改金额或加 line items：
-    purchase_units: [{
-      amount: { currency_code: 'USD', value: '5.00' },
-      description: 'Demo Purchase',
-    }],
-
-    // 加 PayPal 体验上下文（ECS 用）：
-    payment_source: {
-      paypal: {
-        experience_context: {
-          brand_name:  'My Store',
-          user_action: 'PAY_NOW',   // 或 'CONTINUE'
-          locale:      'en-US',
+  buildBody: function (amount, currency) {
+    // amount + currency 由工厂从前端请求注入，其余字段自定义
+    return {
+      intent: C.INTENT.CAPTURE,
+      payment_source: {          // 产品专属：experience_context、email 等
+        paypal: {
+          experience_context: {
+            brand_name:  'My Store',
+            user_action: 'PAY_NOW',
+            landing_page: 'LOGIN',
+          }
         }
-      }
+      },
+      purchase_units: [{
+        reference_id:   '01234567',       // 产品专属字段
+        description:    C.DEMO_DESCRIPTION,
+        invoice_id:     'INV-' + Date.now(),
+        custom_id:      'MemberNumber00001',
+        soft_descriptor: 'SDCW',
+        amount: {
+          currency_code: currency,
+          value:         amount,
+          breakdown: { item_total: { currency_code: currency, value: amount } }
+        },
+        items: [{
+          name:        'Monkey Toy',
+          sku:         'sku01',
+          quantity:    '1',
+          unit_amount: { currency_code: currency, value: amount }
+        }],
+        shipping: {                        // 自定义收货地址，或用 C.SANDBOX_SHIPPING
+          name:    { full_name: 'Test Buyer' },
+          address: { address_line_1: 'Via Silvio Spaventa, 97', admin_area_2: 'Naples', country_code: 'IT', postal_code: '80166' }
+        }
+      }]
     }
-  }
+  },
 })
 ```
 
-`_factory.js` 的合并逻辑：
+**工厂的调用逻辑（_factory.js POST handler）：**
 ```js
-const body = {
-  intent: 'CAPTURE',
-  purchase_units: [{ amount: { currency_code: 'USD', value: '1.00' } }],
-  ...orderBody,   // ← orderBody 里的同名字段会覆盖默认值
-}
+// 有 buildBody → 调用它（产品完全控制 body）
+// 无 buildBody → 调用 buildOrderBody（标准 body，向后兼容）
+const body = typeof buildBody === 'function'
+  ? buildBody(amount, currency)
+  : buildOrderBody(amount, { currency, topLevel: orderBody })
 ```
 
-### 自定义路由产品（直接改 POST handler 的 `body`）
+### 自定义路由产品（直接改 POST handler）
 
-适用：buttons, acdc, vault-paypal-setup-only, vault-acdc-setup-only, vault-return
+适用：buttons, acdc, vault-*-setup-only, vault-return（这些本身就是自定义路由）
 
 ```js
 // routes/paypal/jssdk-v5/<product>.js 里的 POST handler
+const C = require('../../../config/constants')
+
 router.post('/api/<product>/create-order', async (req, res) => {
-  const token = await getCNToken()
-  const body = {
-    intent: 'CAPTURE',
-    purchase_units: [{
-      amount: { currency_code: 'USD', value: '1.00' },
-      // 在这里直接修改
-    }],
-    // 加任何顶层字段
-  }
-  const r = await fetch(`${API}/v2/checkout/orders`, { ... body: JSON.stringify(body) })
-  // ...
+  const amount   = req.body.amount   || C.DEFAULT_AMOUNT
+  const currency = req.body.currency || C.DEFAULT_CURRENCY
+  const body = C.buildOrderBody(amount, { currency })
+  // 或直接手写完整 body
 })
-```
-
-### 动态参数（从前端传入，如用户选择金额）
-
-需要同时改两个地方：
-
-**后端（_factory.js 或自定义路由）：**
-```js
-router.post(`/api/${productKey}/create-order`, async (req, res) => {
-  const amount = req.body.amount || '1.00'   // 从请求读取
-  const body = {
-    intent: 'CAPTURE',
-    purchase_units: [{ amount: { currency_code: 'USD', value: amount } }],
-    ...orderBody,
-  }
-  // ...
-})
-```
-
-**前端（EJS 或对应 JS 文件）：**
-```js
-// spb.js 或其他 JS 文件里的 createOrder callback
-createOrder: function () {
-  return fetch(urls.createOrder, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount: '2.00' })   // 传给后端
-  }).then(r => r.json()).then(d => d.id)
-}
 ```
 
 ### 常用 body 参数参考
 
 ```js
 {
-  intent: 'CAPTURE',           // 或 'AUTHORIZE'（先授权后捕获）
-
-  purchase_units: [{
-    amount: {
-      currency_code: 'USD',
-      value: '1.00',
-      breakdown: {             // 可选：细项（必须与 value 对应）
-        item_total: { currency_code: 'USD', value: '1.00' }
-      }
-    },
-    items: [{                  // 可选：商品列表
-      name: 'Demo Item',
-      quantity: '1',
-      unit_amount: { currency_code: 'USD', value: '1.00' }
-    }],
-    description: 'Demo Purchase',
-    custom_id: 'demo-123',     // 可选：自定义 ID
-  }],
+  intent: C.INTENT.CAPTURE,       // 'CAPTURE' | 'AUTHORIZE'
 
   payment_source: {
     paypal: {
       experience_context: {
-        brand_name:                  'My Store',
-        user_action:                 'PAY_NOW',    // 'PAY_NOW' | 'CONTINUE'
-        payment_method_preference:   'IMMEDIATE_PAYMENT_REQUIRED',
-        landing_page:                'LOGIN',      // 'LOGIN' | 'GUEST_CHECKOUT'
-        locale:                      'en-US',
-        return_url: 'http://localhost:3000',
-        cancel_url: 'http://localhost:3000',
+        brand_name:                'My Store',
+        user_action:               'PAY_NOW',      // 'PAY_NOW' | 'CONTINUE'
+        landing_page:              'LOGIN',         // 'LOGIN' | 'GUEST_CHECKOUT'
+        shipping_preference:       'SET_PROVIDED_ADDRESS',
+        return_url: 'https://example.com/return',
+        cancel_url: 'https://example.com/cancel',
       },
+      email_address: 'buyer@example.com',          // 预填买家邮箱
+      name: { given_name: 'John', surname: 'Doe' },
       attributes: {
-        vault: {                      // Vault with-purchase 才加
-          store_in_vault: 'ON_SUCCESS',
-          usage_type:     'MERCHANT',
-        }
+        vault: { store_in_vault: 'ON_SUCCESS' }    // Vault 才加
       }
     }
-  }
+  },
+
+  purchase_units: [{
+    reference_id:    '01234567',
+    description:     C.DEMO_DESCRIPTION,
+    invoice_id:      'INV-001',
+    custom_id:       'MemberNumber00001',
+    soft_descriptor: 'SDCW',
+    amount: {
+      currency_code: currency,
+      value:         amount,
+      breakdown: { item_total: { currency_code: currency, value: amount } }
+    },
+    items: [{
+      name: 'Demo Item', sku: 'sku01', quantity: '1',
+      unit_amount: { currency_code: currency, value: amount }
+    }],
+    shipping: C.SANDBOX_SHIPPING,  // 或自定义地址
+  }]
 }
 ```
 
@@ -563,11 +548,10 @@ createOrder: function () {
 
 | 场景 | 修改文件 |
 |------|---------|
-| 工厂产品改静态 body | `routes/paypal/jssdk-v5/<product>.js` → `orderBody` |
+| 工厂产品改 body（任何字段）| **`routes/paypal/jssdk-v5/<product>.js`** → `buildBody` 函数 |
 | 自定义产品改 body | `routes/paypal/jssdk-v5/<product>.js` → POST handler |
-| 所有工厂产品通用逻辑 | `routes/paypal/jssdk-v5/_factory.js` → `createStandardRoute` |
-| 前端动态传参 | `_factory.js` 读 `req.body`；`public/js/.../spb.js` 改 fetch body |
-| 改默认金额 | `_factory.js` 第 34 行：`value: '1.00'` |
+| 所有产品通用默认值（DEMO_ITEM 等）| `config/constants.js` |
+| 金额/币种从前端传入 | 已实现：`req.body.amount` + `req.body.currency`，`buildBody(amount, currency)` 接收 |
 
 ---
 

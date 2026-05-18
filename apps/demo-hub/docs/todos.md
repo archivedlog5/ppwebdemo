@@ -58,6 +58,10 @@
 - [x] 更新 `_factory.js`、`buttons.js`、`acdc.js`、`vault-return.js`：用 `buildOrderBody` + 读 `req.body.amount`
 - [x] 更新前端 JS：金额输入框 + validateAmount（$1–$30,000）
 - [x] 更新 EJS 视图：金额输入框 UI + sandbox.css 样式
+- [x] 重构 `_factory.js`：支持 `buildBody(amount, currency)` 模式
+  - `buildBody` 优先；无 `buildBody` 时降级用 `buildOrderBody`（向后兼容）
+  - 产品所有 API 参数在路由文件一处定义，无需动 `_factory.js`
+- [x] 更新 `spb-ecm.js`：改用 `buildBody` + `const C = require('.../constants')`
 
 #### 待实现：币种选择器
 
