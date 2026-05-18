@@ -1225,7 +1225,7 @@ git commit -m "feat(demo-hub): add PayPal access token helper (CN + US accounts)
 - Create: `apps/demo-hub/src/routes/paypal/jssdk-v5/spb-ecm.js`
 - Create: `apps/demo-hub/src/views/paypal/jssdk-v5/spb-ecm.ejs`
 
-SPB ECM (Express Checkout Mini) — standard PayPal button that opens a mini checkout modal.
+SPB ECM (Express Checkout Mark) — standard PayPal button, checkout completes in PayPal window.
 
 - [ ] **Step 1: Create `src/routes/paypal/jssdk-v5/spb-ecm.js`**
 
@@ -1303,7 +1303,7 @@ module.exports = router
       <div class="sandbox-header">
         <div class="provider-badge">PayPal · JSSDK v5 · ECM</div>
         <h1>${title}</h1>
-        <p>SPB Express Checkout Mini — PayPal button with mini modal checkout</p>
+        <p>Smart Payment Button — Express Checkout Mark Flow</p>
       </div>
       <div class="sandbox-card">
         <div class="amount-display">
@@ -2588,7 +2588,7 @@ CREATE POLICY "public_read" ON demohub.products FOR SELECT USING (true);
 
 INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
 VALUES
-  ('paypal','jssdk-v5','spb-ecm',                    'SPB ECM Flow',               'Smart Payment Button — Express Checkout Mini',        true,  1),
+  ('paypal','jssdk-v5','spb-ecm',                    'SPB ECM Flow',               'Smart Payment Button — Express Checkout Mark Flow',   true,  1),
   ('paypal','jssdk-v5','spb-ecs',                    'SPB ECS Flow',               'Smart Payment Button — Express Checkout Standard',    true,  2),
   ('paypal','jssdk-v5','buttons',                    'Independent Buttons',        'PayPal / PayLater / BCDC / Venmo 独立按钮渲染',        true,  3),
   ('paypal','jssdk-v5','acdc',                       'ACDC',                       'Advanced Credit/Debit Card 卡片输入集成',              true,  4),
