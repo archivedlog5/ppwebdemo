@@ -206,3 +206,211 @@ Status: LIVING DOCUMENT（随实现持续更新）
 修改页面 HTML     → src/views/paypal/jssdk-v5/<product>.ejs
 修改页面 UI 样式  → src/public/css/sandbox.css
 ```
+
+---
+
+## 加载与调用链（以 SPB ECM 为例）
+
+### 阶段一：服务器启动
+
+```
+node src/app.js
+  │
+  ├─ require('dotenv').config()              ← 加载 .env 环境变量
+  │
+  ├─ require('./config/products')            ← 定义 loadProductConfig、getProduct 等函数
+  │   └─ require('@supabase/supabase-js')
+  │   └─ require('ws')                       ← Node 20 WebSocket polyfill
+  │
+  ├─ require('./config/paypal')              ← 定义 getCNToken、getUSToken（含 8h 缓存）
+  │
+  ├─ require('./routes/paypal/jssdk-v5/spb-ecm')
+  │   └─ 立即调用 createStandardRoute({ productKey, sdkParams, view })
+  │       └─ _factory.js 注册三条路由到 router：
+  │           ├─ GET  /spb-ecm
+  │           ├─ POST /api/spb-ecm/create-order
+  │           └─ POST /api/spb-ecm/capture-order
+  │
+  ├─ app.use('/paypal/jssdk-v5', router)    ← 路由挂载到 Express
+  │
+  ├─ loadProductConfig()                     ← 从 Supabase demohub.products 读取数据
+  │   └─ 写入内存 Map：
+  │       key = 'paypal/jssdk-v5/spb-ecm'
+  │       value = { displayName, description, enabled, sortOrder, ... }
+  │
+  └─ app.listen(3000)                        ← 开始监听请求
+```
+
+---
+
+### 阶段二：浏览器请求页面（GET /paypal/jssdk-v5/spb-ecm）
+
+```
+浏览器
+  │  GET /paypal/jssdk-v5/spb-ecm
+  ▼
+Express → _factory.js GET handler
+  ├─ getProduct('paypal','jssdk-v5','spb-ecm')  ← 读内存 Map
+  ├─ getProviderProducts('paypal')               ← 读内存 Map（侧边栏数据）
+  └─ res.render('paypal/jssdk-v5/spb-ecm', vars)
+      │
+      ▼  EJS 服务端渲染顺序（从上到下拼 HTML）
+      │
+      1. include('../../partials/header')
+      │   └─ 输出：
+      │       <html><head>
+      │         <link href="/css/base.css">
+      │         <link href="/css/layout.css">
+      │         <link href="/css/sandbox.css">
+      │         <script src="/js/theme.js">           ← 主题切换（立即执行）
+      │         <script src="paypal.com/sdk/js?...">  ← PayPal SDK
+      │       </head><body>
+      │         <nav class="topbar">...</nav>
+      │         <div class="sidebar">...</div>        ← 侧边栏（sidebarProducts 数据）
+      │         <nav class="breadcrumb">...</nav>
+      │         <div class="tab-bar">...</div>
+      │
+      2. spb-ecm.ejs 主体
+      │   └─ 输出：
+      │       <div class="sandbox-page">
+      │         <div id="paypal-button-container" class="sdk-loading">
+      │           <div class="sdk-spinner"></div>     ← loading spinner
+      │         </div>
+      │         <div id="result"></div>
+      │       </div>
+      │
+      3. 内联 <script>
+      │   └─ window.DEMO = { urls: { createOrder, captureOrder } }
+      │                                               ← 注入 API 端点配置
+      4. <script src="/js/paypal/jssdk-v5/spb.js">   ← 引入静态 JS 文件
+      │
+      5. include('../../partials/footer')
+          └─ 输出：</div></div></body></html>
+```
+
+---
+
+### 阶段三：浏览器执行（脚本按顺序执行）
+
+```
+HTML 解析完成，浏览器按 <script> 出现顺序执行：
+
+Step 1  /js/theme.js
+        └─ 同步执行：读 localStorage，设 data-theme，注册 #theme-toggle 点击事件
+
+Step 2  paypal.com/sdk/js?client-id=...&components=buttons
+        └─ 异步加载：创建全局 window.paypalSDK
+
+Step 3  window.DEMO = { urls: { createOrder: '...', captureOrder: '...' } }
+        └─ 同步执行：API 端点写入全局变量
+
+Step 4  /js/paypal/jssdk-v5/spb.js
+        └─ 同步执行 IIFE：
+            └─ window.addEventListener('load', callback)
+               （回调延迟到页面完全加载后才执行）
+
+Step 5  页面 load 事件触发
+        └─ spb.js 的 callback 执行：
+            ├─ container.classList.remove('sdk-loading')  ← 移除 spinner
+            ├─ container.innerHTML = ''                   ← 清空容器
+            ├─ 读取 window.DEMO.urls
+            └─ paypalSDK.Buttons({
+                 createOrder: fn,
+                 onApprove:   fn,
+                 onError:     fn,
+               }).render('#paypal-button-container')      ← 渲染 PayPal 按钮
+```
+
+---
+
+### 阶段四：用户点击支付
+
+```
+用户点击 PayPal 按钮
+  │
+  ▼
+paypalSDK 触发 createOrder callback（定义在 spb.js）
+  └─ fetch('POST /paypal/jssdk-v5/api/spb-ecm/create-order')
+      │
+      ▼
+Express → _factory.js POST create-order handler
+  ├─ getCNToken()                                ← 取缓存 token（过期才重新获取）
+  ├─ fetch('POST paypal-api/v2/checkout/orders') ← 调用 PayPal REST API
+  │   body: { intent:'CAPTURE', purchase_units:[{ amount:{ value:'1.00' } }] }
+  └─ res.json({ id: order.id })
+      │
+      ▼
+paypalSDK 收到 order.id → 弹出 PayPal 结账窗口
+用户在 PayPal 弹窗里登录并确认支付
+      │
+      ▼
+paypalSDK 触发 onApprove callback（定义在 spb.js）
+  └─ fetch('POST /paypal/jssdk-v5/api/spb-ecm/capture-order', { orderID })
+      │
+      ▼
+Express → _factory.js POST capture-order handler
+  ├─ getCNToken()                                ← 取缓存 token
+  ├─ fetch('POST paypal-api/v2/checkout/orders/{id}/capture')
+  └─ res.json(captureResult)
+      │
+      ▼
+spb.js onApprove callback 收到结果
+  └─ showResult('✓ Payment captured · Order: ' + order.id, 'success')
+     └─ 更新页面上 #result 元素的样式和文字
+```
+
+---
+
+### 依赖关系总图
+
+```
+服务端依赖：
+┌─────────────────────────────────────────────────────┐
+│                     app.js                          │
+│                       │                             │
+│         ┌─────────────┼─────────────┐               │
+│         ▼             ▼             ▼               │
+│  config/products   config/paypal  routes/*/         │
+│  (Supabase client) (token cache)  spb-ecm.js        │
+│         │                            │              │
+│    (启动时读取)                  _factory.js         │
+│    内存 Map                     (注册路由)           │
+│    ┌─────────────────────────────────┘              │
+│    │ GET handler：读 Map → res.render               │
+│    │ POST handler：getCNToken → 调 PayPal API       │
+└────┼────────────────────────────────────────────────┘
+     │
+     ▼ （HTTP 响应 HTML）
+
+浏览器依赖：
+┌─────────────────────────────────────────────────────┐
+│  header.ejs 输出的 HTML                              │
+│    │                                                 │
+│    ├─ /css/base.css  layout.css  sandbox.css        │
+│    ├─ /js/theme.js              ← 同步立即执行        │
+│    ├─ paypal.com/sdk/js?...     ← 创建 paypalSDK    │
+│    └─ window.DEMO = {...}       ← 注入 API 配置      │
+│                                                      │
+│  /js/paypal/jssdk-v5/spb.js                         │
+│    读取 window.DEMO.urls  ──────────────────────┐   │
+│    调用 paypalSDK.Buttons()                      │   │
+│         │                                        │   │
+│         ▼ 用户点击                               │   │
+│    createOrder → fetch(window.DEMO.urls.*)  ◄───┘   │
+│    onApprove   → fetch(window.DEMO.urls.*)          │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+### 不同产品的差异点
+
+| 产品 | 阶段一差异 | 阶段三差异 | 阶段四差异 |
+|------|-----------|-----------|-----------|
+| spb-ecm | `createStandardRoute` | `paypalSDK.Buttons().render()` | `/v2/checkout/orders` create + capture |
+| spb-ecs | `createStandardRoute` + `orderBody`（PAY_NOW） | 同 ECM（共用 spb.js） | 同 ECM（order body 不同） |
+| acdc | 自定义路由，`components=card-fields` | `paypalSDK.CardFields()`，`cardFields.submit()` | 同 ECM（同 REST API） |
+| buttons | 自定义路由，双 SDK（cnSdkUrl + usSdkUrl） | 4 个 `Buttons()` 分别 render | 两套 token：getCNToken/getUSToken |
+| vault-*-with-purchase | `createVaultWithPurchaseRoute`，`payment_source` 含 vault 指令 | 同对应产品的 JS | capture 返回值含 `vaultId` |
+| vault-*-setup-only | 自定义路由，`/v3/vault/setup-tokens` | `Buttons({ createVaultSetupToken })` | 无 capture，返回 `paymentTokenId` |
+| vault-return | 自定义路由，`/v2/checkout/orders` + capture 一步完成 | 无 SDK，纯 fetch | 无 PayPal 弹窗，纯服务端 |
