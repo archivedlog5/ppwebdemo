@@ -59,9 +59,18 @@
 - [x] 更新前端 JS：金额输入框 + validateAmount（$1–$30,000）
 - [x] 更新 EJS 视图：金额输入框 UI + sandbox.css 样式
 - [x] 重构 `_factory.js`：支持 `buildBody(amount, currency)` 模式
-  - `buildBody` 优先；无 `buildBody` 时降级用 `buildOrderBody`（向后兼容）
-  - 产品所有 API 参数在路由文件一处定义，无需动 `_factory.js`
-- [x] 更新 `spb-ecm.js`：改用 `buildBody` + `const C = require('.../constants')`
+- [x] 迁移 `spb-ecm.js` → `buildBody` + `const demoParams = require('.../constants')`
+
+#### 待迁移：所有工厂路由改用 `buildBody`（参考 spb-ecm.js）
+
+- [ ] `spb-ecs.js`
+- [ ] `applepay-ecm.js`
+- [ ] `applepay-ecs.js`
+- [ ] `googlepay-ecm.js`
+- [ ] `googlepay-ecs.js`
+- [ ] `vault-paypal-with-purchase.js`
+- [ ] `vault-acdc-with-purchase.js`
+- [ ] `vault-applepay-with-purchase.js`
 
 #### 待实现：币种选择器
 

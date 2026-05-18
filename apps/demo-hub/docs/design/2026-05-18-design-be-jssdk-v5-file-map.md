@@ -548,10 +548,31 @@ router.post('/api/<product>/create-order', async (req, res) => {
 
 | 场景 | 修改文件 |
 |------|---------|
-| 工厂产品改 body（任何字段）| **`routes/paypal/jssdk-v5/<product>.js`** → `buildBody` 函数 |
+| 工厂产品改 body（任何字段）| **`routes/paypal/jssdk-v5/<product>.js`** → `buildBody` 函数（唯一入口）|
 | 自定义产品改 body | `routes/paypal/jssdk-v5/<product>.js` → POST handler |
 | 所有产品通用默认值（DEMO_ITEM 等）| `config/constants.js` |
 | 金额/币种从前端传入 | 已实现：`req.body.amount` + `req.body.currency`，`buildBody(amount, currency)` 接收 |
+
+### `buildBody` 迁移状态
+
+**规范：所有工厂路由必须使用 `buildBody`，常量用 `const demoParams = require('.../constants')` 引入。**
+
+| 产品路由文件 | 类型 | `buildBody` 状态 |
+|------------|------|----------------|
+| `spb-ecm.js` | 工厂 | ✅ 已迁移 |
+| `spb-ecs.js` | 工厂 | ⏳ 待迁移 |
+| `applepay-ecm.js` | 工厂 | ⏳ 待迁移 |
+| `applepay-ecs.js` | 工厂 | ⏳ 待迁移 |
+| `googlepay-ecm.js` | 工厂 | ⏳ 待迁移 |
+| `googlepay-ecs.js` | 工厂 | ⏳ 待迁移 |
+| `vault-paypal-with-purchase.js` | 工厂 | ⏳ 待迁移 |
+| `vault-acdc-with-purchase.js` | 工厂 | ⏳ 待迁移 |
+| `vault-applepay-with-purchase.js` | 工厂 | ⏳ 待迁移 |
+| `buttons.js` | 自定义 | N/A（直接控制 POST handler）|
+| `acdc.js` | 自定义 | N/A |
+| `vault-paypal-setup-only.js` | 自定义 | N/A（无 purchase body）|
+| `vault-acdc-setup-only.js` | 自定义 | N/A |
+| `vault-return.js` | 自定义 | N/A |
 
 ---
 

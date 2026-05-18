@@ -207,7 +207,7 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 6. 新增产品：写路由代码 → 在 Supabase 插入行（含 sdk_version） → 重启 app
 7. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
 8. **API 常量引入方式**：路由文件用 `const C = require('../../../config/constants')` 整个引入，用 `C.INTENT`、`C.SANDBOX_SHIPPING` 等，不逐个解构
-9. **Order body 首选**：提供 `buildBody(amount, currency)` 函数（产品所有 API 参数在一个文件），工厂自动调用；不提供时降级用 `buildOrderBody`
+9. **Order body 规范**：所有工厂路由产品（`createStandardRoute` / `createVaultWithPurchaseRoute`）**必须**提供 `buildBody(amount, currency)` 函数；自定义路由（buttons/acdc/vault-setup-only/vault-return）直接在 POST handler 里控制 body
 10. **金额动态传递**：前端从 `#demo-amount` 读值 → fetch body `{ amount, currency }` → 后端 `req.body.amount` / `req.body.currency`
 11. **币种选择**：`#demo-currency` 下拉框切换时刷新页面（`?currency=EUR&amount=xxx`）；服务端读 `req.query.currency` 并注入 SDK URL；零小数位货币（JPY/KRW/TWD/CLP/IDR）金额自动取整
 12. **币种校验**：后端用 `SUPPORTED_CURRENCIES` 白名单校验，无效则 fallback 到 `DEFAULT_CURRENCY`
@@ -303,9 +303,20 @@ module.exports = createStandardRoute({
 })
 ```
 
-**简单产品（不需要自定义 body，用标准结构）：** 不写 `buildBody`，工厂自动用 `buildOrderBody` 生成：
+**所有工厂路由产品必须使用 `buildBody`，包括"简单"产品。** 这样所有 API 参数都在路由文件一处，方便调试和日志查看：
 ```js
-module.exports = createStandardRoute({ productKey, sdkParams, view })
+// 即使是最简单的产品，也用 buildBody 而非省略
+module.exports = createStandardRoute({
+  productKey: 'spb-ecs',
+  sdkParams:  'components=buttons',
+  view:       'paypal/jssdk-v5/spb-ecs',
+  buildBody: function (amount, currency) {
+    return {
+      intent: demoParams.INTENT.CAPTURE,
+      purchase_units: [{ ... }]
+    }
+  }
+})
 ```
 
 **Vault with-purchase（带购买的 Vault）：**
