@@ -25,6 +25,8 @@ const ITEM_CATEGORY = {
 // ── Demo 默认值 ──────────────────────────────────────────────────────
 const DEFAULT_AMOUNT   = '100.00'
 const DEFAULT_CURRENCY = CURRENCY.USD
+const MIN_AMOUNT       = 1.00
+const MAX_AMOUNT       = 30000.00
 
 // ── Demo 订单描述（显示在 PayPal 结账页）─────────────────────────────
 const DEMO_DESCRIPTION = 'PayPal Integration Demo Purchase'
@@ -66,6 +68,17 @@ const SANDBOX_BILLING = {
  *   @param {object} overrides.purchaseUnit  - 合并进 purchase_units[0]（如 Vault payment_source）
  *   @param {object} overrides.topLevel      - 合并进顶层（如 payment_source.token）
  */
+/**
+ * 服务端金额校验，返回错误字符串或 null
+ */
+function validateAmount(amount) {
+  const num = parseFloat(amount)
+  if (!amount || isNaN(num)) return 'Invalid amount'
+  if (num < MIN_AMOUNT) return `Amount must be at least $${MIN_AMOUNT.toFixed(2)}`
+  if (num > MAX_AMOUNT) return `Amount cannot exceed $${MAX_AMOUNT.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+  return null
+}
+
 function buildOrderBody(amount, overrides = {}) {
   const value    = parseFloat(amount).toFixed(2)
   const currency = overrides.currency || DEFAULT_CURRENCY
@@ -101,9 +114,12 @@ module.exports = {
   ITEM_CATEGORY,
   DEFAULT_AMOUNT,
   DEFAULT_CURRENCY,
+  MIN_AMOUNT,
+  MAX_AMOUNT,
   DEMO_DESCRIPTION,
   DEMO_ITEM,
   SANDBOX_SHIPPING,
   SANDBOX_BILLING,
+  validateAmount,
   buildOrderBody,
 }

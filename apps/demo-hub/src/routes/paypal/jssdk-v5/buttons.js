@@ -3,7 +3,7 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, getUSToken, API } = require('../../../config/paypal')
-const { buildOrderBody, DEFAULT_AMOUNT } = require('../../../config/constants')
+const { buildOrderBody, DEFAULT_AMOUNT, validateAmount } = require('../../../config/constants')
 
 const router = Router()
 const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'buttons'
@@ -27,6 +27,8 @@ router.get('/buttons', (req, res) => {
 router.post('/api/buttons/create-order', async (req, res) => {
   try {
     const amount = req.body.amount || DEFAULT_AMOUNT
+    const amountErr = validateAmount(amount)
+    if (amountErr) return res.status(400).json({ error: amountErr })
     const token  = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method:  'POST',
@@ -43,6 +45,8 @@ router.post('/api/buttons/create-order', async (req, res) => {
 router.post('/api/buttons/create-order-us', async (req, res) => {
   try {
     const amount = req.body.amount || DEFAULT_AMOUNT
+    const amountErr = validateAmount(amount)
+    if (amountErr) return res.status(400).json({ error: amountErr })
     const token  = await getUSToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method:  'POST',

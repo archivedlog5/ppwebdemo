@@ -6,7 +6,7 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, API } = require('../../../config/paypal')
-const { buildOrderBody, DEFAULT_AMOUNT } = require('../../../config/constants')
+const { buildOrderBody, DEFAULT_AMOUNT, validateAmount } = require('../../../config/constants')
 
 const PROVIDER    = 'paypal'
 const SDK_VERSION = 'jssdk-v5'
@@ -45,6 +45,8 @@ function createStandardRoute({ productKey, sdkParams, view, orderBody = {}, extr
   router.post(`/api/${productKey}/create-order`, async (req, res) => {
     try {
       const amount = req.body.amount || DEFAULT_AMOUNT
+      const amountErr = validateAmount(amount)
+      if (amountErr) return res.status(400).json({ error: amountErr })
       const token  = await getCNToken()
       const body   = buildOrderBody(amount, { topLevel: orderBody })
       const r = await fetch(`${API}/v2/checkout/orders`, {
@@ -108,6 +110,8 @@ function createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSour
   router.post(`/api/${productKey}/create-order`, async (req, res) => {
     try {
       const amount = req.body.amount || DEFAULT_AMOUNT
+      const amountErr = validateAmount(amount)
+      if (amountErr) return res.status(400).json({ error: amountErr })
       const token  = await getCNToken()
       const body   = buildOrderBody(amount, { purchaseUnit: { payment_source: paymentSource } })
       const r = await fetch(`${API}/v2/checkout/orders`, {

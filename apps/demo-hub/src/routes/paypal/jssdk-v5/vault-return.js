@@ -3,7 +3,7 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, API } = require('../../../config/paypal')
-const { buildOrderBody, DEFAULT_AMOUNT } = require('../../../config/constants')
+const { buildOrderBody, DEFAULT_AMOUNT, validateAmount } = require('../../../config/constants')
 
 const router = Router()
 const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'vault-return'
@@ -25,6 +25,8 @@ router.post('/api/vault-return/create-and-capture', async (req, res) => {
   try {
     const { paymentTokenId, amount } = req.body
     if (!paymentTokenId) return res.status(400).json({ error: 'paymentTokenId required' })
+    const amountErr = validateAmount(amount || DEFAULT_AMOUNT)
+    if (amountErr) return res.status(400).json({ error: amountErr })
 
     const token = await getCNToken()
     const body  = buildOrderBody(amount || DEFAULT_AMOUNT, {

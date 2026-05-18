@@ -22,14 +22,25 @@
     return input ? input.value.trim() : (window.DEMO && window.DEMO.defaultAmount) || '100.00'
   }
 
+  var MIN_AMOUNT = 1.00
+  var MAX_AMOUNT = 30000.00
+
   function validateAmount() {
     var input = document.getElementById('demo-amount')
     var errEl = document.getElementById('amount-error')
     if (!input) return true
     var val = input.value.trim()
     var num = parseFloat(val)
-    if (!val || isNaN(num) || num <= 0 || !/^\d+(\.\d{1,2})?$/.test(val)) {
-      if (errEl) errEl.textContent = 'Please enter a valid amount (e.g. 100.00)'
+    var err = ''
+    if (!val || isNaN(num) || !/^\d+(\.\d{1,2})?$/.test(val)) {
+      err = 'Please enter a valid number (e.g. 100.00)'
+    } else if (num < MIN_AMOUNT) {
+      err = 'Minimum amount is $' + MIN_AMOUNT.toFixed(2)
+    } else if (num > MAX_AMOUNT) {
+      err = 'Maximum amount is $' + MAX_AMOUNT.toLocaleString('en-US', { minimumFractionDigits: 2 })
+    }
+    if (err) {
+      if (errEl) errEl.textContent = err
       input.classList.add('amount-input--error')
       return false
     }
