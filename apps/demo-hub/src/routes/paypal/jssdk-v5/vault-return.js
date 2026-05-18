@@ -32,7 +32,7 @@ router.post('/api/vault-return/create-and-capture', async (req, res) => {
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         intent: 'CAPTURE',
-        purchase_units: [{ amount: { currency_code: 'USD', value: '1.00' } }],
+        purchase_units: [{ amount: { currency_code: 'USD', value: '100.00' } }],
         payment_source: { token: { id: paymentTokenId, type: 'PAYMENT_METHOD_TOKEN' } },
       }),
     })

@@ -48,7 +48,7 @@
         })
         .finally(function () {
           btn.disabled    = false
-          btn.textContent = 'Charge $1.00 with Vaulted Method'
+          btn.textContent = 'Charge \$100.00 with Vaulted Method'
         })
     })
   })

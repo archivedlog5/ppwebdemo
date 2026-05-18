@@ -26,7 +26,7 @@ router.post('/api/acdc/create-order', async (req, res) => {
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: '1.00' } }] }),
+      body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: '100.00' } }] }),
     })
     const order = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })
