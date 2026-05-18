@@ -25,9 +25,19 @@ function resolveCurrency(value) {
 /**
  * createStandardRoute
  * GET  reads ?currency and ?amount from query → passes to EJS + SDK URL
- * POST reads req.body.amount + req.body.currency → validates → buildOrderBody
+ * POST reads req.body.amount + req.body.currency → validates → builds body
+ *
+ * @param {object} config
+ * @param {string} config.productKey
+ * @param {string} config.sdkParams
+ * @param {string} config.view
+ * @param {function} [config.buildBody]  - (amount, currency) => body object
+ *   If provided, called with dynamic amount+currency — all body logic in the route file.
+ *   Can import and use constants directly: const C = require('.../constants')
+ * @param {object}   [config.orderBody]  - Fallback: merged into buildOrderBody topLevel (legacy)
+ * @param {Array}    [config.extraScripts]
  */
-function createStandardRoute({ productKey, sdkParams, view, orderBody = {}, extraScripts = [] }) {
+function createStandardRoute({ productKey, sdkParams, view, buildBody, orderBody = {}, extraScripts = [] }) {
   const router = Router()
 
   router.get(`/${productKey}`, (req, res) => {
@@ -59,7 +69,11 @@ function createStandardRoute({ productKey, sdkParams, view, orderBody = {}, extr
       const amountErr = validateAmount(amount, currency)
       if (amountErr) return res.status(400).json({ error: amountErr })
       const token = await getCNToken()
-      const body  = buildOrderBody(amount, { currency, topLevel: orderBody })
+      // buildBody(amount, currency) → full control from route file
+      // orderBody                  → legacy: merged into buildOrderBody topLevel
+      const body = typeof buildBody === 'function'
+        ? buildBody(amount, currency)
+        : buildOrderBody(amount, { currency, topLevel: orderBody })
       const r = await fetch(`${API}/v2/checkout/orders`, {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -97,8 +111,11 @@ function createStandardRoute({ productKey, sdkParams, view, orderBody = {}, extr
 
 /**
  * createVaultWithPurchaseRoute
+ * @param {function} [config.buildBody] - (amount, currency) => body object
+ *   If provided, full body control from route file (paymentSource ignored).
+ * @param {object}   [config.paymentSource] - Fallback vault payment_source
  */
-function createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSource }) {
+function createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody, paymentSource }) {
   const router = Router()
 
   router.get(`/${productKey}`, (req, res) => {
@@ -129,7 +146,9 @@ function createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSour
       const amountErr = validateAmount(amount, currency)
       if (amountErr) return res.status(400).json({ error: amountErr })
       const token = await getCNToken()
-      const body  = buildOrderBody(amount, { currency, purchaseUnit: { payment_source: paymentSource } })
+      const body = typeof buildBody === 'function'
+        ? buildBody(amount, currency)
+        : buildOrderBody(amount, { currency, purchaseUnit: { payment_source: paymentSource } })
       const r = await fetch(`${API}/v2/checkout/orders`, {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
