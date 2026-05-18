@@ -50,8 +50,14 @@
 - SPB ECM 完整实现（spb.js 复用）；ACDC 完整实现（acdc.js）；Vault 完整实现
 - 待实现：applepay.js / googlepay.js（需要 Apple/Google Pay sandbox 环境）
 
+- [x] 更正 CLAUDE.md 中 superpowers/gstack skills 各阶段归属（plan-review 系列必须在有 plan 后才调用）
+- [x] 设计动态金额输入 + API 常量文件 → `docs/design/2026-05-18-design-be-dynamic-amount-and-constants.md`
+
 ### 下一步
+- [ ] 实现 `config/constants.js` + `buildOrderBody`
+- [ ] 更新 `_factory.js` + 各自定义路由读 `req.body.amount`
+- [ ] 更新前端 JS 读输入框 amount
+- [ ] 更新 EJS 视图加金额输入框 + sandbox.css 加样式
 - [ ] 浏览器测试 SPB ECM / ACDC / Vault 完整支付流程
 - [ ] 实现 applepay.js（需 Safari + Apple Wallet）
 - [ ] 实现 googlepay.js（需 Chrome + Google Pay card）
-- [ ] 讨论 store-fashion 需求

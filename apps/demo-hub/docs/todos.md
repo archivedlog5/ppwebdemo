@@ -49,12 +49,25 @@
 - [ ] **Task 12** — applepay-ecm, applepay-ecs（等 `applepay.js` 实现）
 - [ ] **Task 13** — googlepay-ecm, googlepay-ecs（等 `googlepay.js` 实现）
 
+### 动态金额 + 常量文件（新需求）
+
+> 设计文档：`docs/design/2026-05-18-design-be-dynamic-amount-and-constants.md`
+
+- [ ] **新建** `src/config/constants.js`（INTENT、CURRENCY、DEMO_ITEM、SANDBOX_SHIPPING、SANDBOX_BILLING、buildOrderBody）
+- [ ] 更新 `_factory.js`：POST handler 读 `req.body.amount`，调用 `buildOrderBody`
+- [ ] 更新 `buttons.js`、`acdc.js`、`vault-return.js`：改用 `buildOrderBody`
+- [ ] 更新前端 JS（spb/acdc/buttons/vault-return.js）：`createOrder` 读输入框 amount 传给后端
+- [ ] 更新所有有购买行为的 EJS 视图：加金额输入框（default $100.00，验证，blur 格式化）
+- [ ] 更新 `sandbox.css`：加金额输入框样式
+
 #### 验证
 
 - [ ] 浏览器测试 SPB ECM 完整支付流程（`npm run dev:demo-hub` → http://localhost:3000）
+- [ ] 浏览器测试自定义金额（修改金额后支付，PayPal 结账页显示正确金额）
 - [ ] 浏览器测试 ACDC 完整支付流程
 - [ ] 浏览器测试 Vault setup-only 并获取 Payment Token
 - [ ] 浏览器测试 Vault return buyer（用上面获取的 token）
+- [ ] PayPal 结账页确认：商品名称、描述、收货地址预填正确
 
 ---
 

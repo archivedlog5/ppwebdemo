@@ -568,3 +568,62 @@ createOrder: function () {
 | 所有工厂产品通用逻辑 | `routes/paypal/jssdk-v5/_factory.js` → `createStandardRoute` |
 | 前端动态传参 | `_factory.js` 读 `req.body`；`public/js/.../spb.js` 改 fetch body |
 | 改默认金额 | `_factory.js` 第 34 行：`value: '1.00'` |
+
+---
+
+## 常量文件与动态金额（2026-05-18）
+
+> 完整设计：`docs/design/2026-05-18-design-be-dynamic-amount-and-constants.md`
+
+### 新增文件：`src/config/constants.js`
+
+所有路由文件通过此文件统一引用 PayPal API 参数，不再硬编码：
+
+```js
+const { INTENT, CURRENCY, DEFAULT_AMOUNT, buildOrderBody,
+        SANDBOX_SHIPPING, SANDBOX_BILLING } = require('../../../config/constants')
+```
+
+| 导出 | 类型 | 说明 |
+|------|------|------|
+| `INTENT` | 对象 | `{ CAPTURE, AUTHORIZE }` |
+| `CURRENCY` | 对象 | `{ USD, CNY, EUR, GBP }` |
+| `ITEM_CATEGORY` | 对象 | `{ PHYSICAL, DIGITAL }` |
+| `DEFAULT_AMOUNT` | 字符串 | `'100.00'` |
+| `DEFAULT_CURRENCY` | 字符串 | `'USD'` |
+| `DEMO_DESCRIPTION` | 字符串 | 出现在 PayPal 结账页的订单描述 |
+| `DEMO_ITEM` | 对象 | 商品名称、描述、类目、数量 |
+| `SANDBOX_SHIPPING` | 对象 | 预填收货地址（US sandbox 地址） |
+| `SANDBOX_BILLING` | 对象 | 账单地址（ACDC 场景） |
+| `buildOrderBody(amount, overrides)` | 函数 | 统一组装 PayPal order body |
+
+### `buildOrderBody` 调用方式
+
+```js
+// 标准场景（工厂路由）
+buildOrderBody(amount)
+
+// Vault with-purchase（需要 payment_source 在 purchase_unit 内）
+buildOrderBody(amount, {
+  purchaseUnit: { payment_source: { paypal: { attributes: { vault: {...} } } } }
+})
+
+// 覆盖顶层字段
+buildOrderBody(amount, {
+  topLevel: { payment_source: { token: { id, type } } }
+})
+```
+
+### 动态金额输入框
+
+所有有购买行为的 demo 页面在 sandbox-card 内加金额输入框：
+
+- 位置：`amount-display` 区域改为输入框
+- 默认值：`100.00`
+- 验证：正数、最多两位小数、最小 $0.01，blur 时自动格式化
+- 传参：`createOrder` callback 读 `#demo-amount` 值，放入 fetch body `{ amount }`
+
+### 不加输入框的页面
+
+- `vault-paypal-setup-only.ejs` — 纯签约，无购买金额
+- `vault-acdc-setup-only.ejs` — 纯签约，无购买金额
