@@ -5,26 +5,46 @@ module.exports = createStandardRoute({
   productKey: 'spb-ecs',
   sdkParams:  'components=buttons',
   view:       'paypal/jssdk-v5/spb-ecs',
+
   buildBody: function (amount, currency) {
-    const zd = demoParams.isZeroDecimal(currency)
+    const zd  = demoParams.isZeroDecimal(currency)
     const val = zd ? String(Math.round(parseFloat(amount))) : parseFloat(amount).toFixed(2)
     const amountObj = (curr) => ({ currency_code: curr, value: val })
+
     return {
       intent: demoParams.INTENT.CAPTURE,
+
       payment_source: {
         paypal: {
+          // ECS: no pre-filled buyer info, just experience_context
           experience_context: {
-            payment_method_preference: 'IMMEDIATE_PAYMENT_REQUIRED',
-            user_action: 'PAY_NOW',
-          }
-        }
+            ...demoParams.EXPERIENCE_CONTEXT,        // brand_name, landing_page, return_url, cancel_url
+            shipping_preference: 'GET_FROM_FILE',   // PayPal gets address from buyer account
+            user_action:         'CONTINUE',         // buyer sees "Continue" not "Pay Now"
+          },
+        },
       },
+
       purchase_units: [{
-        amount: { currency_code: currency, value: val, breakdown: { item_total: amountObj(currency) } },
-        description: demoParams.DEMO_DESCRIPTION,
-        items: [{ ...demoParams.DEMO_ITEM, unit_amount: amountObj(currency) }],
-        shipping: demoParams.SANDBOX_SHIPPING,
-      }]
+        reference_id:    demoParams.DEMO_REFERENCE_ID,
+        description:     demoParams.DEMO_DESCRIPTION,
+        invoice_id:      `INV-${Date.now()}`,
+        custom_id:       demoParams.DEMO_CUSTOM_ID,
+        soft_descriptor: demoParams.DEMO_SOFT_DESCRIPTOR,
+
+        amount: {
+          currency_code: currency,
+          value:         val,
+          breakdown:     { item_total: amountObj(currency) },
+        },
+
+        items: [{
+          ...demoParams.DEMO_ITEM,             // name, sku, description, url, category, quantity
+          unit_amount: amountObj(currency),
+        }],
+
+        // No shipping — GET_FROM_FILE: PayPal fetches address from buyer's account
+      }],
     }
   },
 })
