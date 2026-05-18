@@ -3,11 +3,8 @@
  * 用于：buttons
  *
  * window.DEMO = {
- *   urls: {
- *     createOrder:   '/paypal/jssdk-v5/api/buttons/create-order',
- *     createOrderUs: '/paypal/jssdk-v5/api/buttons/create-order-us',
- *     captureOrder:  '/paypal/jssdk-v5/api/buttons/capture-order',
- *   }
+ *   urls: { createOrder, createOrderUs, captureOrder },
+ *   defaultAmount: '100.00'
  * }
  */
 ;(function () {
@@ -18,6 +15,27 @@
     if (!el) return
     el.className = 'result-msg ' + type
     el.textContent = text
+  }
+
+  function getAmount() {
+    var input = document.getElementById('demo-amount')
+    return input ? input.value.trim() : (window.DEMO && window.DEMO.defaultAmount) || '100.00'
+  }
+
+  function validateAmount() {
+    var input = document.getElementById('demo-amount')
+    var errEl = document.getElementById('amount-error')
+    if (!input) return true
+    var val = input.value.trim()
+    var num = parseFloat(val)
+    if (!val || isNaN(num) || num <= 0 || !/^\d+(\.\d{1,2})?$/.test(val)) {
+      if (errEl) errEl.textContent = 'Please enter a valid amount (e.g. 100.00)'
+      input.classList.add('amount-input--error')
+      return false
+    }
+    if (errEl) errEl.textContent = ''
+    input.classList.remove('amount-input--error')
+    return true
   }
 
   function capture(orderID, account) {
@@ -37,51 +55,60 @@
   window.addEventListener('load', function () {
     var urls = window.DEMO && window.DEMO.urls
 
-    // ── CN: PayPal Button ──────────────────────────────────────────
+    // Format amount on blur
+    var amountInput = document.getElementById('demo-amount')
+    if (amountInput) {
+      amountInput.addEventListener('blur', function () {
+        var num = parseFloat(this.value)
+        if (!isNaN(num) && num > 0) this.value = num.toFixed(2)
+        validateAmount()
+      })
+    }
+
+    function makeCreateOrder(endpoint) {
+      return function () {
+        if (!validateAmount()) return Promise.reject(new Error('Invalid amount'))
+        return fetch(endpoint, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ amount: getAmount() }),
+        })
+          .then(function (r) { return r.json() })
+          .then(function (d) { if (d.error) throw new Error(d.error); return d.id })
+      }
+    }
+
+    // ── CN: PayPal ──────────────────────────────────────────────────
     if (typeof paypalCN !== 'undefined') {
       paypalCN.Buttons({
         fundingSource: paypalCN.FUNDING.PAYPAL,
-        createOrder: function () {
-          return fetch(urls.createOrder, { method: 'POST' })
-            .then(function (r) { return r.json() }).then(function (d) { return d.id })
-        },
-        onApprove:  function (d) { return capture(d.orderID, 'cn') },
-        onError:    function (e) { showResult('✗ PayPal: ' + (e.message || String(e)), 'error') },
+        createOrder:   makeCreateOrder(urls.createOrder),
+        onApprove:     function (d) { return capture(d.orderID, 'cn') },
+        onError:       function (e) { showResult('✗ PayPal: ' + (e.message || String(e)), 'error') },
       }).render('#btn-paypal')
 
-      // ── CN: PayLater ─────────────────────────────────────────────
       paypalCN.Buttons({
         fundingSource: paypalCN.FUNDING.PAYLATER,
-        createOrder: function () {
-          return fetch(urls.createOrder, { method: 'POST' })
-            .then(function (r) { return r.json() }).then(function (d) { return d.id })
-        },
-        onApprove:  function (d) { return capture(d.orderID, 'cn') },
-        onError:    function (e) { showResult('✗ PayLater: ' + (e.message || String(e)), 'error') },
+        createOrder:   makeCreateOrder(urls.createOrder),
+        onApprove:     function (d) { return capture(d.orderID, 'cn') },
+        onError:       function (e) { showResult('✗ PayLater: ' + (e.message || String(e)), 'error') },
       }).render('#btn-paylater')
 
-      // ── CN: BCDC ─────────────────────────────────────────────────
       paypalCN.Buttons({
         fundingSource: paypalCN.FUNDING.CARD,
-        createOrder: function () {
-          return fetch(urls.createOrder, { method: 'POST' })
-            .then(function (r) { return r.json() }).then(function (d) { return d.id })
-        },
-        onApprove:  function (d) { return capture(d.orderID, 'cn') },
-        onError:    function (e) { showResult('✗ BCDC: ' + (e.message || String(e)), 'error') },
+        createOrder:   makeCreateOrder(urls.createOrder),
+        onApprove:     function (d) { return capture(d.orderID, 'cn') },
+        onError:       function (e) { showResult('✗ BCDC: ' + (e.message || String(e)), 'error') },
       }).render('#btn-bcdc')
     }
 
-    // ── US: Venmo ─────────────────────────────────────────────────
+    // ── US: Venmo ───────────────────────────────────────────────────
     if (typeof paypalUS !== 'undefined') {
       paypalUS.Buttons({
         fundingSource: paypalUS.FUNDING.VENMO,
-        createOrder: function () {
-          return fetch(urls.createOrderUs, { method: 'POST' })
-            .then(function (r) { return r.json() }).then(function (d) { return d.id })
-        },
-        onApprove:  function (d) { return capture(d.orderID, 'us') },
-        onError:    function (e) { showResult('✗ Venmo: ' + (e.message || String(e)), 'error') },
+        createOrder:   makeCreateOrder(urls.createOrderUs),
+        onApprove:     function (d) { return capture(d.orderID, 'us') },
+        onError:       function (e) { showResult('✗ Venmo: ' + (e.message || String(e)), 'error') },
       }).render('#btn-venmo')
     }
   })

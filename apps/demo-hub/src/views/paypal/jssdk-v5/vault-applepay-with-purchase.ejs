@@ -28,6 +28,7 @@
       createOrder:  '/paypal/jssdk-v5/api/vault-applepay-with-purchase/create-order',
       captureOrder: '/paypal/jssdk-v5/api/vault-applepay-with-purchase/capture-order',
     }
+    defaultAmount: '<%= defaultAmount || "100.00" %>',
   }
 </script>
 <%# Apple Pay 视图逻辑与 applepay-ecm.ejs 共用同一 JS 文件（待创建 applepay.js） %>

@@ -3,6 +3,7 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, API } = require('../../../config/paypal')
+const { buildOrderBody, DEFAULT_AMOUNT } = require('../../../config/constants')
 
 const router = Router()
 const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'acdc'
@@ -17,16 +18,18 @@ router.get('/acdc', (req, res) => {
     sidebarProducts: getProviderProducts(PROVIDER),
     showSidebar: true,
     sdkUrl: `https://www.paypal.com/sdk/js?client-id=${clientId}&components=card-fields&currency=USD`,
+    defaultAmount: DEFAULT_AMOUNT,
   })
 })
 
 router.post('/api/acdc/create-order', async (req, res) => {
   try {
-    const token = await getCNToken()
+    const amount = req.body.amount || DEFAULT_AMOUNT
+    const token  = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: '100.00' } }] }),
+      body:    JSON.stringify(buildOrderBody(amount)),
     })
     const order = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })

@@ -309,3 +309,64 @@
   .sandbox-card { padding: var(--sp-5); }
   .field-row { grid-template-columns: 1fr; }
 }
+
+/* ── 动态金额输入框 ─────────────────────────────────────────────────── */
+.amount-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 0 14px;
+  transition: border-color var(--t-base), box-shadow var(--t-base);
+  min-height: 44px;
+}
+
+.amount-input-wrapper:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.amount-prefix {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--fg-muted);
+  margin-right: 4px;
+  user-select: none;
+}
+
+.amount-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--fg);
+  padding: 8px 0;
+  width: 100%;
+  letter-spacing: -0.5px;
+}
+
+.amount-input::placeholder {
+  color: var(--fg-subtle);
+  font-weight: 400;
+}
+
+.amount-input--error {
+  color: var(--error);
+}
+
+.amount-input-wrapper:has(.amount-input--error) {
+  border-color: var(--error);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.amount-error {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--error);
+  margin-top: 4px;
+  min-height: 14px;
+}

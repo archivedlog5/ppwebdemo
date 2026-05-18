@@ -10,11 +10,17 @@
     <p>Apple Pay via PayPal. Requires Safari + Apple Wallet card.</p>
   </div>
   <div class="sandbox-card">
-    <div class="amount-display">
-      <div class="amount-label">Test Amount</div>
-      <div class="amount-value">$100.00</div>
-      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
+    <div class="field-group">
+      <label class="field-label" for="demo-amount">Amount (USD)</label>
+      <div class="amount-input-wrapper">
+        <span class="amount-prefix">$</span>
+        <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+          value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
+          aria-label="Payment amount in USD" />
+      </div>
+      <div class="amount-error" id="amount-error" role="alert"></div>
     </div>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
     <div id="paypal-button-container" class="sdk-loading">
       <div class="sdk-spinner"></div><span>Loading Apple Pay...</span>
     </div>

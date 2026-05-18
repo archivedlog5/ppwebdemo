@@ -3,6 +3,7 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, getUSToken, API } = require('../../../config/paypal')
+const { buildOrderBody, DEFAULT_AMOUNT } = require('../../../config/constants')
 
 const router = Router()
 const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'buttons'
@@ -25,11 +26,12 @@ router.get('/buttons', (req, res) => {
 // CN: PayPal / PayLater / BCDC
 router.post('/api/buttons/create-order', async (req, res) => {
   try {
-    const token = await getCNToken()
+    const amount = req.body.amount || DEFAULT_AMOUNT
+    const token  = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: '100.00' } }] }),
+      body:    JSON.stringify(buildOrderBody(amount)),
     })
     const order = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })
@@ -40,11 +42,12 @@ router.post('/api/buttons/create-order', async (req, res) => {
 // US: Venmo
 router.post('/api/buttons/create-order-us', async (req, res) => {
   try {
-    const token = await getUSToken()
+    const amount = req.body.amount || DEFAULT_AMOUNT
+    const token  = await getUSToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: '100.00' } }] }),
+      body:    JSON.stringify(buildOrderBody(amount)),
     })
     const order = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })

@@ -3,6 +3,7 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, API } = require('../../../config/paypal')
+const { buildOrderBody, DEFAULT_AMOUNT } = require('../../../config/constants')
 
 const router = Router()
 const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'vault-return'
@@ -15,26 +16,26 @@ router.get('/vault-return', (req, res) => {
     currentProductKey: KEY, currentSdkVersion: SDK,
     sidebarProducts: getProviderProducts(PROVIDER),
     showSidebar: true,
+    defaultAmount: DEFAULT_AMOUNT,
   })
 })
 
 // Server-side charge via vault payment token — no buyer interaction
 router.post('/api/vault-return/create-and-capture', async (req, res) => {
   try {
-    const { paymentTokenId } = req.body
+    const { paymentTokenId, amount } = req.body
     if (!paymentTokenId) return res.status(400).json({ error: 'paymentTokenId required' })
 
     const token = await getCNToken()
+    const body  = buildOrderBody(amount || DEFAULT_AMOUNT, {
+      topLevel: { payment_source: { token: { id: paymentTokenId, type: 'PAYMENT_METHOD_TOKEN' } } }
+    })
 
     // Create order using vault payment token
     const orderRes = await fetch(`${API}/v2/checkout/orders`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        intent: 'CAPTURE',
-        purchase_units: [{ amount: { currency_code: 'USD', value: '100.00' } }],
-        payment_source: { token: { id: paymentTokenId, type: 'PAYMENT_METHOD_TOKEN' } },
-      }),
+      body:    JSON.stringify(body),
     })
     const order = await orderRes.json()
     if (!orderRes.ok) return res.status(orderRes.status).json({ error: order.message, details: order })

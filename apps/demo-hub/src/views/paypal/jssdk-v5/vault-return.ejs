@@ -31,7 +31,8 @@
   window.DEMO = {
     urls: {
       createAndCapture: '/paypal/jssdk-v5/api/vault-return/create-and-capture',
-    }
+    },
+    defaultAmount: '<%= defaultAmount || "100.00" %>',
   }
 </script>
 <script src="/js/paypal/jssdk-v5/vault-return.js"></script>
