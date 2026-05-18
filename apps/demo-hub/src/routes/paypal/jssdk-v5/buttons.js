@@ -1,86 +1,116 @@
 /* Custom: dual SDK (CN account + US account for Venmo) */
-const { Router } = require('express')
-const fetch = require('node-fetch')
-const { getProduct, getProviderProducts } = require('../../../config/products')
-const { getCNToken, getUSToken, API, getHeaders } = require('../../../config/paypal')
-const { buildOrderBody, DEFAULT_AMOUNT, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES, validateAmount } = require('../../../config/constants')
+const { Router } = require("express");
+const fetch = require("node-fetch");
+const { getProduct, getProviderProducts } = require("../../../config/products");
+const {
+  getCNToken,
+  getUSToken,
+  API,
+  getHeaders,
+} = require("../../../config/paypal");
+const {
+  buildOrderBody,
+  DEFAULT_AMOUNT,
+  DEFAULT_CURRENCY,
+  SUPPORTED_CURRENCIES,
+  validateAmount,
+} = require("../../../config/constants");
 
-function resolveCurrency(v) { return SUPPORTED_CURRENCIES.includes(v) ? v : DEFAULT_CURRENCY }
+function resolveCurrency(v) {
+  return SUPPORTED_CURRENCIES.includes(v) ? v : DEFAULT_CURRENCY;
+}
 
-const router = Router()
-const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'buttons'
+const router = Router();
+const PROVIDER = "paypal",
+  SDK = "jssdk-v5",
+  KEY = "buttons";
 
-router.get('/buttons', (req, res) => {
-  const product  = getProduct(PROVIDER, SDK, KEY)
-  const currency = resolveCurrency(req.query.currency)
-  const amount   = req.query.amount || DEFAULT_AMOUNT
-  const CN_ID = process.env.PAYPAL_CN_CLIENT_ID
-  const US_ID = process.env.PAYPAL_US_CLIENT_ID
-  res.render('paypal/jssdk-v5/buttons', {
-    title: product?.displayName ?? 'Independent Buttons',
-    provider: PROVIDER, sdkVersion: SDK,
-    currentProductKey: KEY, currentSdkVersion: SDK,
+router.get("/buttons", (req, res) => {
+  const product = getProduct(PROVIDER, SDK, KEY);
+  const currency = resolveCurrency(req.query.currency);
+  const amount = req.query.amount || DEFAULT_AMOUNT;
+  const CN_ID = process.env.PAYPAL_CN_CLIENT_ID;
+  const US_ID = process.env.PAYPAL_US_CLIENT_ID;
+  res.render("paypal/jssdk-v5/buttons", {
+    title: product?.displayName ?? "Standalone Buttons",
+    provider: PROVIDER,
+    sdkVersion: SDK,
+    currentProductKey: KEY,
+    currentSdkVersion: SDK,
     sidebarProducts: getProviderProducts(PROVIDER),
     showSidebar: true,
     defaultAmount: amount,
     currency,
-    cnSdkUrl: `https://www.paypal.com/sdk/js?client-id=${CN_ID}&components=buttons&currency=${currency}`,
-    usSdkUrl: `https://www.paypal.com/sdk/js?client-id=${US_ID}&components=buttons&enable-funding=venmo&currency=${currency}`,
-  })
-})
+    cnSdkUrl: `https://www.paypal.com/sdk/js?client-id=${CN_ID}&commit=true&buyer-country=US&components=buttons&currency=${currency}&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort`,
+    usSdkUrl: `https://www.paypal.com/sdk/js?client-id=${US_ID}&commit=true&buyer-country=US&components=buttons&enable-funding=venmo&currency=${currency}&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort`,
+  });
+});
 
 // CN: PayPal / PayLater / BCDC
-router.post('/api/buttons/create-order', async (req, res) => {
+router.post("/api/buttons/create-order", async (req, res) => {
   try {
-    const amount   = req.body.amount   || DEFAULT_AMOUNT
-    const currency = resolveCurrency(req.body.currency)
-    const amountErr = validateAmount(amount, currency)
-    if (amountErr) return res.status(400).json({ error: amountErr })
-    const token  = await getCNToken()
+    const amount = req.body.amount || DEFAULT_AMOUNT;
+    const currency = resolveCurrency(req.body.currency);
+    const amountErr = validateAmount(amount, currency);
+    if (amountErr) return res.status(400).json({ error: amountErr });
+    const token = await getCNToken();
     const r = await fetch(`${API}/v2/checkout/orders`, {
-      method:  'POST',
+      method: "POST",
       headers: getHeaders(token),
-      body:    JSON.stringify(buildOrderBody(amount, { currency })),
-    })
-    const order = await r.json()
-    if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })
-    res.json({ id: order.id })
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
+      body: JSON.stringify(buildOrderBody(amount, { currency })),
+    });
+    const order = await r.json();
+    if (!r.ok)
+      return res
+        .status(r.status)
+        .json({ error: order.message, details: order });
+    res.json({ id: order.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // US: Venmo
-router.post('/api/buttons/create-order-us', async (req, res) => {
+router.post("/api/buttons/create-order-us", async (req, res) => {
   try {
-    const amount   = req.body.amount   || DEFAULT_AMOUNT
-    const currency = resolveCurrency(req.body.currency)
-    const amountErr = validateAmount(amount, currency)
-    if (amountErr) return res.status(400).json({ error: amountErr })
-    const token  = await getUSToken()
+    const amount = req.body.amount || DEFAULT_AMOUNT;
+    const currency = resolveCurrency(req.body.currency);
+    const amountErr = validateAmount(amount, currency);
+    if (amountErr) return res.status(400).json({ error: amountErr });
+    const token = await getUSToken();
     const r = await fetch(`${API}/v2/checkout/orders`, {
-      method:  'POST',
+      method: "POST",
       headers: getHeaders(token),
-      body:    JSON.stringify(buildOrderBody(amount, { currency })),
-    })
-    const order = await r.json()
-    if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })
-    res.json({ id: order.id })
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
+      body: JSON.stringify(buildOrderBody(amount, { currency })),
+    });
+    const order = await r.json();
+    if (!r.ok)
+      return res
+        .status(r.status)
+        .json({ error: order.message, details: order });
+    res.json({ id: order.id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Capture (handles both CN and US)
-router.post('/api/buttons/capture-order', async (req, res) => {
+router.post("/api/buttons/capture-order", async (req, res) => {
   try {
-    const { orderID, account } = req.body
-    if (!orderID) return res.status(400).json({ error: 'orderID required' })
-    const token = account === 'us' ? await getUSToken() : await getCNToken()
+    const { orderID, account } = req.body;
+    if (!orderID) return res.status(400).json({ error: "orderID required" });
+    const token = account === "us" ? await getUSToken() : await getCNToken();
     const r = await fetch(`${API}/v2/checkout/orders/${orderID}/capture`, {
-      method: 'POST',
+      method: "POST",
       headers: getHeaders(token),
-    })
-    const data = await r.json()
-    if (!r.ok) return res.status(r.status).json({ error: data.message, details: data })
-    res.json(data)
-  } catch (err) { res.status(500).json({ error: err.message }) }
-})
+    });
+    const data = await r.json();
+    if (!r.ok)
+      return res.status(r.status).json({ error: data.message, details: data });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-module.exports = router
+module.exports = router;

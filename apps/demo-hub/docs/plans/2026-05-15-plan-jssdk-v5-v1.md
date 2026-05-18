@@ -1483,7 +1483,7 @@ git commit -m "feat(demo-hub): add PayPal SPB ECS demo (/paypal/jssdk-v5/spb-ecs
 
 ---
 
-## Task 10: Independent Buttons Demo (CN + US dual SDK)
+## Task 10: Standalone Buttons Demo (CN + US dual SDK)
 
 **Files:**
 - Create: `apps/demo-hub/src/routes/paypal/jssdk-v5/buttons.js`
@@ -1505,7 +1505,7 @@ const PROVIDER = 'paypal', SDK_VERSION = 'jssdk-v5', PRODUCT_KEY = 'buttons'
 router.get('/buttons', (req, res) => {
   const product = getProduct(PROVIDER, SDK_VERSION, PRODUCT_KEY)
   res.render('paypal/jssdk-v5/buttons', {
-    title: product?.displayName ?? 'Independent Buttons',
+    title: product?.displayName ?? 'Standalone Buttons',
     provider: PROVIDER, sdkVersion: SDK_VERSION,
     currentProductKey: PRODUCT_KEY, currentSdkVersion: SDK_VERSION,
     sidebarProducts: getProviderProducts(PROVIDER),
@@ -1633,7 +1633,7 @@ Open `http://localhost:3000/paypal/jssdk-v5/buttons` — 4 buttons appear. Verif
 ```bash
 git add apps/demo-hub/src/routes/paypal/jssdk-v5/buttons.js \
         apps/demo-hub/src/views/paypal/jssdk-v5/buttons.ejs
-git commit -m "feat(demo-hub): add independent buttons demo (PayPal/PayLater/BCDC/Venmo)"
+git commit -m "feat(demo-hub): add standalone buttons demo (PayPal/PayLater/BCDC/Venmo)"
 ```
 
 ---
@@ -2589,8 +2589,8 @@ CREATE POLICY "public_read" ON demohub.products FOR SELECT USING (true);
 INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
 VALUES
   ('paypal','jssdk-v5','spb-ecm',                    'SPB ECM Flow',               'Smart Payment Button — Express Checkout Mark Flow',   true,  1),
-  ('paypal','jssdk-v5','spb-ecs',                    'SPB ECS Flow',               'Smart Payment Button — Express Checkout Standard',    true,  2),
-  ('paypal','jssdk-v5','buttons',                    'Independent Buttons',        'PayPal / PayLater / BCDC / Venmo 独立按钮渲染',        true,  3),
+  ('paypal','jssdk-v5','spb-ecs',                    'SPB ECS Flow',               'Smart Payment Button — Express Checkout Shortcut',   true,  2),
+  ('paypal','jssdk-v5','buttons',                    'Standalone Buttons',        'PayPal / PayLater / BCDC / Venmo Standalone Buttons 渲染',        true,  3),
   ('paypal','jssdk-v5','acdc',                       'ACDC',                       'Advanced Credit/Debit Card 卡片输入集成',              true,  4),
   ('paypal','jssdk-v5','applepay-ecm',               'Apple Pay ECM',              'Apple Pay — Express Checkout Mini 流程',              true,  5),
   ('paypal','jssdk-v5','applepay-ecs',               'Apple Pay ECS',              'Apple Pay — Express Checkout Standard 流程',          true,  6),

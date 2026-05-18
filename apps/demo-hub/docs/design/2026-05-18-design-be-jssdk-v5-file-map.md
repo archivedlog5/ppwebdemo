@@ -26,7 +26,7 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由（SDK 参数 + API） | `src/routes/paypal/jssdk-v5/spb-ecm.js` | `sdkParams: 'components=buttons&currency=USD'`，调用 `createStandardRoute` |
+| 路由（SDK 参数 + API） | `src/routes/paypal/jssdk-v5/spb-ecm.js` | `sdkParams` 含 `commit=true&buyer-country=US&disable-funding=...`；`buildBody` 含完整 buyer info + experience_context |
 | 后端逻辑 | `src/routes/paypal/jssdk-v5/_factory.js` → `createStandardRoute` | `POST /v2/checkout/orders`（intent: CAPTURE），`POST /v2/checkout/orders/{id}/capture` |
 | EJS 视图 | `src/views/paypal/jssdk-v5/spb-ecm.ejs` | `window.DEMO.urls.createOrder/captureOrder`，badge 文字 |
 | SDK JS | `src/public/js/paypal/jssdk-v5/spb.js` | `paypalSDK.Buttons({ createOrder, onApprove, onError })` |
@@ -39,30 +39,30 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 ---
 
-### spb-ecs — Standard PayPal Button, Express Checkout Standard
+### spb-ecs — Standard PayPal Button, Express Checkout Shortcut
 
-> ECS = Express Checkout Standard，携带 `PAY_NOW` 体验上下文
+> ECS = Express Checkout Shortcut，`user_action: CONTINUE`，`shipping_preference: GET_FROM_FILE`（从买家账户获取地址）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由（SDK 参数 + API） | `src/routes/paypal/jssdk-v5/spb-ecs.js` | `sdkParams: 'components=buttons&currency=USD'`，`orderBody` 含 `experience_context.user_action: 'PAY_NOW'` |
+| 路由（SDK 参数 + API） | `src/routes/paypal/jssdk-v5/spb-ecs.js` | `sdkParams` 含 `commit=false&buyer-country=US`；`buildBody` 设 `user_action: CONTINUE`, `shipping_preference: GET_FROM_FILE` |
 | 后端逻辑 | `src/routes/paypal/jssdk-v5/_factory.js` → `createStandardRoute` | 同 ECM，但 order body 含 `payment_source.paypal.experience_context` |
 | EJS 视图 | `src/views/paypal/jssdk-v5/spb-ecs.ejs` | 同 ECM 结构，window.DEMO 改为 spb-ecs API |
 | SDK JS | `src/public/js/paypal/jssdk-v5/spb.js` | 与 ECM **共用同一 JS 文件** |
 
 ---
 
-## 独立按钮（自定义路由）
+## Standalone Buttons（自定义路由）
 
-### buttons — PayPal/PayLater/BCDC/Venmo 独立渲染
+### buttons — PayPal/PayLater/BCDC/Venmo Standalone 渲染
 
 > 同一页面展示 4 个按钮，CN 账户 + US 账户双 SDK
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
 | 路由 + API | `src/routes/paypal/jssdk-v5/buttons.js` | 自定义路由；`create-order`（CN）、`create-order-us`（US Venmo）、`capture-order`（account 参数区分） |
-| EJS 视图 | `src/views/paypal/jssdk-v5/buttons.ejs` | 4 个 `btn-slot` div；`cnSdkUrl`/`usSdkUrl` 双 script 注入；`window.DEMO.urls` 含三个端点 |
-| SDK JS | `src/public/js/paypal/jssdk-v5/buttons.js` | 分别渲染 paypalCN.FUNDING.PAYPAL/PAYLATER/CARD 和 paypalUS.FUNDING.VENMO |
+| EJS 视图 | `src/views/paypal/jssdk-v5/buttons.ejs` | 4 个 `btn-slot` div，顺序：PayPal → PayLater → Venmo → BCDC；`cnSdkUrl`/`usSdkUrl` 双 script 注入；`window.DEMO.urls` 含三个端点；**币种选择器已 `disabled`**（双 SDK 各自带 currency 参数，切换需同步刷新两个 SDK，暂不支持） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/buttons.js` | 分别渲染 paypalCN.FUNDING.PAYPAL/PAYLATER/CARD 和 paypalUS.FUNDING.VENMO；BCDC 加 `expandCardForm: true` |
 
 **常用微调点：**
 - CN/US 账户切换 → `buttons.js` 路由里改 `getCNToken()`/`getUSToken()`
@@ -179,20 +179,23 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 ## SDK 参数速查表
 
-每个产品的 SDK URL 格式：`https://www.paypal.com/sdk/js?client-id=<ID>&<sdkParams>`
+每个产品的 SDK URL 格式：`https://www.paypal.com/sdk/js?client-id=<ID>&<sdkParams>&currency=<CURRENCY>`
+（factory 动态注入 currency，sdkParams 不用再写 currency=）
 
-| 产品 | 关键 sdkParams | 说明 |
-|------|----------------|------|
-| spb-ecm, spb-ecs | `components=buttons&currency=USD` | 标准按钮，按需加 `intent=authorize` |
-| buttons | CN: `components=buttons` / US: `components=buttons&enable-funding=venmo` | 双 SDK 加载 |
-| acdc | `components=card-fields&currency=USD` | 不能和 buttons 混用 |
-| applepay-ecm/ecs | `components=applepay&currency=USD` | 需 Safari |
-| googlepay-ecm/ecs | `components=googlepay&currency=USD` | 需额外加载 `pay.google.com/gp/p/js/pay.js` |
-| vault-paypal-with-purchase | `components=buttons&vault=true&currency=USD` | vault=true 才能存储支付方式 |
-| vault-acdc-with-purchase | `components=card-fields&vault=true&currency=USD` | |
-| vault-paypal-setup-only | `components=buttons&vault=true&currency=USD` | createVaultSetupToken 需要 vault=true |
-| vault-acdc-setup-only | `components=card-fields&vault=true&currency=USD` | |
-| vault-return | 无 SDK（server-side only） | 不需要前端加载 SDK |
+| 产品 | sdkParams（当前实际值） | 关键说明 |
+|------|------------------------|---------|
+| **spb-ecm** | `components=buttons&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort` | ECM：`commit=true` 显示 "Pay Now" |
+| **spb-ecs** | `components=buttons&commit=false&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort` | ECS：`commit=false` 显示 "Continue" |
+| **buttons** | CN: `components=buttons&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort&currency=${currency}` / US: 同 CN + `&enable-funding=venmo` | 双 SDK，currency 由路由注入；`commit=true` 两个 SDK 均生效 |
+| **acdc** | `components=card-fields` | 不能和 buttons 混用 |
+| **applepay-ecm/ecs** | `components=applepay` | 需 Safari + Apple Wallet |
+| **googlepay-ecm/ecs** | `components=googlepay` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 需 Chrome + Google Pay 卡 |
+| **vault-paypal-with-purchase** | `components=buttons&vault=true` | vault=true 才能 store_in_vault |
+| **vault-acdc-with-purchase** | `components=card-fields&vault=true` | |
+| **vault-applepay-with-purchase** | `components=applepay&vault=true` | |
+| **vault-paypal-setup-only** | `components=buttons&vault=true` | 路由文件中手动构建完整 sdkUrl |
+| **vault-acdc-setup-only** | `components=card-fields&vault=true` | 同上 |
+| **vault-return** | 无 SDK（server-side only）| 不加载任何 SDK |
 
 ---
 
