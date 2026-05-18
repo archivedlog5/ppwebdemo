@@ -45,4 +45,18 @@ async function getUSToken() {
   return _cache.us.accessToken
 }
 
-module.exports = { getCNToken, getUSToken, API }
+/**
+ * Standard headers for PayPal REST API calls.
+ * @param {string} token  - Bearer access token
+ * @param {object} [extra] - Additional headers (e.g. PayPal-Request-Id)
+ */
+function getHeaders(token, extra = {}) {
+  return {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type':  'application/json',
+    'Prefer':        'return=representation',
+    ...extra,
+  }
+}
+
+module.exports = { getCNToken, getUSToken, API, getHeaders }

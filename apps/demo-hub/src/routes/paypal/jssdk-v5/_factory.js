@@ -4,7 +4,7 @@
 const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
-const { getCNToken, API } = require('../../../config/paypal')
+const { getCNToken, API, getHeaders } = require('../../../config/paypal')
 const {
   buildOrderBody, validateAmount,
   DEFAULT_AMOUNT, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES,
@@ -76,7 +76,7 @@ function createStandardRoute({ productKey, sdkParams, view, buildBody, orderBody
         : buildOrderBody(amount, { currency, topLevel: orderBody })
       const r = await fetch(`${API}/v2/checkout/orders`, {
         method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: getHeaders(token),
         body:    JSON.stringify(body),
       })
       const order = await r.json()
@@ -95,7 +95,7 @@ function createStandardRoute({ productKey, sdkParams, view, buildBody, orderBody
       const token = await getCNToken()
       const r = await fetch(`${API}/v2/checkout/orders/${orderID}/capture`, {
         method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: getHeaders(token),
       })
       const data = await r.json()
       if (!r.ok) return res.status(r.status).json({ error: data.message || 'Capture failed', details: data })
@@ -151,7 +151,7 @@ function createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody, 
         : buildOrderBody(amount, { currency, purchaseUnit: { payment_source: paymentSource } })
       const r = await fetch(`${API}/v2/checkout/orders`, {
         method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: getHeaders(token),
         body:    JSON.stringify(body),
       })
       const order = await r.json()
@@ -170,7 +170,7 @@ function createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody, 
       const token = await getCNToken()
       const r = await fetch(`${API}/v2/checkout/orders/${orderID}/capture`, {
         method:  'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: getHeaders(token),
       })
       const data = await r.json()
       if (!r.ok) return res.status(r.status).json({ error: data.message || 'Capture failed', details: data })

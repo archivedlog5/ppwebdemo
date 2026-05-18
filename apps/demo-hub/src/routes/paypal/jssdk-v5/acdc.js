@@ -2,7 +2,7 @@
 const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
-const { getCNToken, API } = require('../../../config/paypal')
+const { getCNToken, API, getHeaders } = require('../../../config/paypal')
 const { buildOrderBody, DEFAULT_AMOUNT, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES, validateAmount } = require('../../../config/constants')
 
 function resolveCurrency(v) { return SUPPORTED_CURRENCIES.includes(v) ? v : DEFAULT_CURRENCY }
@@ -34,7 +34,7 @@ router.post('/api/acdc/create-order', async (req, res) => {
     const token  = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method:  'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: getHeaders(token),
       body:    JSON.stringify(buildOrderBody(amount, { currency })),
     })
     const order = await r.json()
@@ -50,7 +50,7 @@ router.post('/api/acdc/capture-order', async (req, res) => {
     const token = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders/${orderID}/capture`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: getHeaders(token),
     })
     const data = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: data.message, details: data })
