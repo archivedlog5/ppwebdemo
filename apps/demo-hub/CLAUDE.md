@@ -370,6 +370,20 @@ npm run dev        # 或在已启动的 nodemon 中输入 rs
 3. 读 `docs/progress.md`
 4. 读 `docs/debug-log.md`
 
+## JSSDK v5 文件速查（调试用）
+
+```
+修改 SDK 加载参数  → src/routes/paypal/jssdk-v5/<product>.js 的 sdkParams
+修改 PayPal API   → src/routes/paypal/jssdk-v5/_factory.js（工厂产品）
+                    或 src/routes/paypal/jssdk-v5/<product>.js（自定义产品）
+修改 SDK 行为     → src/public/js/paypal/jssdk-v5/<shared>.js
+修改页面 HTML     → src/views/paypal/jssdk-v5/<product>.ejs
+修改 UI 样式      → src/public/css/sandbox.css
+```
+
+完整文件映射（每个 demo 对应哪些文件）：
+→ `docs/design/2026-05-18-design-be-jssdk-v5-file-map.md`
+
 ## 参考文档
 
 - 需求：`docs/req/2026-05-15-req-demo-hub.md`
