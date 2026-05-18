@@ -1,32 +1,41 @@
 /**
  * Route factory for PayPal JSSDK v5 standard demos.
- * Eliminates boilerplate across 14 product route files.
  */
 const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, API } = require('../../../config/paypal')
-const { buildOrderBody, DEFAULT_AMOUNT, validateAmount } = require('../../../config/constants')
+const {
+  buildOrderBody, validateAmount,
+  DEFAULT_AMOUNT, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES,
+} = require('../../../config/constants')
 
 const PROVIDER    = 'paypal'
 const SDK_VERSION = 'jssdk-v5'
 
+/** Strip existing currency= from sdkParams so we can inject it dynamically */
+function stripCurrency(sdkParams) {
+  return sdkParams.replace(/[&]?currency=[^&]*/g, '').replace(/^&/, '')
+}
+
+function resolveCurrency(value) {
+  return SUPPORTED_CURRENCIES.includes(value) ? value : DEFAULT_CURRENCY
+}
+
 /**
- * createStandardRoute — for standard PayPal/ApplePay/GooglePay demos.
- * create-order reads amount from req.body.amount (sent by frontend input).
- *
- * @param {object} config
- * @param {string} config.productKey    - e.g. 'spb-ecm'
- * @param {string} config.sdkParams     - SDK URL query string
- * @param {string} config.view          - EJS view path
- * @param {object} [config.orderBody]   - Merged into buildOrderBody overrides.topLevel
- * @param {Array}  [config.extraScripts]- Extra scripts (e.g. Google Pay)
+ * createStandardRoute
+ * GET  reads ?currency and ?amount from query → passes to EJS + SDK URL
+ * POST reads req.body.amount + req.body.currency → validates → buildOrderBody
  */
 function createStandardRoute({ productKey, sdkParams, view, orderBody = {}, extraScripts = [] }) {
   const router = Router()
 
   router.get(`/${productKey}`, (req, res) => {
-    const product = getProduct(PROVIDER, SDK_VERSION, productKey)
+    const product  = getProduct(PROVIDER, SDK_VERSION, productKey)
+    const currency = resolveCurrency(req.query.currency)
+    const amount   = req.query.amount || DEFAULT_AMOUNT
+    const baseParams = stripCurrency(sdkParams)
+
     res.render(view, {
       title:             product?.displayName ?? productKey,
       provider:          PROVIDER,
@@ -36,19 +45,21 @@ function createStandardRoute({ productKey, sdkParams, view, orderBody = {}, extr
       sidebarProducts:   getProviderProducts(PROVIDER),
       showSidebar:       true,
       clientId:          process.env.PAYPAL_CN_CLIENT_ID,
-      sdkUrl:            `https://www.paypal.com/sdk/js?client-id=${process.env.PAYPAL_CN_CLIENT_ID}&${sdkParams}`,
+      sdkUrl:            `https://www.paypal.com/sdk/js?client-id=${process.env.PAYPAL_CN_CLIENT_ID}&${baseParams}&currency=${currency}`,
       extraScripts,
-      defaultAmount:     DEFAULT_AMOUNT,
+      defaultAmount:     amount,
+      currency,
     })
   })
 
   router.post(`/api/${productKey}/create-order`, async (req, res) => {
     try {
-      const amount = req.body.amount || DEFAULT_AMOUNT
-      const amountErr = validateAmount(amount)
+      const amount   = req.body.amount   || DEFAULT_AMOUNT
+      const currency = resolveCurrency(req.body.currency)
+      const amountErr = validateAmount(amount, currency)
       if (amountErr) return res.status(400).json({ error: amountErr })
-      const token  = await getCNToken()
-      const body   = buildOrderBody(amount, { topLevel: orderBody })
+      const token = await getCNToken()
+      const body  = buildOrderBody(amount, { currency, topLevel: orderBody })
       const r = await fetch(`${API}/v2/checkout/orders`, {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -85,14 +96,17 @@ function createStandardRoute({ productKey, sdkParams, view, orderBody = {}, extr
 }
 
 /**
- * createVaultWithPurchaseRoute — Vault with-purchase demos.
- * payment_source goes into purchaseUnit override so buildOrderBody can merge it.
+ * createVaultWithPurchaseRoute
  */
 function createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSource }) {
   const router = Router()
 
   router.get(`/${productKey}`, (req, res) => {
-    const product = getProduct(PROVIDER, SDK_VERSION, productKey)
+    const product  = getProduct(PROVIDER, SDK_VERSION, productKey)
+    const currency = resolveCurrency(req.query.currency)
+    const amount   = req.query.amount || DEFAULT_AMOUNT
+    const baseParams = stripCurrency(sdkParams)
+
     res.render(view, {
       title:             product?.displayName ?? productKey,
       provider:          PROVIDER,
@@ -102,18 +116,20 @@ function createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSour
       sidebarProducts:   getProviderProducts(PROVIDER),
       showSidebar:       true,
       clientId:          process.env.PAYPAL_CN_CLIENT_ID,
-      sdkUrl:            `https://www.paypal.com/sdk/js?client-id=${process.env.PAYPAL_CN_CLIENT_ID}&${sdkParams}`,
-      defaultAmount:     DEFAULT_AMOUNT,
+      sdkUrl:            `https://www.paypal.com/sdk/js?client-id=${process.env.PAYPAL_CN_CLIENT_ID}&${baseParams}&currency=${currency}`,
+      defaultAmount:     amount,
+      currency,
     })
   })
 
   router.post(`/api/${productKey}/create-order`, async (req, res) => {
     try {
-      const amount = req.body.amount || DEFAULT_AMOUNT
-      const amountErr = validateAmount(amount)
+      const amount   = req.body.amount   || DEFAULT_AMOUNT
+      const currency = resolveCurrency(req.body.currency)
+      const amountErr = validateAmount(amount, currency)
       if (amountErr) return res.status(400).json({ error: amountErr })
-      const token  = await getCNToken()
-      const body   = buildOrderBody(amount, { purchaseUnit: { payment_source: paymentSource } })
+      const token = await getCNToken()
+      const body  = buildOrderBody(amount, { currency, purchaseUnit: { payment_source: paymentSource } })
       const r = await fetch(`${API}/v2/checkout/orders`, {
         method:  'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -139,7 +155,6 @@ function createVaultWithPurchaseRoute({ productKey, sdkParams, view, paymentSour
       })
       const data = await r.json()
       if (!r.ok) return res.status(r.status).json({ error: data.message || 'Capture failed', details: data })
-      // Vault token id varies by payment source type
       const src     = data?.payment_source
       const vaultId = src?.paypal?.attributes?.vault?.id ||
                       src?.card?.attributes?.vault?.id   ||

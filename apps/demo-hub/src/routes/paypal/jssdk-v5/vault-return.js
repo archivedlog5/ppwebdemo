@@ -3,7 +3,9 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, API } = require('../../../config/paypal')
-const { buildOrderBody, DEFAULT_AMOUNT, validateAmount } = require('../../../config/constants')
+const { buildOrderBody, DEFAULT_AMOUNT, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES, validateAmount } = require('../../../config/constants')
+
+function resolveCurrency(v) { return SUPPORTED_CURRENCIES.includes(v) ? v : DEFAULT_CURRENCY }
 
 const router = Router()
 const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'vault-return'
@@ -16,7 +18,8 @@ router.get('/vault-return', (req, res) => {
     currentProductKey: KEY, currentSdkVersion: SDK,
     sidebarProducts: getProviderProducts(PROVIDER),
     showSidebar: true,
-    defaultAmount: DEFAULT_AMOUNT,
+    defaultAmount: req.query.amount || DEFAULT_AMOUNT,
+    currency:      resolveCurrency(req.query.currency),
   })
 })
 

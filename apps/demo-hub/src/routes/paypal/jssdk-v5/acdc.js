@@ -3,7 +3,9 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, API } = require('../../../config/paypal')
-const { buildOrderBody, DEFAULT_AMOUNT, validateAmount } = require('../../../config/constants')
+const { buildOrderBody, DEFAULT_AMOUNT, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES, validateAmount } = require('../../../config/constants')
+
+function resolveCurrency(v) { return SUPPORTED_CURRENCIES.includes(v) ? v : DEFAULT_CURRENCY }
 
 const router = Router()
 const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'acdc'
@@ -17,21 +19,23 @@ router.get('/acdc', (req, res) => {
     currentProductKey: KEY, currentSdkVersion: SDK,
     sidebarProducts: getProviderProducts(PROVIDER),
     showSidebar: true,
-    sdkUrl: `https://www.paypal.com/sdk/js?client-id=${clientId}&components=card-fields&currency=USD`,
-    defaultAmount: DEFAULT_AMOUNT,
+    sdkUrl: `https://www.paypal.com/sdk/js?client-id=${clientId}&components=card-fields&currency=${resolveCurrency(req.query.currency)}`,
+    defaultAmount: req.query.amount || DEFAULT_AMOUNT,
+    currency:      resolveCurrency(req.query.currency),
   })
 })
 
 router.post('/api/acdc/create-order', async (req, res) => {
   try {
-    const amount = req.body.amount || DEFAULT_AMOUNT
-    const amountErr = validateAmount(amount)
+    const amount   = req.body.amount   || DEFAULT_AMOUNT
+    const currency = resolveCurrency(req.body.currency)
+    const amountErr = validateAmount(amount, currency)
     if (amountErr) return res.status(400).json({ error: amountErr })
     const token  = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method:  'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify(buildOrderBody(amount)),
+      body:    JSON.stringify(buildOrderBody(amount, { currency })),
     })
     const order = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })

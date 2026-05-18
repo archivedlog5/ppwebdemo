@@ -11,6 +11,31 @@
 ;(function () {
   'use strict'
 
+  var ZERO_DECIMAL = ['JPY','KRW','TWD','CLP','IDR']
+
+  function getCurrency() {
+    var sel = document.getElementById('demo-currency')
+    return sel ? sel.value : (window.DEMO && window.DEMO.currency) || 'USD'
+  }
+
+  function isZeroDecimal(currency) {
+    return ZERO_DECIMAL.indexOf(currency) !== -1
+  }
+
+  // Currency change → reload page with ?currency=X&amount=Y
+  document.addEventListener('DOMContentLoaded', function () {
+    var currencySel = document.getElementById('demo-currency')
+    if (!currencySel) return
+    currencySel.addEventListener('change', function () {
+      var amtInput = document.getElementById('demo-amount')
+      var url = new URL(window.location.href)
+      url.searchParams.set('currency', this.value)
+      if (amtInput) url.searchParams.set('amount', amtInput.value.trim())
+      window.location.replace(url.toString())
+    })
+  })
+
+
   function showResult(text, type) {
     var el = document.getElementById('result')
     if (!el) return
@@ -32,8 +57,27 @@
     if (!input) return true
     var val = input.value.trim()
     var num = parseFloat(val)
+    var cur = getCurrency()
+    var zd  = isZeroDecimal(cur)
     var err = ''
     if (!val || isNaN(num) || !/^\d+(\.\d{1,2})?$/.test(val)) {
+      err = 'Please enter a valid number'
+    } else if (num < MIN_AMOUNT) {
+      err = 'Minimum amount is ' + MIN_AMOUNT.toFixed(zd ? 0 : 2)
+    } else if (num > MAX_AMOUNT) {
+      err = 'Maximum amount is ' + MAX_AMOUNT.toLocaleString()
+    } else if (zd && val.indexOf('.') !== -1 && parseFloat(val) !== Math.round(parseFloat(val))) {
+      err = cur + ' does not support decimal amounts'
+    }
+    if (err) {
+      if (errEl) errEl.textContent = err
+      input.classList.add('amount-input--error')
+      return false
+    }
+    if (errEl) errEl.textContent = ''
+    input.classList.remove('amount-input--error')
+    return true
+  })?$/.test(val)) {
       err = 'Please enter a valid number (e.g. 100.00)'
     } else if (num < MIN_AMOUNT) {
       err = 'Minimum amount is $' + MIN_AMOUNT.toFixed(2)
@@ -60,7 +104,7 @@
     if (amountInput) {
       amountInput.addEventListener('blur', function () {
         var num = parseFloat(this.value)
-        if (!isNaN(num) && num > 0) this.value = num.toFixed(2)
+        if (!isNaN(num) && num > 0) this.value = isZeroDecimal(getCurrency()) ? String(Math.round(num)) : num.toFixed(2)
         validateAmount()
       })
     }
@@ -81,7 +125,7 @@
       fetch(urls.createAndCapture, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ paymentTokenId: tokenId, amount: getAmount() }),
+        body:    JSON.stringify({ paymentTokenId: tokenId, amount: getAmount(), currency: getCurrency() }),
       })
         .then(function (r) { return r.json() })
         .then(function (order) {

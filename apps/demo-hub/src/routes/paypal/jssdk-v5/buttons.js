@@ -3,13 +3,17 @@ const { Router } = require('express')
 const fetch = require('node-fetch')
 const { getProduct, getProviderProducts } = require('../../../config/products')
 const { getCNToken, getUSToken, API } = require('../../../config/paypal')
-const { buildOrderBody, DEFAULT_AMOUNT, validateAmount } = require('../../../config/constants')
+const { buildOrderBody, DEFAULT_AMOUNT, DEFAULT_CURRENCY, SUPPORTED_CURRENCIES, validateAmount } = require('../../../config/constants')
+
+function resolveCurrency(v) { return SUPPORTED_CURRENCIES.includes(v) ? v : DEFAULT_CURRENCY }
 
 const router = Router()
 const PROVIDER = 'paypal', SDK = 'jssdk-v5', KEY = 'buttons'
 
 router.get('/buttons', (req, res) => {
-  const product = getProduct(PROVIDER, SDK, KEY)
+  const product  = getProduct(PROVIDER, SDK, KEY)
+  const currency = resolveCurrency(req.query.currency)
+  const amount   = req.query.amount || DEFAULT_AMOUNT
   const CN_ID = process.env.PAYPAL_CN_CLIENT_ID
   const US_ID = process.env.PAYPAL_US_CLIENT_ID
   res.render('paypal/jssdk-v5/buttons', {
@@ -18,22 +22,25 @@ router.get('/buttons', (req, res) => {
     currentProductKey: KEY, currentSdkVersion: SDK,
     sidebarProducts: getProviderProducts(PROVIDER),
     showSidebar: true,
-    cnSdkUrl: `https://www.paypal.com/sdk/js?client-id=${CN_ID}&components=buttons&currency=USD`,
-    usSdkUrl: `https://www.paypal.com/sdk/js?client-id=${US_ID}&components=buttons&enable-funding=venmo&currency=USD`,
+    defaultAmount: amount,
+    currency,
+    cnSdkUrl: `https://www.paypal.com/sdk/js?client-id=${CN_ID}&components=buttons&currency=${currency}`,
+    usSdkUrl: `https://www.paypal.com/sdk/js?client-id=${US_ID}&components=buttons&enable-funding=venmo&currency=${currency}`,
   })
 })
 
 // CN: PayPal / PayLater / BCDC
 router.post('/api/buttons/create-order', async (req, res) => {
   try {
-    const amount = req.body.amount || DEFAULT_AMOUNT
-    const amountErr = validateAmount(amount)
+    const amount   = req.body.amount   || DEFAULT_AMOUNT
+    const currency = resolveCurrency(req.body.currency)
+    const amountErr = validateAmount(amount, currency)
     if (amountErr) return res.status(400).json({ error: amountErr })
     const token  = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method:  'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify(buildOrderBody(amount)),
+      body:    JSON.stringify(buildOrderBody(amount, { currency })),
     })
     const order = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })
@@ -44,14 +51,15 @@ router.post('/api/buttons/create-order', async (req, res) => {
 // US: Venmo
 router.post('/api/buttons/create-order-us', async (req, res) => {
   try {
-    const amount = req.body.amount || DEFAULT_AMOUNT
-    const amountErr = validateAmount(amount)
+    const amount   = req.body.amount   || DEFAULT_AMOUNT
+    const currency = resolveCurrency(req.body.currency)
+    const amountErr = validateAmount(amount, currency)
     if (amountErr) return res.status(400).json({ error: amountErr })
     const token  = await getUSToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method:  'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify(buildOrderBody(amount)),
+      body:    JSON.stringify(buildOrderBody(amount, { currency })),
     })
     const order = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })

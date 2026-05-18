@@ -9,22 +9,30 @@ const INTENT = {
   AUTHORIZE: 'AUTHORIZE',
 }
 
-const CURRENCY = {
-  USD: 'USD',
-  CNY: 'CNY',
-  EUR: 'EUR',
-  GBP: 'GBP',
-}
-
 const ITEM_CATEGORY = {
   PHYSICAL: 'PHYSICAL_GOODS',
   DIGITAL:  'DIGITAL_GOODS',
   DONATION: 'DONATION',
 }
 
+// ── 支持的货币列表（30 种，已去重）──────────────────────────────────
+const SUPPORTED_CURRENCIES = [
+  'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'BRL', 'CHF', 'CZK', 'DKK',
+  'HKD', 'HUF', 'ILS', 'JPY', 'MXN', 'NOK', 'NZD', 'PHP', 'PLN',
+  'SEK', 'SGD', 'THB', 'TWD', 'KRW', 'CLP', 'SAR', 'UYU', 'COP',
+  'IDR', 'PEN', 'AED',
+]
+
+// 零小数位货币（不支持 .xx，如 ¥100 而非 ¥100.00）
+const ZERO_DECIMAL_CURRENCIES = new Set(['JPY', 'KRW', 'TWD', 'CLP', 'IDR'])
+
+function isZeroDecimal(currency) {
+  return ZERO_DECIMAL_CURRENCIES.has(currency)
+}
+
 // ── Demo 默认值 ──────────────────────────────────────────────────────
 const DEFAULT_AMOUNT   = '100.00'
-const DEFAULT_CURRENCY = CURRENCY.USD
+const DEFAULT_CURRENCY = 'USD'
 const MIN_AMOUNT       = 1.00
 const MAX_AMOUNT       = 30000.00
 
@@ -60,18 +68,13 @@ const SANDBOX_BILLING = {
 }
 
 /**
- * 统一组装 PayPal v2/checkout/orders 请求 body
- *
- * @param {string} amount   - 金额字符串，如 '100.00'（前端传入）
- * @param {object} overrides
- *   @param {string} overrides.currency      - 货币代码，默认 USD
- *   @param {object} overrides.purchaseUnit  - 合并进 purchase_units[0]（如 Vault payment_source）
- *   @param {object} overrides.topLevel      - 合并进顶层（如 payment_source.token）
+ * 服务端金额校验
+ * @param {string} amount
+ * @param {string} [currency]
+ * @returns {string|null} 错误信息，或 null 表示通过
  */
-/**
- * 服务端金额校验，返回错误字符串或 null
- */
-function validateAmount(amount) {
+function validateAmount(amount, currency) {
+  const cur = currency || DEFAULT_CURRENCY
   const num = parseFloat(amount)
   if (!amount || isNaN(num)) return 'Invalid amount'
   if (num < MIN_AMOUNT) return `Amount must be at least $${MIN_AMOUNT.toFixed(2)}`
@@ -79,16 +82,31 @@ function validateAmount(amount) {
   return null
 }
 
+/**
+ * 统一组装 PayPal v2/checkout/orders 请求 body
+ *
+ * @param {string} amount
+ * @param {object} overrides
+ *   @param {string} overrides.currency      - 货币代码（默认 USD）
+ *   @param {object} overrides.purchaseUnit  - 合并进 purchase_units[0]
+ *   @param {object} overrides.topLevel      - 合并进顶层
+ */
 function buildOrderBody(amount, overrides = {}) {
-  const value    = parseFloat(amount).toFixed(2)
-  const currency = overrides.currency || DEFAULT_CURRENCY
+  const currency = SUPPORTED_CURRENCIES.includes(overrides.currency)
+    ? overrides.currency
+    : DEFAULT_CURRENCY
+
+  // 零小数位货币取整，其余保留两位小数
+  const num   = parseFloat(amount)
+  const value = isZeroDecimal(currency)
+    ? String(Math.round(num))
+    : num.toFixed(2)
 
   const purchaseUnit = {
     amount: {
       currency_code: currency,
       value,
       breakdown: {
-        // 包含 items 时 PayPal 要求 breakdown.item_total === items 之和
         item_total: { currency_code: currency, value }
       }
     },
@@ -110,8 +128,9 @@ function buildOrderBody(amount, overrides = {}) {
 
 module.exports = {
   INTENT,
-  CURRENCY,
   ITEM_CATEGORY,
+  SUPPORTED_CURRENCIES,
+  ZERO_DECIMAL_CURRENCIES,
   DEFAULT_AMOUNT,
   DEFAULT_CURRENCY,
   MIN_AMOUNT,
@@ -120,6 +139,7 @@ module.exports = {
   DEMO_ITEM,
   SANDBOX_SHIPPING,
   SANDBOX_BILLING,
+  isZeroDecimal,
   validateAmount,
   buildOrderBody,
 }
