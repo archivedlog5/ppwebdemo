@@ -34,9 +34,11 @@
     <div class="btn-slot"><div class="btn-slot-label">PayPal</div><div id="btn-paypal"></div></div>
     <div class="btn-slot"><div class="btn-slot-label">PayLater</div><div id="btn-paylater"></div></div>
     <div class="btn-slot">
-      <div class="btn-slot-label">Venmo (US Account)</div>
+      <div style="display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-1)">
+        <span class="btn-slot-label" style="margin-bottom:0">Venmo (US Account)</span>
+        <span class="test-hint" style="margin-top:0">Requires a US IP to test</span>
+      </div>
       <div id="btn-venmo"></div>
-      <div class="test-hint" style="text-align:left;margin-top:4px">Requires a US IP to test</div>
     </div>
     <div class="btn-slot"><div class="btn-slot-label">BCDC (Basic Card)</div><div id="btn-bcdc"></div></div>
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>

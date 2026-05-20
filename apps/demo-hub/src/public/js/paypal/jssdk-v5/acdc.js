@@ -18,7 +18,6 @@
     number: 'card-number-container',
     expiry: 'card-expiry-container',
     cvv:    'card-cvv-container',
-    name:   'card-name-container',
   }
 
   // stateObject.fields key → container element ID (used for onChange validation)
@@ -26,7 +25,6 @@
     cardNumberField: 'card-number-container',
     cardExpiryField: 'card-expiry-container',
     cardCvvField:    'card-cvv-container',
-    cardNameField:   'card-name-container',
   }
 
   function getCurrency() {
@@ -37,6 +35,11 @@
   function getSCA() {
     var sel = document.getElementById('demo-sca')
     return sel ? sel.value : 'SCA_WHEN_REQUIRED'
+  }
+
+  function getName() {
+    var input = document.getElementById('card-name')
+    return input ? input.value.trim() : ''
   }
 
   function isZeroDecimal(currency) {
@@ -150,7 +153,7 @@
         return fetch(urls.createOrder, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ amount: getAmount(), currency: getCurrency(), scaMethod: getSCA() }),
+          body:    JSON.stringify({ amount: getAmount(), currency: getCurrency(), scaMethod: getSCA(), cardholderName: getName(), billingAddress: (window.DEMO && window.DEMO.billing) || {} }),
         })
           .then(function (r) { return r.json() })
           .then(function (d) {
@@ -221,8 +224,7 @@
     })
 
     if (cardFields.isEligible()) {
-      cardFields.NameField({ placeholder: 'Full name on card' }).render('#card-name-container')
-      cardFields.NumberField({ placeholder: '4111 1111 1111 1111' }).render('#card-number-container')
+      cardFields.NumberField({ placeholder: '4032030176760800' }).render('#card-number-container')
       cardFields.ExpiryField({ placeholder: 'MM / YY' }).render('#card-expiry-container')
       cardFields.CVVField({ placeholder: '•••' }).render('#card-cvv-container')
     } else {
@@ -235,7 +237,17 @@
       payBtn.addEventListener('click', function () {
         if (!validateAmount()) return
         payBtn.disabled = true
-        cardFields.submit().catch(function (err) {
+        var billing = (window.DEMO && window.DEMO.billing) || {}
+        cardFields.submit({
+          billingAddress: {
+            addressLine1: billing.addressLine1 || '',
+            addressLine2: billing.addressLine2 || '',
+            adminArea1:   billing.adminArea1   || '',
+            adminArea2:   billing.adminArea2   || '',
+            countryCode:  billing.countryCode  || '',
+            postalCode:   billing.postalCode   || '',
+          },
+        }).catch(function (err) {
           showResult('✗ ' + (err.message || String(err)), 'error')
           payBtn.disabled = false
         })

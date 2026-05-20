@@ -87,6 +87,12 @@ const DEMO_ITEM = {
   quantity: "1",
 };
 
+// ── ACDC 卡支付体验上下文（payment_source.card.experience_context）────
+const ACDC_EXPERIENCE_CONTEXT = {
+  return_url: "https://example.com/paypal/acdc/return",
+  cancel_url:  "https://example.com/paypal/acdc/cancel",
+};
+
 // ── PayPal 结账体验上下文（payment_source.paypal.experience_context）──
 const EXPERIENCE_CONTEXT = {
   brand_name:          "Cross WEN China Store",
@@ -230,6 +236,7 @@ module.exports = {
   DEMO_ITEM,
 
   // PayPal 结账体验 & 买家信息
+  ACDC_EXPERIENCE_CONTEXT,
   EXPERIENCE_CONTEXT,
   SANDBOX_BUYER,
 

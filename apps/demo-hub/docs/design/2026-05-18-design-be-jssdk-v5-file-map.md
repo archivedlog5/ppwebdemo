@@ -75,12 +75,12 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 + API | `src/routes/paypal/jssdk-v5/acdc.js` | 自定义路由；SDK 参数 `components=card-fields`；读取 `req.body.scaMethod`，白名单校验（`SCA_WHEN_REQUIRED` / `SCA_ALWAYS`，无效时 fallback `SCA_WHEN_REQUIRED`），注入 `payment_source.card.attributes.verification.method` |
-| EJS 视图 | `src/views/paypal/jssdk-v5/acdc.ejs` | 字段顺序：Name → Number → Expiry/CVV；`sandbox-card--wide`（540px）；按钮文字 "Pay Now"；amount-row 含三列：Currency / Amount / **3DS**（select：`SCA_WHEN_REQUIRED` 默认，`SCA_ALWAYS`） |
-| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | `paypalSDK.CardFields()` + `inputEvents`；`getSCA()` 读取 `#demo-sca`；`createOrder` fetch body 含 `{ amount, currency, scaMethod }`；`#acdc-pay-btn` 点击触发 `submit()` |
+| 路由 + API | `src/routes/paypal/jssdk-v5/acdc.js` | 自定义路由；SDK 参数 `components=card-fields`；从 body 读取 `scaMethod`（白名单校验）、`cardholderName`、`billingAddress`（camelCase → snake_case 转换）；注入 `payment_source.card = { name, billing_address, experience_context: ACDC_EXPERIENCE_CONTEXT, attributes.verification.method }` |
+| EJS 视图 | `src/views/paypal/jssdk-v5/acdc.ejs` | 字段顺序：Name（普通 input，预填 sandboxCardholderName）→ Number → Expiry/CVV；amount-row 含三列：Currency / Amount / **3DS** select；`window.DEMO.billing` 注入 sandboxBilling（camelCase） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | `getName()` 读 `#card-name`；`getSCA()` 读 `#demo-sca`；`createOrder` fetch body 含 `{ amount, currency, scaMethod, cardholderName, billingAddress: window.DEMO.billing }`；`submit({ billingAddress: window.DEMO.billing })`；NameField 已移除（name 改为普通 input） |
 
 **inputEvents 行为：**
-- `onFocus` / `onBlur` → 给对应容器 div 加/去 `.focused` 类（蓝色边框 + glow）
+- `onFocus` / `onBlur` → 给对应容器 div 加/去 `.focused` 类（number/expiry/cvv，name 已移出托管字段）
 - `onChange` → 调用 `updateFieldStates(data.fields)`：
   - `isValid: true` → `.field-host--valid`（绿色边框）
   - `isPotentiallyValid: false` 且非空 → `.field-host--invalid`（红色边框 + glow）
@@ -96,9 +96,9 @@ Status: LIVING DOCUMENT（随实现持续更新）
 - `.invalid` → `color: #EF4444`（iframe 内输入文字变红）
 
 **常用微调点：**
-- 隐藏姓名字段 → `acdc.ejs` 删除 `card-name-container`；`acdc.js` 删除 `cardFields.NameField().render()`
 - 改 CardFields 样式 → `acdc.js` 的 `CardFields({ style: { input: {...}, '.invalid': {...} } })`
-- 测试卡 → `4111 1111 1111 1111`，任意未来日期，任意 CVV
+- 改 billing 地址 → `constants.js` 的 `SANDBOX_BILLING`，路由层转 camelCase 后注入 `window.DEMO.billing`
+- 测试卡 → `4032030176760800`，任意未来日期，任意 CVV
 
 ---
 
@@ -619,7 +619,8 @@ const { INTENT, CURRENCY, DEFAULT_AMOUNT, buildOrderBody,
 | `DEMO_ITEM` | 对象 | 商品名称、描述、类目、数量 |
 | `SANDBOX_SHIPPING` | 对象 | 预填收货地址（US sandbox 地址，CN 账户通用） |
 | `VENMO_SHIPPING` | 对象 | Venmo 专用收货地址（`test / Trumbull, AL 06611, US`） |
-| `SANDBOX_BILLING` | 对象 | 账单地址（ACDC 场景） |
+| `SANDBOX_BILLING` | 对象 | 账单地址（ACDC `payment_source.card.billing_address`）|
+| `ACDC_EXPERIENCE_CONTEXT` | 对象 | ACDC 卡支付 `return_url` / `cancel_url` |
 | `buildOrderBody(amount, overrides)` | 函数 | 统一组装 PayPal order body |
 
 ### `buildOrderBody` 调用方式

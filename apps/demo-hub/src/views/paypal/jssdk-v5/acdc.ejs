@@ -41,7 +41,9 @@
 
     <div class="field-group">
       <label class="field-label">Name on Card</label>
-      <div class="field-host" id="card-name-container"></div>
+      <input id="card-name" type="text" class="field-host"
+        value="<%= sandboxCardholderName %>" placeholder="Full name on card"
+        style="width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:13px;color:var(--fg);outline:none;" />
     </div>
     <div class="field-group">
       <label class="field-label" for="card-number-container">Card Number</label>
@@ -62,7 +64,7 @@
 
     <button id="acdc-pay-btn" class="pay-btn pay-btn-paypal" type="button">Pay Now</button>
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
-    <div class="test-hint">Test card: <strong>4111 1111 1111 1111</strong> · Any future date · Any CVV</div>
+    <div class="test-hint">Test card: <strong>4032030176760800</strong> · Any future date · Any CVV</div>
   </div>
 </div>
 
@@ -71,7 +73,8 @@
     urls: {
       createOrder:  '/paypal/jssdk-v5/api/acdc/create-order',
       captureOrder: '/paypal/jssdk-v5/api/acdc/capture-order',
-    }
+    },
+    billing: <%- JSON.stringify(sandboxBilling) %>,
   }
 </script>
 <script src="/js/paypal/jssdk-v5/acdc.js"></script>
