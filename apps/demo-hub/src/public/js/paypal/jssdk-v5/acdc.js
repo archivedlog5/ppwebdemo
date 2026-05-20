@@ -11,7 +11,23 @@
 ;(function () {
   'use strict'
 
-  var ZERO_DECIMAL = ['JPY','KRW','TWD','CLP','IDR']
+  var ZERO_DECIMAL = ['JPY', 'KRW', 'TWD', 'CLP', 'IDR']
+
+  // emittedBy value → container element ID (used for onFocus/onBlur)
+  var CONTAINER_BY_EMITTED = {
+    number: 'card-number-container',
+    expiry: 'card-expiry-container',
+    cvv:    'card-cvv-container',
+    name:   'card-name-container',
+  }
+
+  // stateObject.fields key → container element ID (used for onChange validation)
+  var CONTAINER_BY_FIELD = {
+    cardNumberField: 'card-number-container',
+    cardExpiryField: 'card-expiry-container',
+    cardCvvField:    'card-cvv-container',
+    cardNameField:   'card-name-container',
+  }
 
   function getCurrency() {
     var sel = document.getElementById('demo-currency')
@@ -34,7 +50,6 @@
       window.location.replace(url.toString())
     })
   })
-
 
   function showResult(text, type) {
     var el = document.getElementById('result')
@@ -84,6 +99,24 @@
     if (!el) return
     el.classList.remove('sdk-loading')
     el.innerHTML = ''
+  }
+
+  // Update container border class based on per-field validity state
+  function updateFieldStates(fields) {
+    Object.keys(CONTAINER_BY_FIELD).forEach(function (key) {
+      var el = document.getElementById(CONTAINER_BY_FIELD[key])
+      if (!el) return
+      var f = fields[key]
+      if (!f) return
+      el.classList.remove('field-host--valid', 'field-host--invalid')
+      if (!f.isEmpty) {
+        if (f.isValid) {
+          el.classList.add('field-host--valid')
+        } else if (!f.isPotentiallyValid) {
+          el.classList.add('field-host--invalid')
+        }
+      }
+    })
   }
 
   window.addEventListener('load', function () {
@@ -137,22 +170,56 @@
       onError: function (err) {
         showResult('✗ ' + (err.message || String(err)), 'error')
       },
+
       style: {
         input: {
           'font-family': "'Space Mono', monospace",
           'font-size':   '13px',
           color:         'inherit',
-        }
-      }
+        },
+        '.invalid': {
+          color: '#EF4444',
+        },
+      },
+
+      inputEvents: {
+        onChange: function (data) {
+          // Card type detection → console
+          if (data.cards && data.cards.length > 0) {
+            var card = data.cards[0]
+            console.log('[ACDC] Card type:', card.niceType, '(' + card.type + ')')
+            console.log('[ACDC]', card.code.name + ':', card.code.size + ' digits | form valid:', data.isFormValid)
+            if (data.errors && data.errors.length > 0) {
+              console.log('[ACDC] Errors:', data.errors.join(', '))
+            }
+          }
+          // Per-field valid/invalid border state
+          if (data.fields) updateFieldStates(data.fields)
+        },
+
+        onFocus: function (data) {
+          var id = CONTAINER_BY_EMITTED[data.emittedBy]
+          if (id) {
+            var el = document.getElementById(id)
+            if (el) el.classList.add('focused')
+          }
+        },
+
+        onBlur: function (data) {
+          var id = CONTAINER_BY_EMITTED[data.emittedBy]
+          if (id) {
+            var el = document.getElementById(id)
+            if (el) el.classList.remove('focused')
+          }
+        },
+      },
     })
 
     if (cardFields.isEligible()) {
+      cardFields.NameField({ placeholder: 'Full name on card' }).render('#card-name-container')
       cardFields.NumberField({ placeholder: '4111 1111 1111 1111' }).render('#card-number-container')
       cardFields.ExpiryField({ placeholder: 'MM / YY' }).render('#card-expiry-container')
       cardFields.CVVField({ placeholder: '•••' }).render('#card-cvv-container')
-      if (document.getElementById('card-name-container')) {
-        cardFields.NameField({ placeholder: 'Full Name' }).render('#card-name-container')
-      }
     } else {
       document.getElementById('card-number-container').innerHTML =
         '<p style="color:var(--fg-muted);font-size:12px;text-align:center">Card Fields not available for this account.</p>'

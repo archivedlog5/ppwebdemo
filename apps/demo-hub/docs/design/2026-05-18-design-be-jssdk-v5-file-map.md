@@ -76,12 +76,28 @@ Status: LIVING DOCUMENT（随实现持续更新）
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
 | 路由 + API | `src/routes/paypal/jssdk-v5/acdc.js` | 自定义路由；SDK 参数 `components=card-fields`；create/capture 同工厂 |
-| EJS 视图 | `src/views/paypal/jssdk-v5/acdc.ejs` | 4 个 `field-host` div（card-number/expiry/cvv/name）；`#acdc-pay-btn`；`window.DEMO.urls` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | `paypalSDK.CardFields()`，render 到各容器；`#acdc-pay-btn` 点击触发 `cardFields.submit()` |
+| EJS 视图 | `src/views/paypal/jssdk-v5/acdc.ejs` | 字段顺序：Name → Number → Expiry/CVV；`sandbox-card--wide`（540px）；按钮文字 "Pay Now"；`window.DEMO.urls` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | `paypalSDK.CardFields()` + `inputEvents`；`#acdc-pay-btn` 点击触发 `submit()` |
+
+**inputEvents 行为：**
+- `onFocus` / `onBlur` → 给对应容器 div 加/去 `.focused` 类（蓝色边框 + glow）
+- `onChange` → 调用 `updateFieldStates(data.fields)`：
+  - `isValid: true` → `.field-host--valid`（绿色边框）
+  - `isPotentiallyValid: false` 且非空 → `.field-host--invalid`（红色边框 + glow）
+  - 检测卡类型并输出到控制台：`[ACDC] Card type: Visa (visa)` + CVV 位数 + 表单是否有效 + 错误列表
+
+**CSS 类（sandbox.css）：**
+- `.sandbox-card--wide` → `max-width: 540px`（ACDC/vault-acdc 专用）
+- `.field-host--valid` → 绿色边框 `#22c55e`
+- `.field-host--invalid` → 红色边框 `#ef4444` + 红色 glow
+
+**CardFields style 对象：**
+- `input` → Space Mono 13px
+- `.invalid` → `color: #EF4444`（iframe 内输入文字变红）
 
 **常用微调点：**
 - 隐藏姓名字段 → `acdc.ejs` 删除 `card-name-container`；`acdc.js` 删除 `cardFields.NameField().render()`
-- 改 CardFields 样式 → `acdc.js` 的 `CardFields({ style: { input: {...} } })`
+- 改 CardFields 样式 → `acdc.js` 的 `CardFields({ style: { input: {...}, '.invalid': {...} } })`
 - 测试卡 → `4111 1111 1111 1111`，任意未来日期，任意 CVV
 
 ---

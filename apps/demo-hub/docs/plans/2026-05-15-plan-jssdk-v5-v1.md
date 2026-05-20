@@ -1722,80 +1722,42 @@ router.post('/api/acdc/capture-order', async (req, res) => {
 module.exports = router
 ```
 
-- [ ] **Step 2: Create `src/views/paypal/jssdk-v5/acdc.ejs`**
+- [x] **Step 2: Create `src/views/paypal/jssdk-v5/acdc.ejs` + `src/public/js/paypal/jssdk-v5/acdc.js`**
 
-```html
-<%- include('../../layout', {
-  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar,
-  extraHead: `<script src="https://www.paypal.com/sdk/js?client-id=${clientId}&components=card-fields&currency=USD" data-namespace="paypalSDK"></script>`,
-  body: `
-    <div class="sandbox-page">
-      <div class="sandbox-header">
-        <div class="provider-badge">PayPal · JSSDK v5 · ACDC</div>
-        <h1>${title}</h1>
-        <p>Advanced Credit/Debit Card — hosted card input fields</p>
-      </div>
-      <div class="sandbox-card">
-        <div class="amount-display">
-          <div class="amount-label">Test Amount</div>
-          <div class="amount-value">$1.00</div>
-          <span class="sandbox-badge">⚡ Sandbox Mode</span>
-        </div>
-        <div class="field-group">
-          <div class="field-label">Card Number</div>
-          <div class="field-host" id="card-number"></div>
-        </div>
-        <div class="field-row">
-          <div class="field-group">
-            <div class="field-label">Expiry</div>
-            <div class="field-host" id="expiry"></div>
-          </div>
-          <div class="field-group">
-            <div class="field-label">CVV</div>
-            <div class="field-host" id="cvv"></div>
-          </div>
-        </div>
-        <div class="field-group">
-          <div class="field-label">Name on Card</div>
-          <div class="field-host" id="card-name"></div>
-        </div>
-        <button id="pay-btn" style="width:100%;background:linear-gradient(135deg,#003087,#009CDE);border:none;border-radius:8px;padding:14px;color:white;font-family:'Space Mono',monospace;font-size:13px;font-weight:700;cursor:pointer;margin-top:12px;">Pay $1.00</button>
-        <div class="result-msg" id="result"></div>
-        <div class="test-hint">Test card: <strong>4111 1111 1111 1111</strong> · Any future date · Any CVV</div>
-      </div>
-    </div>
-    <script>
-      let orderID
-      const cardFields = paypalSDK.CardFields({
-        createOrder: () =>
-          fetch('/paypal/jssdk-v5/api/acdc/create-order', { method: 'POST' })
-            .then(r => r.json()).then(d => { orderID = d.id; return d.id }),
-        onApprove: (data) =>
-          fetch('/paypal/jssdk-v5/api/acdc/capture-order', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderID: data.orderID })
-          }).then(r => r.json()).then(o => {
-            const el = document.getElementById('result')
-            el.className = 'result-msg success'
-            el.textContent = '✓ Payment captured: ' + o.id
-          }),
-        onError: e => {
-          const el = document.getElementById('result')
-          el.className = 'result-msg error'
-          el.textContent = '✗ ' + (e.message || JSON.stringify(e))
-        },
-        style: { input: { 'font-family': 'Space Mono, monospace', 'font-size': '13px', color: '#F8FAFC' } }
-      })
-      cardFields.NumberField().render('#card-number')
-      cardFields.ExpiryField().render('#expiry')
-      cardFields.CVVField().render('#cvv')
-      cardFields.NameField().render('#card-name')
-      document.getElementById('pay-btn').addEventListener('click', () => cardFields.submit())
-    </script>
-  `
-}) %>
+> ✅ 已实现（EJS/JS 分离模式，比原计划更完整）
+
+**acdc.ejs 关键结构：**
+- `sandbox-card sandbox-card--wide`（540px，比标准 420px 更宽，适合卡表单）
+- 字段顺序：**Name on Card → Card Number → Expiry / CVV**（name 在最上方）
+- 按钮文字：**"Pay Now"**（不显示金额）
+- `window.DEMO.urls` 注入 `createOrder` / `captureOrder` 端点
+- `<script src="/js/paypal/jssdk-v5/acdc.js">` 引入静态 JS
+
+**acdc.js 关键行为：**
+```js
+paypalSDK.CardFields({
+  style: {
+    input: { 'font-family': "'Space Mono', monospace", 'font-size': '13px', color: 'inherit' },
+    '.invalid': { color: '#EF4444' },   // iframe 内错误输入文字变红
+  },
+  inputEvents: {
+    onChange: function(data) {
+      // 卡类型检测 → 控制台输出
+      // [ACDC] Card type: Visa (visa)
+      // [ACDC] CVV: 3 digits | form valid: false
+      updateFieldStates(data.fields)   // 更新容器边框状态
+    },
+    onFocus: function(data) { /* 给对应容器加 .focused 类 */ },
+    onBlur:  function(data) { /* 去掉 .focused 类 */ },
+  }
+})
+// 字段渲染顺序：NameField → NumberField → ExpiryField → CVVField
 ```
+
+**CSS 验证状态（sandbox.css）：**
+- `.field-host--valid` → 绿色边框 `#22c55e`（`isValid: true`）
+- `.field-host--invalid` → 红色边框 `#ef4444` + glow（`isPotentiallyValid: false` 且非空）
+- `.field-host.focused` → accent 色边框 + glow（已有）
 
 - [ ] **Step 3: Verify**
 

@@ -63,6 +63,11 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+/* Wider card for multi-field forms (ACDC, vault-acdc) */
+.sandbox-card--wide {
+  max-width: 540px;
+}
+
 /* Amount display */
 .amount-display {
   text-align: center;
@@ -165,14 +170,23 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  padding: 10px 14px;
-  min-height: 44px;
+  padding: 5px 12px;
+  min-height: 0;
   transition: border-color var(--t-base);
 }
 
 .field-host.focused {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.field-host--valid {
+  border-color: #22c55e;
+}
+
+.field-host--invalid {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
 }
 
 .field-row {
