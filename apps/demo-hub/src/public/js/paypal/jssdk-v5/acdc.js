@@ -147,6 +147,28 @@
 
     var urls = window.DEMO && window.DEMO.urls
 
+    function doCapture(orderID) {
+      return fetch(urls.captureOrder, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ orderID: orderID }),
+      })
+        .then(function (r) { return r.json() })
+        .then(function (order) {
+          if (order.error) throw new Error(order.error)
+          var capture = order.purchase_units &&
+                        order.purchase_units[0] &&
+                        order.purchase_units[0].payments &&
+                        order.purchase_units[0].payments.captures &&
+                        order.purchase_units[0].payments.captures[0]
+          if (!capture || capture.status !== 'COMPLETED') {
+            showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
+            return
+          }
+          showResult('✓ Payment captured · Order: ' + order.id, 'success')
+        })
+    }
+
     var cardFields = paypalSDK.CardFields({
       createOrder: function () {
         if (!validateAmount()) return Promise.reject(new Error('Invalid amount'))
@@ -162,21 +184,51 @@
           })
       },
       onApprove: function (data) {
-        return fetch(urls.captureOrder, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ orderID: data.orderID }),
-        })
+        var liabilityShift = data.liabilityShift
+        console.log('[ACDC] 3DS liabilityShift (client):', liabilityShift)
+
+        // POSSIBLE → liability shifts to issuer; undefined → 3DS not triggered → capture
+        if (!liabilityShift || liabilityShift === 'POSSIBLE') {
+          return doCapture(data.orderID)
+        }
+
+        // Otherwise fetch server-side enrollment_status + authentication_status
+        // and apply the recommended action table
+        var getOrderUrl = urls.getOrder.replace(':orderID', data.orderID)
+        return fetch(getOrderUrl)
           .then(function (r) { return r.json() })
-          .then(function (order) {
-            if (order.error) throw new Error(order.error)
-            var msg = '✓ Payment captured · Order: ' + order.id
-            if (order.vaultId) msg += ' · Vault: ' + order.vaultId
-            showResult(msg, 'success')
+          .then(function (result) {
+            var authResult = (result.payment_source && result.payment_source.card && result.payment_source.card.authentication_result) || {}
+            var threeDS    = authResult.three_d_secure || {}
+            var ls         = authResult.liability_shift
+            var enrollment = threeDS.enrollment_status
+            var authStatus = threeDS.authentication_status
+            console.log('[ACDC] 3DS server — liabilityShift:', ls,
+              '| enrollment:', enrollment, '| auth:', authStatus)
+
+            // Continue cases from recommended action table:
+            // enrollment N / U / B with liability_shift NO → continue
+            if (ls === 'NO' && (enrollment === 'N' || enrollment === 'U' || enrollment === 'B')) {
+              return doCapture(data.orderID)
+            }
+
+            // All other cases: do not continue
+            if (ls === 'UNKNOWN') {
+              showResult('✗ 3D Secure unavailable — please retry.', 'error')
+            } else {
+              showResult('✗ 3D Secure declined (enrollment: ' + enrollment +
+                ', auth: ' + authStatus + ') — please try another card.', 'error')
+            }
           })
       },
       onError: function (err) {
         showResult('✗ ' + (err.message || String(err)), 'error')
+      },
+
+      onCancel: function () {
+        showResult('3D Secure cancelled — payment not completed.', 'error')
+        var payBtn = document.getElementById('acdc-pay-btn')
+        if (payBtn) payBtn.disabled = false
       },
 
       style: {

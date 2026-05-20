@@ -211,6 +211,18 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 10. **金额动态传递**：前端从 `#demo-amount` 读值 → fetch body `{ amount, currency }` → 后端 `req.body.amount` / `req.body.currency`
 11. **币种选择**：`#demo-currency` 下拉框切换时刷新页面（`?currency=EUR&amount=xxx`）；服务端读 `req.query.currency` 并注入 SDK URL；零小数位货币（JPY/KRW/TWD/CLP/IDR）金额自动取整
 12. **币种校验**：后端用 `SUPPORTED_CURRENCIES` 白名单校验，无效则 fallback 到 `DEFAULT_CURRENCY`
+13. **Capture 成功判断**：capture order API 返回后，必须检查 `purchase_units[0].payments.captures[0].status === 'COMPLETED'` 才算成功扣款。不能用 `order.status`（订单级状态，不代表扣款成功）也不能仅靠 `order.error` 缺失来判断。非 COMPLETED 状态（如 DECLINED、PENDING）必须显示错误。
+    ```js
+    var capture = order.purchase_units &&
+                  order.purchase_units[0] &&
+                  order.purchase_units[0].payments &&
+                  order.purchase_units[0].payments.captures &&
+                  order.purchase_units[0].payments.captures[0]
+    if (!capture || capture.status !== 'COMPLETED') {
+      showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
+      return
+    }
+    ```
 
 ## EJS/JS 分离模式
 

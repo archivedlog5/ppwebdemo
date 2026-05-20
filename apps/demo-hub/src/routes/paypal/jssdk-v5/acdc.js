@@ -79,6 +79,21 @@ router.post('/api/acdc/create-order', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
+// GET order — returns server-side 3DS fields for liability decision
+router.get('/api/acdc/order/:orderID', async (req, res) => {
+  try {
+    const { orderID } = req.params
+    const token = await getCNToken()
+    const r = await fetch(`${API}/v2/checkout/orders/${orderID}`, {
+      method: 'GET',
+      headers: getHeaders(token),
+    })
+    const data = await r.json()
+    if (!r.ok) return res.status(r.status).json({ error: data.message, details: data })
+    res.json(data)
+  } catch (err) { res.status(500).json({ error: err.message }) }
+})
+
 router.post('/api/acdc/capture-order', async (req, res) => {
   try {
     const { orderID } = req.body

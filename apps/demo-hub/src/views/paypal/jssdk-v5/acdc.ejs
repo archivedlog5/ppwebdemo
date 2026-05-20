@@ -73,6 +73,7 @@
     urls: {
       createOrder:  '/paypal/jssdk-v5/api/acdc/create-order',
       captureOrder: '/paypal/jssdk-v5/api/acdc/capture-order',
+      getOrder:     '/paypal/jssdk-v5/api/acdc/order/:orderID',
     },
     billing: <%- JSON.stringify(sandboxBilling) %>,
   }

@@ -106,6 +106,10 @@ UNIQUE(provider, sdk_version, product_key)  -- 三字段联合唯一
 2. 所有配置变更通过 Supabase 传递，各 app 自行读取
 3. 管理员登录通过 Supabase Auth 实现
 
+## 支付集成规则（通用）
+
+如将来 admin-console 涉及支付相关功能，capture 成功判断必须用 `purchase_units[0].payments.captures[0].status === 'COMPLETED'`，不能用 `order.status` 或仅靠 `order.error` 缺失。详见根目录 `CLAUDE.md` → "支付集成规则"章节。
+
 ## 记忆恢复（Memory Compaction 后）
 
 1. 读 `docs/context.md`

@@ -130,9 +130,16 @@
           .then(function (r) { return r.json() })
           .then(function (order) {
             if (order.error) throw new Error(order.error)
-            var msg = '✓ Payment captured · Order: ' + order.id
-            if (order.vaultId) msg += ' · Vault: ' + order.vaultId
-            showResult(msg, 'success')
+            var capture = order.purchase_units &&
+                          order.purchase_units[0] &&
+                          order.purchase_units[0].payments &&
+                          order.purchase_units[0].payments.captures &&
+                          order.purchase_units[0].payments.captures[0]
+            if (!capture || capture.status !== 'COMPLETED') {
+              showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
+              return
+            }
+            showResult('✓ Payment captured · Order: ' + order.id, 'success')
           })
       },
       onCancel: function () {

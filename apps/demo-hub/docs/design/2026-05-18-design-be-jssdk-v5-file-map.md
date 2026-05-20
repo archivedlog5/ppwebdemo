@@ -75,9 +75,27 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 + API | `src/routes/paypal/jssdk-v5/acdc.js` | 自定义路由；SDK 参数 `components=card-fields`；从 body 读取 `scaMethod`（白名单校验）、`cardholderName`、`billingAddress`（camelCase → snake_case 转换）；注入 `payment_source.card = { name, billing_address, experience_context: ACDC_EXPERIENCE_CONTEXT, attributes.verification.method }` |
-| EJS 视图 | `src/views/paypal/jssdk-v5/acdc.ejs` | 字段顺序：Name（普通 input，预填 sandboxCardholderName）→ Number → Expiry/CVV；amount-row 含三列：Currency / Amount / **3DS** select；`window.DEMO.billing` 注入 sandboxBilling（camelCase） |
-| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | `getName()` 读 `#card-name`；`getSCA()` 读 `#demo-sca`；`createOrder` fetch body 含 `{ amount, currency, scaMethod, cardholderName, billingAddress: window.DEMO.billing }`；`submit({ billingAddress: window.DEMO.billing })`；NameField 已移除（name 改为普通 input） |
+| 路由 + API | `src/routes/paypal/jssdk-v5/acdc.js` | 自定义路由；SDK 参数 `components=card-fields`；从 body 读取 `scaMethod`（白名单校验）、`cardholderName`、`billingAddress`（camelCase → snake_case 转换）；注入 `payment_source.card = { name, billing_address, experience_context: ACDC_EXPERIENCE_CONTEXT, attributes.verification.method }`；`GET /api/acdc/order/:orderID` 返回完整 order 数据（前端自行解析 3DS 字段） |
+| EJS 视图 | `src/views/paypal/jssdk-v5/acdc.ejs` | 字段顺序：Name（普通 input，预填 sandboxCardholderName）→ Number → Expiry/CVV；amount-row 含三列：Currency / Amount / **3DS** select（SCA_WHEN_REQUIRED / SCA_ALWAYS）；`window.DEMO.billing` 注入 sandboxBilling（camelCase）；`window.DEMO.urls.getOrder` 含 `:orderID` 占位符 |
+| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | `getName()` 读 `#card-name`；`getSCA()` 读 `#demo-sca`；`createOrder` fetch body 含 `{ amount, currency, scaMethod, cardholderName, billingAddress: window.DEMO.billing }`；`submit({ billingAddress: window.DEMO.billing })`；NameField 已移除（name 改为普通 input）；`doCapture(orderID)` 抽取为独立 helper |
+
+**onApprove 3DS 决策逻辑（acdc.js）：**
+
+```
+liabilityShift 来自 onApprove data（客户端）：
+  undefined   → 3DS 未触发（SCA_WHEN_REQUIRED 且无需验证）→ 直接 doCapture
+  'POSSIBLE'  → 责任转移到发卡行 → 直接 doCapture
+  其他值       → GET /api/acdc/order/:orderID 取完整 order，解析：
+                  authResult = payment_source.card.authentication_result
+                  ls         = authResult.liability_shift
+                  enrollment = authResult.three_d_secure.enrollment_status
+                  authStatus = authResult.three_d_secure.authentication_status
+                继续条件：ls === 'NO' 且 enrollment 为 N/U/B → doCapture
+                ls === 'UNKNOWN' → 提示重试
+                其余 → 提示 3DS 拒绝（显示 enrollment + authStatus）
+```
+
+**onCancel（acdc.js）：** 3DS 弹窗被用户关闭时触发，显示"3D Secure cancelled"并重新启用支付按钮。
 
 **inputEvents 行为：**
 - `onFocus` / `onBlur` → 给对应容器 div 加/去 `.focused` 类（number/expiry/cvv，name 已移出托管字段）
@@ -374,8 +392,9 @@ Express → _factory.js POST capture-order handler
       │
       ▼
 spb.js onApprove callback 收到结果
-  └─ showResult('✓ Payment captured · Order: ' + order.id, 'success')
-     └─ 更新页面上 #result 元素的样式和文字
+  ├─ 检查 purchase_units[0].payments.captures[0].status === 'COMPLETED'
+  │   非 COMPLETED → showResult('✗ Capture failed · status: ...', 'error')
+  └─ COMPLETED → showResult('✓ Payment captured · Order: ' + order.id, 'success')
 ```
 
 ---
@@ -592,6 +611,37 @@ router.post('/api/<product>/create-order', async (req, res) => {
 | `vault-paypal-setup-only.js` | 自定义 | N/A（无 purchase body）|
 | `vault-acdc-setup-only.js` | 自定义 | N/A |
 | `vault-return.js` | 自定义 | N/A |
+
+---
+
+## Capture 成功判断规则（2026-05-21）
+
+**所有前端 JS 文件中，capture order 成功必须验证 `purchase_units[0].payments.captures[0].status === 'COMPLETED'`。**
+
+- 禁止用 `order.status`（订单级状态，不代表扣款成功）
+- 禁止仅靠 `order.error` 缺失判断成功
+- 非 COMPLETED 状态（如 DECLINED、PENDING）必须显示错误
+
+```js
+var capture = order.purchase_units &&
+              order.purchase_units[0] &&
+              order.purchase_units[0].payments &&
+              order.purchase_units[0].payments.captures &&
+              order.purchase_units[0].payments.captures[0]
+if (!capture || capture.status !== 'COMPLETED') {
+  showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
+  return
+}
+showResult('✓ Payment captured · Order: ' + order.id, 'success')
+```
+
+| 文件 | 位置 | 状态 |
+|------|------|------|
+| `spb.js` | `onApprove` 内联 capture | ✅ 已更新 |
+| `buttons.js` | `capture()` 共享函数 | ✅ 已更新 |
+| `acdc.js` | `doCapture()` helper | ✅ 已更新 |
+| `vault-return.js` | `createAndCapture` 回调 | ✅ 已更新 |
+| `vault-setup.js` | 无 capture（纯签约） | N/A |
 
 ---
 

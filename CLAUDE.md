@@ -546,6 +546,30 @@ npm run dev:demo-hub     # nodemon 会自动重启，或手动 rs
 
 ---
 
+## 支付集成规则（所有 demo 通用）
+
+### Capture 成功判断
+
+PayPal capture order API 返回后，**必须**检查 `purchase_units[0].payments.captures[0].status === 'COMPLETED'` 才算成功扣款。
+
+- `order.status`（订单级状态）不代表扣款成功，禁止用于判断
+- 仅靠 `order.error` 缺失不足以判断成功
+- 非 COMPLETED 状态（如 `DECLINED`、`PENDING`）必须显示错误提示
+
+```js
+var capture = order.purchase_units &&
+              order.purchase_units[0] &&
+              order.purchase_units[0].payments &&
+              order.purchase_units[0].payments.captures &&
+              order.purchase_units[0].payments.captures[0]
+if (!capture || capture.status !== 'COMPLETED') {
+  showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
+  return
+}
+```
+
+---
+
 ## 开发方法论
 
 ### 测试驱动开发（TDD）
