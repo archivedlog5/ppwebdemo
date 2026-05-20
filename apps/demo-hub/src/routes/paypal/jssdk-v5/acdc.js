@@ -25,17 +25,27 @@ router.get('/acdc', (req, res) => {
   })
 })
 
+const SCA_METHODS = ['SCA_WHEN_REQUIRED', 'SCA_ALWAYS']
+
 router.post('/api/acdc/create-order', async (req, res) => {
   try {
-    const amount   = req.body.amount   || DEFAULT_AMOUNT
-    const currency = resolveCurrency(req.body.currency)
+    const amount    = req.body.amount   || DEFAULT_AMOUNT
+    const currency  = resolveCurrency(req.body.currency)
+    const scaMethod = SCA_METHODS.includes(req.body.scaMethod) ? req.body.scaMethod : 'SCA_WHEN_REQUIRED'
     const amountErr = validateAmount(amount, currency)
     if (amountErr) return res.status(400).json({ error: amountErr })
     const token  = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method:  'POST',
       headers: getHeaders(token),
-      body:    JSON.stringify(buildOrderBody(amount, { currency })),
+      body:    JSON.stringify(buildOrderBody(amount, {
+        currency,
+        topLevel: {
+          payment_source: {
+            card: { attributes: { verification: { method: scaMethod } } },
+          },
+        },
+      })),
     })
     const order = await r.json()
     if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })

@@ -34,6 +34,11 @@
     return sel ? sel.value : (window.DEMO && window.DEMO.currency) || 'USD'
   }
 
+  function getSCA() {
+    var sel = document.getElementById('demo-sca')
+    return sel ? sel.value : 'SCA_WHEN_REQUIRED'
+  }
+
   function isZeroDecimal(currency) {
     return ZERO_DECIMAL.indexOf(currency) !== -1
   }
@@ -145,7 +150,7 @@
         return fetch(urls.createOrder, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ amount: getAmount(), currency: getCurrency() }),
+          body:    JSON.stringify({ amount: getAmount(), currency: getCurrency(), scaMethod: getSCA() }),
         })
           .then(function (r) { return r.json() })
           .then(function (d) {

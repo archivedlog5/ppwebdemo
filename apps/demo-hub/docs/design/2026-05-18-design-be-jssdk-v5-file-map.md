@@ -60,8 +60,8 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 + API | `src/routes/paypal/jssdk-v5/buttons.js` | 自定义路由；`create-order`（CN）用 `buildBody` → `payment_source.paypal`（`SANDBOX_BUYER` + `EXPERIENCE_CONTEXT`）；`create-order-us`（US Venmo）用 `buildBodyVenmo` → `payment_source.venmo`（`brand_name: "Cross Wen US Store"`）；`capture-order` 用 `account` 参数区分 CN/US token |
-| EJS 视图 | `src/views/paypal/jssdk-v5/buttons.ejs` | 4 个 `btn-slot` div，顺序：PayPal → PayLater → Venmo → BCDC；`cnSdkUrl`/`usSdkUrl` 双 script 注入（均含 `funding-eligibility`）；`window.DEMO.urls` 含三个端点；**币种选择器已 `disabled`**（双 SDK 各自带 currency 参数，切换需同步刷新两个 SDK，暂不支持） |
+| 路由 + API | `src/routes/paypal/jssdk-v5/buttons.js` | 自定义路由；`create-order`（CN）用 `buildBody` → `payment_source.paypal`（`SANDBOX_BUYER` + `EXPERIENCE_CONTEXT`）；`create-order-us`（US Venmo）用 `buildBodyVenmo` → `payment_source.venmo`（`brand_name: "Cross Wen US Store"`，`shipping: VENMO_SHIPPING`）；`capture-order` 用 `account` 参数区分 CN/US token |
+| EJS 视图 | `src/views/paypal/jssdk-v5/buttons.ejs` | 4 个 `btn-slot` div，顺序：PayPal → PayLater → Venmo → BCDC；Venmo slot 下方显示提示"Requires a US IP to test"；`cnSdkUrl`/`usSdkUrl` 双 script 注入（均含 `funding-eligibility`）；`window.DEMO.urls` 含三个端点；**币种选择器已 `disabled`** |
 | SDK JS | `src/public/js/paypal/jssdk-v5/buttons.js` | 每个按钮先 `Buttons()` 创建，再 `button.isEligible()` 判断，通过才 `render()`；paypalCN 渲染 PAYPAL/PAYLATER/CARD（BCDC 加 `expandCardForm: true`），paypalUS 渲染 VENMO |
 
 **常用微调点：**
@@ -75,9 +75,9 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 + API | `src/routes/paypal/jssdk-v5/acdc.js` | 自定义路由；SDK 参数 `components=card-fields`；create/capture 同工厂 |
-| EJS 视图 | `src/views/paypal/jssdk-v5/acdc.ejs` | 字段顺序：Name → Number → Expiry/CVV；`sandbox-card--wide`（540px）；按钮文字 "Pay Now"；`window.DEMO.urls` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | `paypalSDK.CardFields()` + `inputEvents`；`#acdc-pay-btn` 点击触发 `submit()` |
+| 路由 + API | `src/routes/paypal/jssdk-v5/acdc.js` | 自定义路由；SDK 参数 `components=card-fields`；读取 `req.body.scaMethod`，白名单校验（`SCA_WHEN_REQUIRED` / `SCA_ALWAYS`，无效时 fallback `SCA_WHEN_REQUIRED`），注入 `payment_source.card.attributes.verification.method` |
+| EJS 视图 | `src/views/paypal/jssdk-v5/acdc.ejs` | 字段顺序：Name → Number → Expiry/CVV；`sandbox-card--wide`（540px）；按钮文字 "Pay Now"；amount-row 含三列：Currency / Amount / **3DS**（select：`SCA_WHEN_REQUIRED` 默认，`SCA_ALWAYS`） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | `paypalSDK.CardFields()` + `inputEvents`；`getSCA()` 读取 `#demo-sca`；`createOrder` fetch body 含 `{ amount, currency, scaMethod }`；`#acdc-pay-btn` 点击触发 `submit()` |
 
 **inputEvents 行为：**
 - `onFocus` / `onBlur` → 给对应容器 div 加/去 `.focused` 类（蓝色边框 + glow）
@@ -617,7 +617,8 @@ const { INTENT, CURRENCY, DEFAULT_AMOUNT, buildOrderBody,
 | `DEFAULT_CURRENCY` | 字符串 | `'USD'` |
 | `DEMO_DESCRIPTION` | 字符串 | 出现在 PayPal 结账页的订单描述 |
 | `DEMO_ITEM` | 对象 | 商品名称、描述、类目、数量 |
-| `SANDBOX_SHIPPING` | 对象 | 预填收货地址（US sandbox 地址） |
+| `SANDBOX_SHIPPING` | 对象 | 预填收货地址（US sandbox 地址，CN 账户通用） |
+| `VENMO_SHIPPING` | 对象 | Venmo 专用收货地址（`test / Trumbull, AL 06611, US`） |
 | `SANDBOX_BILLING` | 对象 | 账单地址（ACDC 场景） |
 | `buildOrderBody(amount, overrides)` | 函数 | 统一组装 PayPal order body |
 

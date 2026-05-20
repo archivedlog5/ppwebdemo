@@ -134,6 +134,17 @@ const SANDBOX_SHIPPING = {
   },
 };
 
+// ── Venmo 收货地址（US sandbox，Venmo 专用）──────────────────────────
+const VENMO_SHIPPING = {
+  address: {
+    address_line_1: "test",
+    admin_area_2:   "Trumbull",
+    admin_area_1:   "AL",
+    postal_code:    "06611",
+    country_code:   "US",
+  },
+};
+
 /**
  * 服务端金额校验
  * @param {string} amount
@@ -225,6 +236,7 @@ module.exports = {
   // 地址
   SANDBOX_SHIPPING,
   SANDBOX_BILLING,
+  VENMO_SHIPPING,
 
   // 工具函数
   isZeroDecimal,
