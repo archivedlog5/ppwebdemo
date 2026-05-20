@@ -53,6 +53,41 @@ function buildBody(amount, currency) {
   };
 }
 
+function buildBodyVenmo(amount, currency) {
+  const zd = demoParams.isZeroDecimal(currency);
+  const val = zd
+    ? String(Math.round(parseFloat(amount)))
+    : parseFloat(amount).toFixed(2);
+  const amountObj = (curr) => ({ currency_code: curr, value: val });
+  return {
+    intent: demoParams.INTENT.CAPTURE,
+    payment_source: {
+      venmo: {
+        experience_context: {
+          brand_name: "Cross Wen US Store",
+          shipping_preference: "SET_PROVIDED_ADDRESS",
+        },
+      },
+    },
+    purchase_units: [
+      {
+        reference_id: demoParams.DEMO_REFERENCE_ID,
+        description: demoParams.DEMO_DESCRIPTION,
+        invoice_id: `INV-${Date.now()}`,
+        custom_id: demoParams.DEMO_CUSTOM_ID,
+        soft_descriptor: demoParams.DEMO_SOFT_DESCRIPTOR,
+        amount: {
+          currency_code: currency,
+          value: val,
+          breakdown: { item_total: amountObj(currency) },
+        },
+        items: [{ ...demoParams.DEMO_ITEM, unit_amount: amountObj(currency) }],
+        shipping: demoParams.SANDBOX_SHIPPING,
+      },
+    ],
+  };
+}
+
 const router = Router();
 const PROVIDER = "paypal",
   SDK = "jssdk-v5",
@@ -74,8 +109,8 @@ router.get("/buttons", (req, res) => {
     showSidebar: true,
     defaultAmount: amount,
     currency,
-    cnSdkUrl: `https://www.paypal.com/sdk/js?client-id=${CN_ID}&commit=true&buyer-country=US&components=buttons&currency=${currency}&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort`,
-    usSdkUrl: `https://www.paypal.com/sdk/js?client-id=${US_ID}&commit=true&buyer-country=US&components=buttons&enable-funding=venmo&currency=${currency}&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort`,
+    cnSdkUrl: `https://www.paypal.com/sdk/js?client-id=${CN_ID}&commit=true&buyer-country=US&components=buttons,funding-eligibility&currency=${currency}&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort`,
+    usSdkUrl: `https://www.paypal.com/sdk/js?client-id=${US_ID}&commit=true&buyer-country=US&components=buttons,funding-eligibility&enable-funding=venmo&currency=${currency}&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort`,
   });
 });
 
@@ -115,7 +150,7 @@ router.post("/api/buttons/create-order-us", async (req, res) => {
     const r = await fetch(`${API}/v2/checkout/orders`, {
       method: "POST",
       headers: getHeaders(token),
-      body: JSON.stringify(buildBody(amount, currency)),
+      body: JSON.stringify(buildBodyVenmo(amount, currency)),
     });
     const order = await r.json();
     if (!r.ok)

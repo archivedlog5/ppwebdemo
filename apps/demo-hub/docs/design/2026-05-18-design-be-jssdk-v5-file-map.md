@@ -60,14 +60,14 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 + API | `src/routes/paypal/jssdk-v5/buttons.js` | 自定义路由；`create-order`（CN）、`create-order-us`（US Venmo）、`capture-order`（account 参数区分）；**两个 create-order 均使用 `buildBody(amount, currency)`**，body 结构与 spb-ecm 相同（`SANDBOX_BUYER` + `EXPERIENCE_CONTEXT` + full `purchase_units`） |
-| EJS 视图 | `src/views/paypal/jssdk-v5/buttons.ejs` | 4 个 `btn-slot` div，顺序：PayPal → PayLater → Venmo → BCDC；`cnSdkUrl`/`usSdkUrl` 双 script 注入；`window.DEMO.urls` 含三个端点；**币种选择器已 `disabled`**（双 SDK 各自带 currency 参数，切换需同步刷新两个 SDK，暂不支持） |
-| SDK JS | `src/public/js/paypal/jssdk-v5/buttons.js` | 分别渲染 paypalCN.FUNDING.PAYPAL/PAYLATER/CARD 和 paypalUS.FUNDING.VENMO；BCDC 加 `expandCardForm: true` |
+| 路由 + API | `src/routes/paypal/jssdk-v5/buttons.js` | 自定义路由；`create-order`（CN）用 `buildBody` → `payment_source.paypal`（`SANDBOX_BUYER` + `EXPERIENCE_CONTEXT`）；`create-order-us`（US Venmo）用 `buildBodyVenmo` → `payment_source.venmo`（`brand_name: "Cross Wen US Store"`）；`capture-order` 用 `account` 参数区分 CN/US token |
+| EJS 视图 | `src/views/paypal/jssdk-v5/buttons.ejs` | 4 个 `btn-slot` div，顺序：PayPal → PayLater → Venmo → BCDC；`cnSdkUrl`/`usSdkUrl` 双 script 注入（均含 `funding-eligibility`）；`window.DEMO.urls` 含三个端点；**币种选择器已 `disabled`**（双 SDK 各自带 currency 参数，切换需同步刷新两个 SDK，暂不支持） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/buttons.js` | 每个按钮先 `Buttons()` 创建，再 `button.isEligible()` 判断，通过才 `render()`；paypalCN 渲染 PAYPAL/PAYLATER/CARD（BCDC 加 `expandCardForm: true`），paypalUS 渲染 VENMO |
 
 **常用微调点：**
 - CN/US 账户切换 → `buttons.js` 路由里改 `getCNToken()`/`getUSToken()`
 - 按钮 label → `public/js/.../buttons.js` 各 `Buttons()` 加 `style.label`
-- Venmo 不可用时降级 → `buttons.js` SDK JS 里判断 `paypalUS.isFundingEligible(VENMO)`
+- Venmo brand name → `buttons.js` 路由里 `buildBodyVenmo` 的 `experience_context.brand_name`
 
 ---
 
@@ -202,7 +202,7 @@ Status: LIVING DOCUMENT（随实现持续更新）
 |------|------------------------|---------|
 | **spb-ecm** | `components=buttons&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort` | ECM：`commit=true` 显示 "Pay Now" |
 | **spb-ecs** | `components=buttons&commit=false&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort` | ECS：`commit=false` 显示 "Continue" |
-| **buttons** | CN: `components=buttons&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort&currency=${currency}` / US: 同 CN + `&enable-funding=venmo` | 双 SDK，currency 由路由注入；`commit=true` 两个 SDK 均生效 |
+| **buttons** | CN: `components=buttons,funding-eligibility&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort&currency=${currency}` / US: 同 CN + `&enable-funding=venmo` | 双 SDK，`funding-eligibility` 组件必须，`isEligible()` 依赖它；currency 由路由注入 |
 | **acdc** | `components=card-fields` | 不能和 buttons 混用 |
 | **applepay-ecm/ecs** | `components=applepay` | 需 Safari + Apple Wallet |
 | **googlepay-ecm/ecs** | `components=googlepay` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 需 Chrome + Google Pay 卡 |

@@ -139,61 +139,57 @@
 
     // ── CN: PayPal ──────────────────────────────────────────────────
     if (typeof paypalCN !== "undefined") {
-      paypalCN
-        .Buttons({
-          fundingSource: paypalCN.FUNDING.PAYPAL,
-          createOrder: makeCreateOrder(urls.createOrder),
-          onApprove: function (d) {
-            return capture(d.orderID, "cn");
-          },
-          onError: function (e) {
-            showResult("✗ PayPal: " + (e.message || String(e)), "error");
-          },
-        })
-        .render("#btn-paypal");
+      var btnPayPal = paypalCN.Buttons({
+        fundingSource: paypalCN.FUNDING.PAYPAL,
+        createOrder: makeCreateOrder(urls.createOrder),
+        onApprove: function (d) {
+          return capture(d.orderID, "cn");
+        },
+        onError: function (e) {
+          showResult("✗ PayPal: " + (e.message || String(e)), "error");
+        },
+      });
+      if (btnPayPal.isEligible()) btnPayPal.render("#btn-paypal");
 
-      paypalCN
-        .Buttons({
-          fundingSource: paypalCN.FUNDING.PAYLATER,
-          createOrder: makeCreateOrder(urls.createOrder),
-          onApprove: function (d) {
-            return capture(d.orderID, "cn");
-          },
-          onError: function (e) {
-            showResult("✗ PayLater: " + (e.message || String(e)), "error");
-          },
-        })
-        .render("#btn-paylater");
+      var btnPayLater = paypalCN.Buttons({
+        fundingSource: paypalCN.FUNDING.PAYLATER,
+        createOrder: makeCreateOrder(urls.createOrder),
+        onApprove: function (d) {
+          return capture(d.orderID, "cn");
+        },
+        onError: function (e) {
+          showResult("✗ PayLater: " + (e.message || String(e)), "error");
+        },
+      });
+      if (btnPayLater.isEligible()) btnPayLater.render("#btn-paylater");
 
-      paypalCN
-        .Buttons({
-          fundingSource: paypalCN.FUNDING.CARD,
-          expandCardForm: true,
-          createOrder: makeCreateOrder(urls.createOrder),
-          onApprove: function (d) {
-            return capture(d.orderID, "cn");
-          },
-          onError: function (e) {
-            showResult("✗ BCDC: " + (e.message || String(e)), "error");
-          },
-        })
-        .render("#btn-bcdc");
+      var btnCard = paypalCN.Buttons({
+        fundingSource: paypalCN.FUNDING.CARD,
+        expandCardForm: true,
+        createOrder: makeCreateOrder(urls.createOrder),
+        onApprove: function (d) {
+          return capture(d.orderID, "cn");
+        },
+        onError: function (e) {
+          showResult("✗ BCDC: " + (e.message || String(e)), "error");
+        },
+      });
+      if (btnCard.isEligible()) btnCard.render("#btn-bcdc");
     }
 
     // ── US: Venmo ───────────────────────────────────────────────────
     if (typeof paypalUS !== "undefined") {
-      paypalUS
-        .Buttons({
-          fundingSource: paypalUS.FUNDING.VENMO,
-          createOrder: makeCreateOrder(urls.createOrderUs),
-          onApprove: function (d) {
-            return capture(d.orderID, "us");
-          },
-          onError: function (e) {
-            showResult("✗ Venmo: " + (e.message || String(e)), "error");
-          },
-        })
-        .render("#btn-venmo");
+      var btnVenmo = paypalUS.Buttons({
+        fundingSource: paypalUS.FUNDING.VENMO,
+        createOrder: makeCreateOrder(urls.createOrderUs),
+        onApprove: function (d) {
+          return capture(d.orderID, "us");
+        },
+        onError: function (e) {
+          showResult("✗ Venmo: " + (e.message || String(e)), "error");
+        },
+      });
+      if (btnVenmo.isEligible()) btnVenmo.render("#btn-venmo");
     }
   });
 })();
