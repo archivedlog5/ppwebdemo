@@ -1515,29 +1515,56 @@ router.get('/buttons', (req, res) => {
   })
 })
 
+// buildBody — same structure as spb-ecm (SANDBOX_BUYER + EXPERIENCE_CONTEXT + full purchase_units)
+function buildBody(amount, currency) {
+  const zd = demoParams.isZeroDecimal(currency)
+  const val = zd ? String(Math.round(parseFloat(amount))) : parseFloat(amount).toFixed(2)
+  const amountObj = (curr) => ({ currency_code: curr, value: val })
+  return {
+    intent: demoParams.INTENT.CAPTURE,
+    payment_source: { paypal: { ...demoParams.SANDBOX_BUYER, experience_context: demoParams.EXPERIENCE_CONTEXT } },
+    purchase_units: [{
+      reference_id: demoParams.DEMO_REFERENCE_ID, description: demoParams.DEMO_DESCRIPTION,
+      invoice_id: `INV-${Date.now()}`, custom_id: demoParams.DEMO_CUSTOM_ID,
+      soft_descriptor: demoParams.DEMO_SOFT_DESCRIPTOR,
+      amount: { currency_code: currency, value: val, breakdown: { item_total: amountObj(currency) } },
+      items: [{ ...demoParams.DEMO_ITEM, unit_amount: amountObj(currency) }],
+      shipping: demoParams.SANDBOX_SHIPPING,
+    }],
+  }
+}
+
 // CN account: PayPal / PayLater / BCDC
 router.post('/api/buttons/create-order', async (req, res) => {
   try {
+    const amount = req.body.amount || DEFAULT_AMOUNT
+    const currency = resolveCurrency(req.body.currency)
+    const amountErr = validateAmount(amount, currency)
+    if (amountErr) return res.status(400).json({ error: amountErr })
     const token = await getCNToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: '1.00' } }] }),
+      method: 'POST', headers: getHeaders(token), body: JSON.stringify(buildBody(amount, currency)),
     })
-    res.json({ id: (await r.json()).id })
+    const order = await r.json()
+    if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })
+    res.json({ id: order.id })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 
 // US account: Venmo
 router.post('/api/buttons/create-order-us', async (req, res) => {
   try {
+    const amount = req.body.amount || DEFAULT_AMOUNT
+    const currency = resolveCurrency(req.body.currency)
+    const amountErr = validateAmount(amount, currency)
+    if (amountErr) return res.status(400).json({ error: amountErr })
     const token = await getUSToken()
     const r = await fetch(`${API}/v2/checkout/orders`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intent: 'CAPTURE', purchase_units: [{ amount: { currency_code: 'USD', value: '1.00' } }] }),
+      method: 'POST', headers: getHeaders(token), body: JSON.stringify(buildBody(amount, currency)),
     })
-    res.json({ id: (await r.json()).id })
+    const order = await r.json()
+    if (!r.ok) return res.status(r.status).json({ error: order.message, details: order })
+    res.json({ id: order.id })
   } catch (err) { res.status(500).json({ error: err.message }) }
 })
 

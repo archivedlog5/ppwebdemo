@@ -60,7 +60,7 @@ Status: LIVING DOCUMENT（随实现持续更新）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 + API | `src/routes/paypal/jssdk-v5/buttons.js` | 自定义路由；`create-order`（CN）、`create-order-us`（US Venmo）、`capture-order`（account 参数区分） |
+| 路由 + API | `src/routes/paypal/jssdk-v5/buttons.js` | 自定义路由；`create-order`（CN）、`create-order-us`（US Venmo）、`capture-order`（account 参数区分）；**两个 create-order 均使用 `buildBody(amount, currency)`**，body 结构与 spb-ecm 相同（`SANDBOX_BUYER` + `EXPERIENCE_CONTEXT` + full `purchase_units`） |
 | EJS 视图 | `src/views/paypal/jssdk-v5/buttons.ejs` | 4 个 `btn-slot` div，顺序：PayPal → PayLater → Venmo → BCDC；`cnSdkUrl`/`usSdkUrl` 双 script 注入；`window.DEMO.urls` 含三个端点；**币种选择器已 `disabled`**（双 SDK 各自带 currency 参数，切换需同步刷新两个 SDK，暂不支持） |
 | SDK JS | `src/public/js/paypal/jssdk-v5/buttons.js` | 分别渲染 paypalCN.FUNDING.PAYPAL/PAYLATER/CARD 和 paypalUS.FUNDING.VENMO；BCDC 加 `expandCardForm: true` |
 
