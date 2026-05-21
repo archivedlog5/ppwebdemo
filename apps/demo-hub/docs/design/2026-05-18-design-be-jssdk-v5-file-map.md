@@ -135,18 +135,191 @@ liabilityShift 来自 onApprove data（客户端）：
 
 ---
 
-## Google Pay（工厂路由）
+## Google Pay（自定义路由）
 
-### googlepay-ecm / googlepay-ecs
+### googlepay-ecm — Google Pay Express Checkout Mark（2026-05-22 完成）
+
+> ECM = 商户侧预填收货地址，`shippingAddressRequired: false`，买家不在 Google Pay sheet 里选地址。
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 googlepay-ecm | `src/routes/paypal/jssdk-v5/googlepay-ecm.js` | `sdkParams: 'components=googlepay&currency=USD'`；`extraScripts: [{ url: 'https://pay.google.com/gp/p/js/pay.js' }]` |
-| 路由 googlepay-ecs | `src/routes/paypal/jssdk-v5/googlepay-ecs.js` | 同 ECM |
-| EJS 视图 | `src/views/paypal/jssdk-v5/googlepay-ecm.ejs` | 自动加载 Google Pay JS + PayPal SDK；`window.DEMO.urls` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/googlepay.js` | **⏳ 待实现**：`google.payments.api.PaymentsClient`、`paypalSDK.Googlepay()`、`loadPaymentData`、`confirmOrder` |
+| 路由 + API | `src/routes/paypal/jssdk-v5/googlepay-ecm.js` | **自定义路由**（非工厂）；3 个 API 端点（见下）；GET handler 把 `sandboxShipping` 传给 EJS |
+| EJS 视图 | `src/views/paypal/jssdk-v5/googlepay-ecm.ejs` | `extraScripts` 加载 Google Pay JS；`amount-row` 三列：Currency / Amount / **3DS**（`#demo-sca`）；只读 Shipping 展示区；`window.DEMO.urls` 含三个端点 + `window.DEMO.shipping`；`#custom-googlepay-btn`（初始 `disabled` + `opacity:0.45`，Google Pay 初始化完成后由 JS 启用） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/googlepay-ecm.js` | ECM 专用；全函数拆分；完整 console.log 日志；3DS 处理（GET order → 解析 google_pay.card.authentication_result）；`addGooglePayButton` 启用 `#custom-googlepay-btn` 并绑定 hover/press/click 监听器 |
 
-**前提条件：** Chrome、Google Pay 账户绑定卡、localhost（Google Pay TEST 环境允许 localhost）
+---
+
+#### 后端 API（`googlepay-ecm.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/googlepay-ecm` | GET | 渲染页面；传 `sandboxShipping`（camelCase）给 EJS |
+| `/api/googlepay-ecm/create-order` | POST | 读 `{ amount, currency, shipping, scaMethod }`；构建完整 order body（见下）；返回 `{ id }` |
+| `/api/googlepay-ecm/order/:orderID` | GET | 返回完整 order JSON（用于 3DS 后读取 authentication_result） |
+| `/api/googlepay-ecm/capture-order` | POST | 读 `{ orderID }`；capture 并返回完整 order JSON |
+
+**create-order body（`payment_source.google_pay`）：**
+
+```js
+{
+  intent: 'CAPTURE',
+  purchase_units: [{
+    reference_id:    demoParams.DEMO_REFERENCE_ID,
+    description:     demoParams.DEMO_DESCRIPTION,
+    invoice_id:      `INV-${Date.now()}`,
+    custom_id:       demoParams.DEMO_CUSTOM_ID,
+    soft_descriptor: demoParams.DEMO_SOFT_DESCRIPTOR,
+    amount: { currency_code, value, breakdown: { item_total } },
+    items:  [{ ...demoParams.DEMO_ITEM, unit_amount }],
+    shipping: { name, address },   // 从 req.body.shipping 读，fallback demoParams.SANDBOX_SHIPPING
+  }],
+  payment_source: {
+    google_pay: {
+      experience_context: {
+        return_url: `${protocol}://${host}/paypal/jssdk-v5/googlepay-ecm`,
+        cancel_url: `${protocol}://${host}/paypal/jssdk-v5/googlepay-ecm`,
+      },
+      attributes: { verification: { method: scaMethod } },  // SCA_WHEN_REQUIRED | SCA_ALWAYS
+    }
+  }
+}
+```
+
+---
+
+#### 前端函数一览（`googlepay-ecm.js`）
+
+| 函数 | 类型 | 职责 |
+|------|------|------|
+| `getCurrency()` | UI helper | 读 `#demo-currency` |
+| `getSCA()` | UI helper | 读 `#demo-sca` |
+| `getAmount()` | UI helper | 读 `#demo-amount` |
+| `validateAmount()` | UI helper | 金额校验（$1–$30,000，零小数位校验） |
+| `showResult(text, type)` | UI helper | 写 `#result` 展示结果 |
+| `getGooglePaymentsClient()` | singleton | 首次 new `google.payments.api.PaymentsClient`，之后返回缓存 |
+| `getGooglePayConfig()` | singleton | 首次调 `paypalSDK.Googlepay().config()`，缓存 `googlepayConfig` |
+| `getGoogleIsReadyToPayRequest(config)` | builder | 构建 `isReadyToPay` 请求体（`BASE_REQUEST + allowedPaymentMethods`） |
+| `getGooglePaymentDataRequest(config, amount, currency)` | builder | 构建 `loadPaymentData` 请求体（含 `transactionInfo`、`shippingAddressRequired: false`）；**无 `callbackIntents`** |
+| `addGooglePayButton(config)` | setup | 清容器 + `createButton()`；启用 `#custom-googlepay-btn`（opacity→1, cursor→pointer）并绑定 mouseenter/mouseleave/mousedown/mouseup/click 监听器 |
+| `onGooglePaymentButtonClicked(config)` | handler | 验证金额 → `createOrder` → `loadPaymentData().then(processPayment)` — sheet 关闭后才处理支付；官方按钮和 custom button 共用此函数 |
+| `processPayment(paymentData)` | orchestrator | `confirmOrder` → 分支：PAYER_ACTION_REQUIRED → `initiatePayerAction` → `getOrderDetails` → `handle3DS`；其余 → `doCapture` |
+| `getOrderDetails(orderID)` | fetch | GET `/api/googlepay-ecm/order/:orderID`，返回完整 order |
+| `handle3DS(order)` | 3DS logic | 解析 `payment_source.google_pay.card.authentication_result`，决定是否 capture（见下） |
+| `doCapture(orderID)` | fetch | POST captureOrder，校验 `captures[0].status === 'COMPLETED'` |
+
+---
+
+#### 3DS 处理逻辑（`handle3DS`）
+
+**路径与 ACDC 的关键区别：**
+- ACDC：`payment_source.card.authentication_result`
+- Google Pay：`payment_source.google_pay.card.authentication_result`（多一层 `google_pay`）
+- Google Pay 没有客户端 `liabilityShift`，必须 GET order details 后从 API 响应读取
+
+```
+handle3DS(order)
+  ├─ 解析 order.payment_source.google_pay.card.authentication_result
+  │   ├─ liability_shift      (ls)
+  │   ├─ three_d_secure.enrollment_status   (enrollment)
+  │   └─ three_d_secure.authentication_status  (authStatus)
+  │
+  ├─ ls === 'POSSIBLE'
+  │   └─ 责任转移到发卡行 → doCapture ✅
+  │
+  ├─ ls === 'NO'
+  │   ├─ enrollment in ['N', 'U', 'B']  → 卡未注册 → doCapture ✅
+  │   └─ 其他 enrollment               → 显示错误，reject ✗
+  │
+  ├─ ls === 'UNKNOWN'
+  │   └─ 显示"请重试"，reject ✗
+  │
+  └─ 其他 ls（undefined 等）
+      └─ 显示错误，reject ✗
+```
+
+---
+
+#### Promise 模式 vs Callback 模式（重要设计决策）
+
+**当前实现：Promise 模式（`loadPaymentData` 返回 Promise，无 `paymentDataCallbacks`）**
+
+Callback 模式问题：若在 `PaymentsClient` 构造时传入 `paymentDataCallbacks: { onPaymentAuthorized }`，并在 `paymentDataRequest` 加 `callbackIntents: ['PAYMENT_AUTHORIZATION']`，Google Pay sheet 会等待 callback 返回的 Promise resolve 后才关闭。因此当 `initiatePayerAction` 触发 3DS 验证窗口时，sheet 仍然覆盖在屏幕上，3DS 窗口被挡住无法交互，用户无法完成验证，最终 sheet 超时报错。
+
+Promise 模式解法：不传 `paymentDataCallbacks`，不设 `callbackIntents`。用户在 sheet 里授权后，sheet 自动关闭，`loadPaymentData()` 的 Promise 才 resolve，此时屏幕干净，`initiatePayerAction` 触发的 3DS 窗口可以正常弹出并完成验证。
+
+```
+❌ Callback 模式（3DS 场景下 sheet 挡住 3DS 窗口）：
+PaymentsClient({ paymentDataCallbacks: { onPaymentAuthorized } })
+loadPaymentData({ callbackIntents: ['PAYMENT_AUTHORIZATION'] })
+  → sheet 保持打开 → 调 onPaymentAuthorized → confirmOrder → initiatePayerAction
+  → 3DS 窗口在 sheet 后面 → 超时报错
+
+✅ Promise 模式（sheet 先关再触发 3DS）：
+PaymentsClient()                        ← 无 paymentDataCallbacks
+loadPaymentData()                       ← 无 callbackIntents
+  → 用户授权 → sheet 自动关闭 → Promise resolve
+  → processPayment → confirmOrder → initiatePayerAction
+  → 3DS 窗口正常弹出 → 完成验证 → doCapture
+```
+
+---
+
+#### 完整 SDK JS 调用链
+
+```
+window load
+  ├─ [LOG] urls, shipping
+  ├─ getGooglePayConfig()              ← 首次调 paypalSDK.Googlepay().config()，缓存结果
+  │   └─ [LOG] config（allowedPaymentMethods、merchantInfo、apiVersion）
+  ├─ getGooglePaymentsClient()         ← new PaymentsClient（无 paymentDataCallbacks）
+  │   └─ [LOG] paymentsClient
+  ├─ getGoogleIsReadyToPayRequest()    ← 构建 isReadyToPay 请求体
+  ├─ isReadyToPay()
+  │   └─ [LOG] 响应
+  └─ addGooglePayButton(config)        ← 清容器，createButton；启用 #custom-googlepay-btn，绑定 hover/press/click
+
+onGooglePaymentButtonClicked(config)   ← 按钮点击
+  ├─ validateAmount()
+  ├─ [LOG] amount, currency, scaMethod, shipping
+  ├─ fetch createOrder
+  │   └─ [LOG] 请求体 + 响应 + orderId → currentOrderID
+  ├─ getGooglePaymentDataRequest()     ← 构建 loadPaymentData 请求体（无 callbackIntents）
+  ├─ loadPaymentData()                 ← 返回 Promise；用户授权后 sheet 自动关闭
+  │   └─ [LOG] paymentDataRequest
+  └─ .then(paymentData)                ← sheet 已关闭，屏幕干净，可安全触发 3DS
+      ├─ [LOG] paymentData, paymentMethodData
+      └─ processPayment(paymentData)
+          ├─ confirmOrder({ orderId, paymentMethodData })
+          │   └─ [LOG] result, status
+          ├─ if PAYER_ACTION_REQUIRED
+          │   ├─ initiatePayerAction({ orderId })
+          │   │   └─ [LOG] completed
+          │   ├─ getOrderDetails(orderId)
+          │   │   └─ [LOG] GET url + 完整 order 响应
+          │   └─ handle3DS(order)
+          │       ├─ [LOG] authResult, ls, enrollment, authStatus
+          │       └─ → doCapture 或 reject
+          └─ else → doCapture(orderId)
+
+doCapture(orderID)
+  ├─ [LOG] orderID, captureOrder API
+  ├─ fetch captureOrder
+  │   └─ [LOG] 完整响应
+  ├─ [LOG] capture 对象
+  └─ status === 'COMPLETED' → [LOG] + showResult ✅  |  否则 error ✗
+```
+
+**前提条件：** Chrome、Google Pay 账户绑定测试卡、localhost（Google Pay TEST 环境允许）
+
+---
+
+### googlepay-ecs — ⏳ 待实现
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 googlepay-ecs | `src/routes/paypal/jssdk-v5/googlepay-ecs.js` | 待实现（`shippingAddressRequired: true`，买家在 Google Pay sheet 里选地址） |
+| EJS 视图 | `src/views/paypal/jssdk-v5/googlepay-ecs.ejs` | 待实现（不显示 Shipping Address 区域）|
+| SDK JS | `src/public/js/paypal/jssdk-v5/googlepay-ecs.js` | ECS 专用（待实现）；需 `onPaymentDataChanged` 处理买家切换地址 |
 
 ---
 
@@ -223,7 +396,8 @@ liabilityShift 来自 onApprove data（客户端）：
 | **buttons** | CN: `components=buttons,funding-eligibility&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort&currency=${currency}` / US: 同 CN + `&enable-funding=venmo` | 双 SDK，`funding-eligibility` 组件必须，`isEligible()` 依赖它；currency 由路由注入 |
 | **acdc** | `components=card-fields` | 不能和 buttons 混用 |
 | **applepay-ecm/ecs** | `components=applepay` | 需 Safari + Apple Wallet |
-| **googlepay-ecm/ecs** | `components=googlepay` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 需 Chrome + Google Pay 卡 |
+| **googlepay-ecm** | `components=googlepay&currency=${currency}` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 自定义路由；需 Chrome + Google Pay 卡；3DS select `#demo-sca` |
+| **googlepay-ecs** | 同 ECM | ⏳ 待实现 |
 | **vault-paypal-with-purchase** | `components=buttons&vault=true` | vault=true 才能 store_in_vault |
 | **vault-acdc-with-purchase** | `components=card-fields&vault=true` | |
 | **vault-applepay-with-purchase** | `components=applepay&vault=true` | |
@@ -451,6 +625,7 @@ spb.js onApprove callback 收到结果
 | buttons | 自定义路由，双 SDK（cnSdkUrl + usSdkUrl） | 4 个 `Buttons()` 分别 render | 两套 token：getCNToken/getUSToken |
 | vault-*-with-purchase | `createVaultWithPurchaseRoute`，`payment_source` 含 vault 指令 | 同对应产品的 JS | capture 返回值含 `vaultId` |
 | vault-*-setup-only | 自定义路由，`/v3/vault/setup-tokens` | `Buttons({ createVaultSetupToken })` | 无 capture，返回 `paymentTokenId` |
+| googlepay-ecm | 自定义路由，`components=googlepay`，双外部 SDK（PayPal + Google Pay） | `paypalSDK.Googlepay().config()` → `PaymentsClient` → `isReadyToPay` → `createButton`；`loadPaymentData()` Promise resolve 后（sheet 关闭）→ `processPayment` → `confirmOrder` → `doCapture` | create-order body 含 SCA method；`shippingAddressRequired: false`；**Promise 模式（无 callbackIntents）**，3DS 需 GET order details |
 | vault-return | 自定义路由，`/v2/checkout/orders` + capture 一步完成 | 无 SDK，纯 fetch | 无 PayPal 弹窗，纯服务端 |
 
 ---
@@ -601,8 +776,8 @@ router.post('/api/<product>/create-order', async (req, res) => {
 | `spb-ecs.js` | 工厂 | ⏳ 待迁移 |
 | `applepay-ecm.js` | 工厂 | ⏳ 待迁移 |
 | `applepay-ecs.js` | 工厂 | ⏳ 待迁移 |
-| `googlepay-ecm.js` | 工厂 | ⏳ 待迁移 |
-| `googlepay-ecs.js` | 工厂 | ⏳ 待迁移 |
+| `googlepay-ecm.js` | 自定义（已改） | N/A（直接控制 POST handler）|
+| `googlepay-ecs.js` | 工厂 | ⏳ 待迁移（或改自定义） |
 | `vault-paypal-with-purchase.js` | 工厂 | ⏳ 待迁移 |
 | `vault-acdc-with-purchase.js` | 工厂 | ⏳ 待迁移 |
 | `vault-applepay-with-purchase.js` | 工厂 | ⏳ 待迁移 |

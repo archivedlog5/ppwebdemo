@@ -162,6 +162,7 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // 需要完全自定义实现的路由：
 // buttons.js            — 双 SDK（CN + US）
 // acdc.js               — CardFields SDK
+// googlepay-ecm.js      — 双外部 SDK（PayPal + Google Pay）；需传 sandboxShipping 给 EJS；含 SCA；命名函数拆分；3DS 通过 GET order details 解析（无前端 liabilityShift）；EJS 内含 #custom-googlepay-btn，JS 在初始化完成后启用并复用同一点击流程
 // vault-*-setup-only.js — /v3/vault/setup-tokens API
 // vault-return.js       — 用户提供 vault token
 ```
@@ -197,6 +198,18 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 - **Tab 结构预留**：`[ Demo ] [ Code ] [ Logs ]`，现阶段只激活 Demo Tab（在 header.ejs 中定义）
 - 页面标题来自 Supabase `display_name` 字段
 
+## 回复规范
+
+每次完成任务后，必须列出本次改动涉及的所有文件：
+
+```
+改动文件：
+- path/to/file1.js
+- path/to/file2.ejs
+```
+
+---
+
 ## 关键开发规则
 
 1. 每个路由文件只处理一个产品，不跨产品共用逻辑
@@ -207,7 +220,7 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 6. 新增产品：写路由代码 → 在 Supabase 插入行（含 sdk_version） → 重启 app
 7. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
 8. **API 常量引入方式**：路由文件用 `const C = require('../../../config/constants')` 整个引入，用 `C.INTENT`、`C.SANDBOX_SHIPPING` 等，不逐个解构
-9. **Order body 规范**：所有工厂路由产品（`createStandardRoute` / `createVaultWithPurchaseRoute`）**必须**提供 `buildBody(amount, currency)` 函数；自定义路由（buttons/acdc/vault-setup-only/vault-return）直接在 POST handler 里控制 body
+9. **Order body 规范**：所有工厂路由产品（`createStandardRoute` / `createVaultWithPurchaseRoute`）**必须**提供 `buildBody(amount, currency)` 函数；自定义路由（buttons/acdc/googlepay-ecm/vault-setup-only/vault-return）直接在 POST handler 里控制 body
 10. **金额动态传递**：前端从 `#demo-amount` 读值 → fetch body `{ amount, currency }` → 后端 `req.body.amount` / `req.body.currency`
 11. **币种选择**：`#demo-currency` 下拉框切换时刷新页面（`?currency=EUR&amount=xxx`）；服务端读 `req.query.currency` 并注入 SDK URL；零小数位货币（JPY/KRW/TWD/CLP/IDR）金额自动取整
 12. **币种校验**：后端用 `SUPPORTED_CURRENCIES` 白名单校验，无效则 fallback 到 `DEFAULT_CURRENCY`
@@ -223,6 +236,16 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
       return
     }
     ```
+14. **Google Pay 必须用 Promise 模式，不能用 Callback 模式**（3DS 场景）：
+    - **Callback 模式**（`paymentDataCallbacks: { onPaymentAuthorized }` + `callbackIntents: ['PAYMENT_AUTHORIZATION']`）：Google Pay sheet 会等 callback 的 Promise resolve 才关闭。`initiatePayerAction` 触发 3DS 窗口时 sheet 仍覆盖屏幕，3DS 被挡住，sheet 超时报错。
+    - **Promise 模式**（当前实现）：`PaymentsClient()` 不传 `paymentDataCallbacks`，`loadPaymentData` 不设 `callbackIntents`。用户授权后 sheet 自动关闭，`loadPaymentData` Promise resolve，此时屏幕干净，`initiatePayerAction` 的 3DS 窗口可正常弹出。
+    - 代码结构：`loadPaymentData(req).then(function(paymentData) { return processPayment(paymentData) })`
+
+15. **Google Pay 3DS 路径**（与 ACDC 不同）：Google Pay 无前端 `liabilityShift`，`confirmOrder` 返回 `PAYER_ACTION_REQUIRED` 时需 `initiatePayerAction` → **GET order details** → 从 `payment_source.google_pay.card.authentication_result`（比 ACDC 多一层 `google_pay`）读取 `liability_shift`、`three_d_secure.enrollment_status`、`three_d_secure.authentication_status`，再决定 capture 还是 reject：
+    - `liability_shift === 'POSSIBLE'` → capture
+    - `liability_shift === 'NO'` + enrollment in `['N','U','B']` → capture（未入会）
+    - `liability_shift === 'NO'` + 其他 enrollment → reject
+    - `liability_shift === 'UNKNOWN'` → reject（提示重试）
 
 ## EJS/JS 分离模式
 
@@ -263,7 +286,8 @@ EJS 文件职责：
 | `public/js/paypal/jssdk-v5/vault-setup.js` | vault-paypal-setup-only |
 | `public/js/paypal/jssdk-v5/vault-return.js` | vault-return |
 | `public/js/paypal/jssdk-v5/applepay.js` | applepay-ecm, applepay-ecs（待实现） |
-| `public/js/paypal/jssdk-v5/googlepay.js` | googlepay-ecm, googlepay-ecs（待实现） |
+| `public/js/paypal/jssdk-v5/googlepay-ecm.js` | googlepay-ecm（已实现；命名函数拆分：singleton paymentsClient/googlepayConfig、handle3DS、doCapture；`addGooglePayButton` 同时启用 EJS 里的 `#custom-googlepay-btn` 并绑定 hover/press/click） |
+| `public/js/paypal/jssdk-v5/googlepay-ecs.js` | googlepay-ecs（待实现；需 shippingAddressRequired:true + onPaymentDataChanged） |
 
 **新增 JS 文件时的规范：**
 - 用 IIFE 包裹（`(function() { 'use strict'; ... })()`）
@@ -342,7 +366,7 @@ module.exports = createVaultWithPurchaseRoute({
 })
 ```
 
-**自定义路由**（CardFields、双SDK、Vault Setup-only、Return Buyer）：参考 `acdc.js`、`buttons.js`、`vault-paypal-setup-only.js`、`vault-return.js`。
+**自定义路由**（CardFields、双SDK、Google Pay、Vault Setup-only、Return Buyer）：参考 `acdc.js`、`buttons.js`、`googlepay-ecm.js`、`vault-paypal-setup-only.js`、`vault-return.js`。
 
 ### 2. 创建（或复用）静态 JS 文件
 

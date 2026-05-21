@@ -1,6 +1,6 @@
 # demo-hub — Todos
 
-最后更新：2026-05-18
+最后更新：2026-05-21
 
 ---
 
@@ -33,7 +33,8 @@
 - [x] **`vault-setup.js`** — Vault setup-only（createVaultSetupToken + confirm）
 - [x] **`vault-return.js`** — Return buyer（纯 fetch，无 SDK）
 - [ ] **`applepay.js`** — Apple Pay（ApplePaySession + validateMerchant，待实现）
-- [ ] **`googlepay.js`** — Google Pay（google.payments.api，待实现）
+- [x] **`googlepay-ecm.js`** — Google Pay ECM（命名函数拆分；**Promise 模式**：`PaymentsClient` 无 `paymentDataCallbacks`，`loadPaymentData` 无 `callbackIntents`，sheet 关闭后 Promise resolve 再调 `processPayment`，3DS 窗口不被 sheet 遮挡；`confirmOrder` → PAYER_ACTION_REQUIRED 时 `initiatePayerAction` → `getOrderDetails` → `handle3DS`（解析 `payment_source.google_pay.card.authentication_result`，比 ACDC 多一层 `google_pay`）；`doCapture` 检查 COMPLETED；含 SCA 下拉、完整 console.log 日志；`addGooglePayButton` 额外启用 `#custom-googlepay-btn` 并绑定 hover/press/click）
+- [ ] **`googlepay-ecs.js`** — Google Pay ECS（shippingAddressRequired: true，需 onPaymentDataChanged，待实现）
 
 #### EJS 视图（`src/views/paypal/jssdk-v5/`）
 
@@ -47,7 +48,8 @@
 - [x] **Task 15** — vault-acdc-setup-only（使用 `acdc.js`）
 - [x] **Task 16** — vault-return（使用 `vault-return.js`）
 - [ ] **Task 12** — applepay-ecm, applepay-ecs（等 `applepay.js` 实现）
-- [ ] **Task 13** — googlepay-ecm, googlepay-ecs（等 `googlepay.js` 实现）
+- [x] **Task 13a** — googlepay-ecm（自定义路由：含 SCA 下拉、reference_id/invoice_id/custom_id/soft_descriptor、return_url+cancel_url、merchant 预填 shipping；EJS 加 Custom Button（#custom-googlepay-btn），JS 在初始化完成后启用并绑定 hover/press/click，与官方按钮复用同一 `onGooglePaymentButtonClicked`）
+- [ ] **Task 13b** — googlepay-ecs（待实现）
 
 ### 动态金额 + 常量文件 + 币种选择器
 
@@ -66,7 +68,7 @@
 - [x] `spb-ecs.js`
 - [x] `applepay-ecm.js`
 - [x] `applepay-ecs.js`
-- [x] `googlepay-ecm.js`
+- [x] `googlepay-ecm.js`（已改为自定义路由，不再用工厂）
 - [x] `googlepay-ecs.js`
 - [x] `vault-paypal-with-purchase.js`
 - [x] `vault-acdc-with-purchase.js`
