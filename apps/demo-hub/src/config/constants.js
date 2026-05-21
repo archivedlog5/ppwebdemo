@@ -90,27 +90,27 @@ const DEMO_ITEM = {
 // ── ACDC 卡支付体验上下文（payment_source.card.experience_context）────
 const ACDC_EXPERIENCE_CONTEXT = {
   return_url: "https://example.com/paypal/acdc/return",
-  cancel_url:  "https://example.com/paypal/acdc/cancel",
+  cancel_url: "https://example.com/paypal/acdc/cancel",
 };
 
 // ── PayPal 结账体验上下文（payment_source.paypal.experience_context）──
 const EXPERIENCE_CONTEXT = {
-  brand_name:          "Cross WEN China Store",
-  landing_page:        "LOGIN",
+  brand_name: "Cross WEN China Store",
+  landing_page: "LOGIN",
   shipping_preference: "SET_PROVIDED_ADDRESS",
-  user_action:         "PAY_NOW",
-  return_url:          "https://example.com/returnUrl",
-  cancel_url:          "https://example.com/cancelUrl",
+  user_action: "PAY_NOW",
+  return_url: "https://example.com/returnUrl",
+  cancel_url: "https://example.com/cancelUrl",
 };
 
 // ── Sandbox 账单地址（ACDC 等卡支付场景）─────────────────────────────
 // 声明在 SANDBOX_BUYER 之前，避免 ReferenceError
 const SANDBOX_BILLING = {
   address_line_1: "123 Townsend St",
-  admin_area_2:   "San Francisco",
-  admin_area_1:   "CA",
-  postal_code:    "94107",
-  country_code:   "US",
+  admin_area_2: "San Francisco",
+  admin_area_1: "CA",
+  postal_code: "94107",
+  country_code: "US",
 };
 
 // ── Sandbox 买家 PayPal 账号信息（payment_source.paypal.*）─────────────
@@ -118,36 +118,38 @@ const SANDBOX_BUYER = {
   email_address: "cwenup@personal.com",
   name: {
     given_name: "Cross",
-    surname:    "Wen",
+    surname: "Wen",
   },
   address: SANDBOX_BILLING,
   phone: {
-    phone_type:   "MOBILE",
+    phone_type: "MOBILE",
     phone_number: { national_number: "12407808080" },
   },
 };
 
 // ── Sandbox 收货地址（purchase_units[0].shipping，pre-fill 到结账页）──
 const SANDBOX_SHIPPING = {
-  name:    { full_name: "Cross Wen" },
+  name: { full_name: "Cross Wen" },
   address: {
     address_line_1: "123 Townsend St",
     address_line_2: "",
-    admin_area_1:   "CA",
-    admin_area_2:   "San Francisco",
-    postal_code:    "94107",
-    country_code:   "US",
+    admin_area_1: "CA",
+    admin_area_2: "San Francisco",
+    postal_code: "94107",
+    country_code: "US",
   },
 };
 
 // ── Venmo 收货地址（US sandbox，Venmo 专用）──────────────────────────
 const VENMO_SHIPPING = {
+  name: { full_name: "Cross Wen" },
   address: {
     address_line_1: "test",
-    admin_area_2:   "Trumbull",
-    admin_area_1:   "AL",
-    postal_code:    "06611",
-    country_code:   "US",
+    address_line_2: "",
+    admin_area_2: "Trumbull",
+    admin_area_1: "AL",
+    postal_code: "06611",
+    country_code: "US",
   },
 };
 
@@ -164,7 +166,9 @@ function validateAmount(amount, currency) {
   if (num < MIN_AMOUNT)
     return `Amount must be at least $${MIN_AMOUNT.toFixed(2)}`;
   if (num > MAX_AMOUNT)
-    return `Amount cannot exceed $${MAX_AMOUNT.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    return `Amount cannot exceed $${MAX_AMOUNT.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+    })}`;
   return null;
 }
 

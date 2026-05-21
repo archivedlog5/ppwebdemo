@@ -487,6 +487,30 @@ Run this checklist in order every time a new app is started (e.g., `store-fashio
 
 ---
 
+## Payment Integration Rules (All Demos)
+
+### Capture Success Check
+
+After a PayPal capture order API call, success **must** be verified by checking `purchase_units[0].payments.captures[0].status === 'COMPLETED'`.
+
+- `order.status` (order-level status) does not confirm that funds were captured — do not use it for this check
+- The absence of `order.error` alone is not sufficient to confirm success
+- Any non-COMPLETED status (e.g. `DECLINED`, `PENDING`) must show an error to the user
+
+```js
+var capture = order.purchase_units &&
+              order.purchase_units[0] &&
+              order.purchase_units[0].payments &&
+              order.purchase_units[0].payments.captures &&
+              order.purchase_units[0].payments.captures[0]
+if (!capture || capture.status !== 'COMPLETED') {
+  showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
+  return
+}
+```
+
+---
+
 ## Development Methodology
 
 ### Test-Driven Development (TDD)
@@ -534,21 +558,22 @@ Every app must complete the full New App Launch Checklist before coding begins.
 
 ---
 
+## Response Convention
+
+After completing any task, always list every file that was modified, in this format:
+
+```
+Files changed:
+- path/to/file1.js
+- path/to/file2.ejs
+- path/to/file3.md
+```
+
+---
+
 ## Git Rules
 
-### Commit and Push are separate — each requires its own explicit instruction
-
-**Commit**: Only run `git commit` when the user explicitly says "commit", "git commit", or equivalent. Never auto-commit after completing a task.
-
-**Push**: Only run `git push` when the user explicitly says "git push", "push it", or equivalent. **Never auto-push after a commit**, even if the user just said "commit". The two steps are independent — each needs its own instruction.
-
-### .gitignore conventions
-The following must not be tracked in version control:
-- Playwright screenshots (`*.png`, `*.jpeg`, `.playwright-mcp/`, `playwright-report/`)
-- Environment variable files (`.env`, `.env.local`)
-- `node_modules/`, `dist/`, `build/`
-- Temporary mockup files (`/tmp/*.html`)
-- OS files (`.DS_Store`)
+Do not perform any git operations (commit, push, pull, branch, etc.). Version control is managed entirely by the user.
 
 ---
 

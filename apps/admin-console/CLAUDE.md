@@ -100,6 +100,18 @@ UNIQUE(provider, sdk_version, product_key)  -- 三字段联合唯一
 /stores/:storeName         → 某个电商网站的支付渠道配置（待设计）
 ```
 
+## 回复规范
+
+每次完成任务后，必须列出本次改动涉及的所有文件：
+
+```
+改动文件：
+- path/to/file1.js
+- path/to/file2.ejs
+```
+
+---
+
 ## 关键开发规则
 
 1. admin-console 只写 Supabase，不直接调用 demo-hub 或电商网站的接口

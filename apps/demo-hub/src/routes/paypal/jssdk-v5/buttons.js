@@ -82,7 +82,8 @@ function buildBodyVenmo(amount, currency) {
           breakdown: { item_total: amountObj(currency) },
         },
         items: [{ ...demoParams.DEMO_ITEM, unit_amount: amountObj(currency) }],
-        shipping: demoParams.VENMO_SHIPPING,
+        shipping: 
+          demoParams.VENMO_SHIPPING
       },
     ],
   };

@@ -620,25 +620,22 @@ if (!capture || capture.status !== 'COMPLETED') {
 
 ---
 
+## 回复规范
+
+每次完成任务后，必须列出本次改动涉及的所有文件，格式如下：
+
+```
+改动文件：
+- path/to/file1.js
+- path/to/file2.ejs
+- path/to/file3.md
+```
+
+---
+
 ## Git 规则
 
-### Commit 和 Push 必须分开，各自需要明确指令
-
-**Commit**：只在用户明确说 "帮我 commit"、"git commit"、"提交一下" 时才执行。不要在每次完成任务后自动 commit。
-
-**Push**：只在用户明确说 "git push"、"push 一下"、"推上去" 时才执行。**绝对不能在 commit 后自动 push**，即使用户刚说了 "帮我 commit" 也不行。
-
-两步是独立操作，必须各自收到独立指令才执行。
-
-### .gitignore 规范
-
-以下内容不进入版本控制：
-
-- Playwright 截图（`*.png`、`*.jpeg`、`.playwright-mcp/`、`playwright-report/`）
-- 环境变量文件（`.env`、`.env.local`）
-- `node_modules/`、`dist/`、`build/`
-- 临时 mockup 文件（`/tmp/*.html`）
-- OS 文件（`.DS_Store`）
+不执行任何 git 操作（commit、push、pull、branch 等）。版本控制由用户自行管理。
 
 ---
 
