@@ -153,8 +153,8 @@ liabilityShift 来自 onApprove data（客户端）：
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/paypal/jssdk-v5/googlepay-ecm` | GET | 渲染页面；传 `sandboxShipping`（camelCase）给 EJS |
-| `/api/googlepay-ecm/create-order` | POST | 读 `{ amount, currency, shipping, scaMethod }`；构建完整 order body（见下）；返回 `{ id }` |
+| `/paypal/jssdk-v5/googlepay-ecm` | GET | 渲染页面；传 `sandboxShipping`（camelCase）+ `sandboxPhone`（格式化字符串）给 EJS |
+| `/api/googlepay-ecm/create-order` | POST | 读 `{ amount, currency, shipping, scaMethod, email }`；构建完整 order body（见下）；返回 `{ id }` |
 | `/api/googlepay-ecm/order/:orderID` | GET | 返回完整 order JSON（用于 3DS 后读取 authentication_result） |
 | `/api/googlepay-ecm/capture-order` | POST | 读 `{ orderID }`；capture 并返回完整 order JSON |
 
@@ -175,6 +175,8 @@ liabilityShift 来自 onApprove data（客户端）：
   }],
   payment_source: {
     google_pay: {
+      ...(email ? { email_address: email } : {}),         // 从 sheet 获取，可选
+      phone_number: demoParams.SANDBOX_PHONE,             // 商户预填：{ country_code: '1', national_number: '4085551234' }
       experience_context: {
         return_url: `${protocol}://${host}/paypal/jssdk-v5/googlepay-ecm`,
         cancel_url: `${protocol}://${host}/paypal/jssdk-v5/googlepay-ecm`,
@@ -201,7 +203,7 @@ liabilityShift 来自 onApprove data（客户端）：
 | `getGoogleIsReadyToPayRequest(config)` | builder | 构建 `isReadyToPay` 请求体（`BASE_REQUEST + allowedPaymentMethods`） |
 | `getGooglePaymentDataRequest(config, amount, currency)` | builder | 构建 `loadPaymentData` 请求体（含 `transactionInfo`、`shippingAddressRequired: false`）；**无 `callbackIntents`** |
 | `addGooglePayButton(config)` | setup | 清容器 + `createButton()`；启用 `#custom-googlepay-btn`（opacity→1, cursor→pointer）并绑定 mouseenter/mouseleave/mousedown/mouseup/click 监听器 |
-| `onGooglePaymentButtonClicked(config)` | handler | 验证金额 → `createOrder` → `loadPaymentData().then(processPayment)` — sheet 关闭后才处理支付；官方按钮和 custom button 共用此函数 |
+| `onGooglePaymentButtonClicked(config)` | handler | 验证金额 → **先 `loadPaymentData()`（sheet 开，含 email 字段）→ sheet 关闭后提取 `paymentData.email` → createOrder（带 email）→ processPayment**；官方按钮和 custom button 共用此函数 |
 | `processPayment(paymentData)` | orchestrator | `confirmOrder` → 分支：PAYER_ACTION_REQUIRED → `initiatePayerAction` → `getOrderDetails` → `handle3DS`；其余 → `doCapture` |
 | `getOrderDetails(orderID)` | fetch | GET `/api/googlepay-ecm/order/:orderID`，返回完整 order |
 | `handle3DS(order)` | 3DS logic | 解析 `payment_source.google_pay.card.authentication_result`，决定是否 capture（见下） |
@@ -280,14 +282,13 @@ window load
 
 onGooglePaymentButtonClicked(config)   ← 按钮点击
   ├─ validateAmount()
-  ├─ [LOG] amount, currency, scaMethod, shipping
-  ├─ fetch createOrder
-  │   └─ [LOG] 请求体 + 响应 + orderId → currentOrderID
-  ├─ getGooglePaymentDataRequest()     ← 构建 loadPaymentData 请求体（无 callbackIntents）
-  ├─ loadPaymentData()                 ← 返回 Promise；用户授权后 sheet 自动关闭
-  │   └─ [LOG] paymentDataRequest
-  └─ .then(paymentData)                ← sheet 已关闭，屏幕干净，可安全触发 3DS
-      ├─ [LOG] paymentData, paymentMethodData
+  ├─ [LOG] amount, currency, sca, shipping (merchant pre-filled)
+  ├─ getGooglePaymentDataRequest()     ← 构建 loadPaymentData 请求体（含 emailRequired:true，无 callbackIntents）
+  ├─ loadPaymentData()                 ← 先开 sheet（让买家输入 email）；用户授权后 sheet 自动关闭
+  └─ .then(paymentData)                ← sheet 已关闭，email 可读
+      ├─ [LOG] paymentData, email from sheet
+      ├─ fetch createOrder（body: { amount, currency, shipping, scaMethod, email }）
+      │   └─ [LOG] 请求体 + 响应 + orderId → currentOrderID
       └─ processPayment(paymentData)
           ├─ confirmOrder({ orderId, paymentMethodData })
           │   └─ [LOG] result, status
@@ -313,13 +314,86 @@ doCapture(orderID)
 
 ---
 
-### googlepay-ecs — ⏳ 待实现
+### googlepay-ecs — Google Pay Express Checkout Shortcut（2026-05-22 完成）
+
+> ECS = 买家在 Google Pay sheet 里选择收货地址 + 输入 email + 电话。订单在 sheet 关闭后才创建（与 ECM 相反）。
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 googlepay-ecs | `src/routes/paypal/jssdk-v5/googlepay-ecs.js` | 待实现（`shippingAddressRequired: true`，买家在 Google Pay sheet 里选地址） |
-| EJS 视图 | `src/views/paypal/jssdk-v5/googlepay-ecs.ejs` | 待实现（不显示 Shipping Address 区域）|
-| SDK JS | `src/public/js/paypal/jssdk-v5/googlepay-ecs.js` | ECS 专用（待实现）；需 `onPaymentDataChanged` 处理买家切换地址 |
+| 路由 + API | `src/routes/paypal/jssdk-v5/googlepay-ecs.js` | **自定义路由**；`mapGooglePayAddress()` 转换地址格式；create-order 接收 `{ amount, currency, scaMethod, shippingAddress, buyerName, email, parsedPhone }` |
+| EJS 视图 | `src/views/paypal/jssdk-v5/googlepay-ecs.ejs` | 无 Shipping Address 展示区，改为"Buyer selects in sheet"提示面板；结构与 ECM 相同（currency/amount/3DS 选择器，custom button） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/googlepay-ecs.js` | ECS 专用；含 `COUNTRY_DIAL` 映射表 + `parsePhoneNumber()`；ECS 流程：sheet 先开 → 提取 name/email/phone → createOrder → processPayment；3DS 路径与 ECM 相同 |
+
+---
+
+#### 后端 API（`googlepay-ecs.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/googlepay-ecs` | GET | 渲染页面（无 sandboxShipping 传入 EJS） |
+| `/api/googlepay-ecs/create-order` | POST | 读 `{ amount, currency, scaMethod, shippingAddress, buyerName, email, parsedPhone }`；`mapGooglePayAddress()` 转换地址；注入 `payment_source.google_pay.name/email_address/phone_number`；返回 `{ id }` |
+| `/api/googlepay-ecs/order/:orderID` | GET | 返回完整 order JSON（3DS 后读取） |
+| `/api/googlepay-ecs/capture-order` | POST | 读 `{ orderID }`；capture 并返回 |
+
+**地址格式转换 `mapGooglePayAddress(sh)`：**
+
+```
+Google Pay shippingAddress:           →   PayPal shipping:
+  name                                →     name.full_name
+  address1                            →     address.address_line_1
+  address2 (可选)                     →     address.address_line_2
+  locality                            →     address.admin_area_2
+  administrativeArea                  →     address.admin_area_1
+  postalCode                          →     address.postal_code
+  countryCode                         →     address.country_code
+```
+
+**create-order body（`payment_source.google_pay`）：**
+
+```js
+payment_source: {
+  google_pay: {
+    ...(buyerName   ? { name:          buyerName   } : {}),
+    ...(email       ? { email_address: email       } : {}),
+    ...(parsedPhone ? { phone_number:  parsedPhone } : {}),
+    // parsedPhone = { country_code: '1', national_number: '4155552671' }
+    experience_context: { return_url, cancel_url },
+    attributes: { verification: { method: scaMethod } },
+  }
+}
+```
+
+---
+
+#### 电话格式转换（`parsePhoneNumber`）
+
+Google Pay 返回 E.164 格式（`+14155552671`），PayPal 需要 `{ country_code, national_number }`。
+
+```
+rawPhone: "+14155552671"  +  isoCountry: "US"
+  1. digits = rawPhone.replace(/\D/g, '')     → "14155552671"
+  2. dialCode = COUNTRY_DIAL["US"]            → "1"
+  3. digits 以 dialCode 开头 → strip prefix  → "4155552671"
+  4. return { country_code: "1", national_number: "4155552671" }
+```
+
+`COUNTRY_DIAL` 覆盖 30 种货币对应国家：AE/AU/BR/CA/CH/CL/CN/CO/CZ/DK/DE/FR/GB/HK/HU/ID/IL/IN/JP/KR/MX/MY/NO/NZ/PE/PH/PL/SA/SE/SG/TH/TW/UY/US
+
+---
+
+#### ECS vs ECM 关键差异
+
+| 维度 | ECM | ECS |
+|------|-----|-----|
+| `shippingAddressRequired` | `false` | `true` |
+| `emailRequired` | `true` | `true` |
+| `phoneNumberRequired` | N/A（tied to shipping） | `true`（在 `shippingAddressParameters` 里） |
+| 订单创建时机 | sheet **之前**（但因 email 需求已改为 sheet 之后） | sheet **之后** |
+| 地址来源 | 商户预填（`SANDBOX_SHIPPING`） | 买家在 sheet 里选 |
+| name 来源 | 无（ECM 不收 buyer name） | `paymentData.shippingAddress.name` |
+| email 来源 | `paymentData.email`（sheet 收集） | `paymentData.email`（sheet 收集） |
+| phone 来源 | 商户预填（`SANDBOX_PHONE`） | `paymentData.shippingAddress.phoneNumber`（sheet 收集）→ `parsePhoneNumber()` |
+| `payment_source.google_pay` | `email_address` + `phone_number: SANDBOX_PHONE` | `name` + `email_address` + `phone_number`（解析后）|
 
 ---
 
@@ -397,7 +471,7 @@ doCapture(orderID)
 | **acdc** | `components=card-fields` | 不能和 buttons 混用 |
 | **applepay-ecm/ecs** | `components=applepay` | 需 Safari + Apple Wallet |
 | **googlepay-ecm** | `components=googlepay&currency=${currency}` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 自定义路由；需 Chrome + Google Pay 卡；3DS select `#demo-sca` |
-| **googlepay-ecs** | 同 ECM | ⏳ 待实现 |
+| **googlepay-ecs** | `components=googlepay&currency=${currency}` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 自定义路由；`shippingAddressRequired: true`；ECS 流程（sheet 先开）；email + phone + name 从 sheet 获取 |
 | **vault-paypal-with-purchase** | `components=buttons&vault=true` | vault=true 才能 store_in_vault |
 | **vault-acdc-with-purchase** | `components=card-fields&vault=true` | |
 | **vault-applepay-with-purchase** | `components=applepay&vault=true` | |
@@ -625,7 +699,8 @@ spb.js onApprove callback 收到结果
 | buttons | 自定义路由，双 SDK（cnSdkUrl + usSdkUrl） | 4 个 `Buttons()` 分别 render | 两套 token：getCNToken/getUSToken |
 | vault-*-with-purchase | `createVaultWithPurchaseRoute`，`payment_source` 含 vault 指令 | 同对应产品的 JS | capture 返回值含 `vaultId` |
 | vault-*-setup-only | 自定义路由，`/v3/vault/setup-tokens` | `Buttons({ createVaultSetupToken })` | 无 capture，返回 `paymentTokenId` |
-| googlepay-ecm | 自定义路由，`components=googlepay`，双外部 SDK（PayPal + Google Pay） | `paypalSDK.Googlepay().config()` → `PaymentsClient` → `isReadyToPay` → `createButton`；`loadPaymentData()` Promise resolve 后（sheet 关闭）→ `processPayment` → `confirmOrder` → `doCapture` | create-order body 含 SCA method；`shippingAddressRequired: false`；**Promise 模式（无 callbackIntents）**，3DS 需 GET order details |
+| googlepay-ecm | 自定义路由，`components=googlepay`，双外部 SDK（PayPal + Google Pay） | sheet 先开（`emailRequired:true`）→ 获取 email → createOrder（email + SANDBOX_PHONE 注入 payment_source）→ processPayment → confirmOrder → doCapture | `shippingAddressRequired: false`；**Promise 模式**；phone 商户预填 SANDBOX_PHONE；email 从 sheet 获取；3DS 需 GET order details |
+| googlepay-ecs | 自定义路由，同 ECM 双外部 SDK | sheet 先开（`shippingAddressRequired: true`，`emailRequired: true`，`phoneNumberRequired: true`）→ 获取 name/email/phone/address → parsePhoneNumber（E.164→PayPal）→ createOrder → processPayment | address 由买家在 sheet 选；name/email/phone 全部注入 payment_source.google_pay；3DS 路径同 ECM |
 | vault-return | 自定义路由，`/v2/checkout/orders` + capture 一步完成 | 无 SDK，纯 fetch | 无 PayPal 弹窗，纯服务端 |
 
 ---
@@ -843,6 +918,7 @@ const { INTENT, CURRENCY, DEFAULT_AMOUNT, buildOrderBody,
 | `DEMO_DESCRIPTION` | 字符串 | 出现在 PayPal 结账页的订单描述 |
 | `DEMO_ITEM` | 对象 | 商品名称、描述、类目、数量 |
 | `SANDBOX_SHIPPING` | 对象 | 预填收货地址（US sandbox 地址，CN 账户通用） |
+| `SANDBOX_PHONE` | 对象 | 商户预填电话，格式 `{ country_code: '1', national_number: '4085551234' }`；用于 Google Pay ECM `payment_source.google_pay.phone_number` |
 | `VENMO_SHIPPING` | 对象 | Venmo 专用收货地址（`test / Trumbull, AL 06611, US`） |
 | `SANDBOX_BILLING` | 对象 | 账单地址（ACDC `payment_source.card.billing_address`）|
 | `ACDC_EXPERIENCE_CONTEXT` | 对象 | ACDC 卡支付 `return_url` / `cancel_url` |

@@ -39,6 +39,7 @@ router.get('/googlepay-ecm', (req, res) => {
       postalCode:   addr.postal_code,
       countryCode:  addr.country_code,
     },
+    sandboxPhone: `+${demoParams.SANDBOX_PHONE.country_code} ${demoParams.SANDBOX_PHONE.national_number}`,
   })
 })
 
@@ -48,6 +49,7 @@ router.post('/api/googlepay-ecm/create-order', async (req, res) => {
     const currency  = resolveCurrency(req.body.currency)
     const sh        = req.body.shipping  || {}
     const scaMethod = SCA_METHODS.includes(req.body.scaMethod) ? req.body.scaMethod : 'SCA_WHEN_REQUIRED'
+    const email     = req.body.email     || null
     const amountErr = demoParams.validateAmount(amount, currency)
     if (amountErr) return res.status(400).json({ error: amountErr })
 
@@ -83,6 +85,8 @@ router.post('/api/googlepay-ecm/create-order', async (req, res) => {
       }],
       payment_source: {
         google_pay: {
+          ...(email ? { email_address: email } : {}),
+          phone_number: demoParams.SANDBOX_PHONE,
           experience_context: {
             return_url: `${req.protocol}://${req.get('host')}/paypal/jssdk-v5/googlepay-ecm`,
             cancel_url: `${req.protocol}://${req.get('host')}/paypal/jssdk-v5/googlepay-ecm`,

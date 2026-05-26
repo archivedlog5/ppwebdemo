@@ -1,10 +1,15 @@
 /**
- * PayPal Google Pay ECM
- * Express Checkout Mark — merchant pre-fills shipping, shippingAddressRequired: false
+ * PayPal Google Pay ECS
+ * Express Checkout Shortcut — buyer selects shipping, email, phone inside the Google Pay sheet.
+ * Order is created AFTER loadPaymentData resolves (using buyer-selected address).
+ *
+ * Key differences from ECM:
+ *   - shippingAddressRequired: true, emailRequired: true, phoneNumberRequired: true
+ *   - Order created AFTER sheet closes (not before)
+ *   - shippingAddress, email, phoneNumber extracted from paymentData and sent to create-order
  *
  * window.DEMO = {
  *   urls: { createOrder, getOrder, captureOrder },
- *   shipping: { name, addressLine1, adminArea2, adminArea1, postalCode, countryCode },
  * }
  */
 ;(function () {
@@ -14,17 +19,41 @@
 
   var ZERO_DECIMAL = ['JPY', 'KRW', 'TWD', 'CLP', 'IDR']
 
+  // ISO 3166-1 alpha-2 → calling code (covers our currency list + common countries)
+  var COUNTRY_DIAL = {
+    AE: '971', AU: '61',  BR: '55',  CA: '1',   CH: '41',  CL: '56',
+    CN: '86',  CO: '57',  CZ: '420', DK: '45',  DE: '49',  FR: '33',
+    GB: '44',  HK: '852', HU: '36',  ID: '62',  IL: '972', IN: '91',
+    JP: '81',  KR: '82',  MX: '52',  MY: '60',  NO: '47',  NZ: '64',
+    PE: '51',  PH: '63',  PL: '48',  SA: '966', SE: '46',  SG: '65',
+    TH: '66',  TW: '886', UY: '598', US: '1',
+  }
+
+  // Google Pay returns phoneNumber in E.164 (e.g. "+14155552671").
+  // PayPal wants { country_code: '1', national_number: '4155552671' }.
+  // Strategy: strip non-digits → use isoCountry to look up dial code → remove prefix.
+  function parsePhoneNumber(rawPhone, isoCountry) {
+    if (!rawPhone) return null
+    var digits = rawPhone.replace(/\D/g, '')
+    if (!digits) return null
+    var dialCode = COUNTRY_DIAL[isoCountry] || ''
+    if (dialCode && digits.indexOf(dialCode) === 0) {
+      return { country_code: dialCode, national_number: digits.slice(dialCode.length) }
+    }
+    return { country_code: dialCode, national_number: digits }
+  }
+
   var BASE_REQUEST = {
-    apiVersion:      2,
+    apiVersion: 2,
     apiVersionMinor: 0,
   }
 
   // ─── Module-level state ──────────────────────────────────────────────────────
 
-  var paymentsClient  = null   // singleton google.payments.api.PaymentsClient
-  var googlepayConfig = null   // cached { allowedPaymentMethods, merchantInfo, apiVersion, ... }
-  var currentOrderID  = null
-  var urls            = null   // from window.DEMO.urls (set on load)
+  var paymentsClient = null
+  var googlepayConfig = null
+  var currentOrderID = null
+  var urls = null
 
   // ─── UI helpers ──────────────────────────────────────────────────────────────
 
@@ -54,8 +83,8 @@
     el.textContent = text
   }
 
-  var MIN_AMOUNT = 1.00
-  var MAX_AMOUNT = 30000.00
+  var MIN_AMOUNT = 1.0
+  var MAX_AMOUNT = 30000.0
 
   function validateAmount() {
     var input = document.getElementById('demo-amount')
@@ -64,7 +93,7 @@
     var val = input.value.trim()
     var num = parseFloat(val)
     var cur = getCurrency()
-    var zd  = isZeroDecimal(cur)
+    var zd = isZeroDecimal(cur)
     var err = ''
     if (!val || isNaN(num) || !/^\d+(\.\d{1,2})?$/.test(val)) {
       err = 'Please enter a valid number'
@@ -102,15 +131,12 @@
   // ─── Google Pay: client singleton ────────────────────────────────────────────
 
   function getGooglePaymentsClient() {
-    console.log('[GooglePay ECM] getGooglePaymentsClient() -- inside')
+    console.log('[GooglePay ECS] getGooglePaymentsClient()')
     if (paymentsClient === null) {
-      console.log('[GooglePay ECM] paymentsClient is null — creating new PaymentsClient (environment: TEST)...')
+      console.log('[GooglePay ECS] creating new PaymentsClient (environment: TEST)')
       paymentsClient = new google.payments.api.PaymentsClient({
         environment: 'TEST',
       })
-      console.log('[GooglePay ECM] paymentsClient created:', paymentsClient)
-    } else {
-      console.log('[GooglePay ECM] returning cached paymentsClient')
     }
     return paymentsClient
   }
@@ -118,72 +144,62 @@
   // ─── Google Pay: config (cached) ─────────────────────────────────────────────
 
   function getGooglePayConfig() {
-    console.log('[GooglePay ECM] getGooglePayConfig() -- inside')
+    console.log('[GooglePay ECS] getGooglePayConfig()')
     if (googlepayConfig !== null) {
-      console.log('[GooglePay ECM] returning cached googlepayConfig:', googlepayConfig)
       return Promise.resolve(googlepayConfig)
     }
-    console.log('[GooglePay ECM] no cached config — calling paypalSDK.Googlepay().config()...')
-    return paypalSDK.Googlepay().config()
-      .then(function (config) {
-        googlepayConfig = config
-        console.log('[GooglePay ECM] ===== googlepay.config() response =====')
-        console.log('[GooglePay ECM] config:', config)
-        console.log('[GooglePay ECM] allowedPaymentMethods:', config.allowedPaymentMethods)
-        console.log('[GooglePay ECM] merchantInfo:', config.merchantInfo)
-        console.log('[GooglePay ECM] apiVersion:', config.apiVersion, 'apiVersionMinor:', config.apiVersionMinor)
-        return config
-      })
+    return paypalSDK.Googlepay().config().then(function (config) {
+      googlepayConfig = config
+      console.log('[GooglePay ECS] config:', config)
+      return config
+    })
   }
 
   // ─── Google Pay: request builders ────────────────────────────────────────────
 
   function getGoogleIsReadyToPayRequest(config) {
-    console.log('[GooglePay ECM] getGoogleIsReadyToPayRequest() -- inside')
-    var req = Object.assign({}, BASE_REQUEST, {
-      allowedPaymentMethods:         config.allowedPaymentMethods,
+    return Object.assign({}, BASE_REQUEST, {
+      allowedPaymentMethods: config.allowedPaymentMethods,
       existingPaymentMethodRequired: true,
     })
-    console.log('[GooglePay ECM] isReadyToPay request:', req)
-    return req
   }
 
   function getGooglePaymentDataRequest(config, amount, currency) {
-    console.log('[GooglePay ECM] getGooglePaymentDataRequest() -- inside')
-    var req = Object.assign({}, BASE_REQUEST, {
+    return Object.assign({}, BASE_REQUEST, {
       allowedPaymentMethods: config.allowedPaymentMethods,
-      merchantInfo:          config.merchantInfo,
+      merchantInfo: config.merchantInfo,
       transactionInfo: {
-        countryCode:      'US',
-        currencyCode:     currency,
+        countryCode: 'US',
+        currencyCode: currency,
         totalPriceStatus: 'FINAL',
-        totalPrice:       amount,
-        totalPriceLabel:  'Total',
+        totalPrice: amount,
+        totalPriceLabel: 'Total',
       },
-      shippingAddressRequired: false,
+      shippingAddressRequired: true,
+      shippingAddressParameters: {
+        phoneNumberRequired: true,
+      },
       emailRequired: true,
     })
-    console.log('[GooglePay ECM] paymentDataRequest:', req)
-    return req
   }
 
   // ─── Google Pay: button ───────────────────────────────────────────────────────
 
   function addGooglePayButton(config) {
-    console.log('[GooglePay ECM] addGooglePayButton() -- inside')
-    var client    = getGooglePaymentsClient()
+    console.log('[GooglePay ECS] addGooglePayButton()')
+    var client = getGooglePaymentsClient()
     var container = document.getElementById('paypal-button-container')
     container.classList.remove('sdk-loading')
     container.innerHTML = ''
 
-    console.log('[GooglePay ECM] calling createButton() — onClick: onGooglePaymentButtonClicked')
     var btn = client.createButton({
-      buttonColor:    'black',
-      buttonType:     'pay',
+      buttonColor: 'black',
+      buttonType: 'pay',
       buttonSizeMode: 'fill',
-      onClick:        function () { onGooglePaymentButtonClicked(config) },
+      onClick: function () {
+        onGooglePaymentButtonClicked(config)
+      },
     })
-    console.log('[GooglePay ECM] button created — appending to container')
     container.appendChild(btn)
 
     var customBtn = document.getElementById('custom-googlepay-btn')
@@ -199,70 +215,96 @@
         this.style.background = 'rgba(255,255,255,0.05)'
         this.style.borderColor = 'rgba(255,255,255,0.10)'
       })
-      customBtn.addEventListener('mousedown', function () { this.style.transform = 'scale(0.98)' })
-      customBtn.addEventListener('mouseup',   function () { this.style.transform = 'scale(1)' })
+      customBtn.addEventListener('mousedown', function () {
+        this.style.transform = 'scale(0.98)'
+      })
+      customBtn.addEventListener('mouseup', function () {
+        this.style.transform = 'scale(1)'
+      })
       customBtn.addEventListener('click', function () {
-        console.log('[GooglePay ECM] custom button clicked — delegating to onGooglePaymentButtonClicked()')
+        console.log('[GooglePay ECS] custom button clicked — delegating to onGooglePaymentButtonClicked()')
         onGooglePaymentButtonClicked(config)
       })
-      console.log('[GooglePay ECM] custom button enabled and listeners attached')
+      console.log('[GooglePay ECS] custom button enabled')
     }
   }
 
+  // ─── ECS flow: sheet first, then create order ─────────────────────────────────
+  //
+  // ECM: createOrder → loadPaymentData → processPayment
+  // ECS: loadPaymentData → extract address/email/phone → createOrder → processPayment
+
   function onGooglePaymentButtonClicked(config) {
-    console.log('[GooglePay ECM] ===== Google Pay button clicked =====')
+    console.log('[GooglePay ECS] ===== Google Pay button clicked =====')
 
     if (!validateAmount()) {
-      console.warn('[GooglePay ECM] amount validation failed — aborting')
+      console.warn('[GooglePay ECS] amount validation failed — aborting')
       return
     }
 
-    var amount   = getAmount()
+    var amount = getAmount()
     var currency = getCurrency()
-    var sca      = getSCA()
-    var shipping = window.DEMO && window.DEMO.shipping
-    console.log('[GooglePay ECM] amount:', amount, '| currency:', currency, '| sca:', sca)
-    console.log('[GooglePay ECM] shipping (merchant pre-filled):', shipping)
+    var sca = getSCA()
+    console.log('[GooglePay ECS] amount:', amount, '| currency:', currency, '| scaMethod:', sca)
 
-    // ECM flow (with email): sheet first → extract email → create order → process
-    // Email is only available after loadPaymentData resolves, so we open the sheet first.
-    // Shipping address stays merchant-pre-filled (shippingAddressRequired: false).
     var paymentDataRequest = getGooglePaymentDataRequest(config, amount, currency)
     var client = getGooglePaymentsClient()
-    console.log('[GooglePay ECM] calling loadPaymentData() — sheet opens (email only, no address selection)')
 
-    client.loadPaymentData(paymentDataRequest)
+    console.log('[GooglePay ECS] calling loadPaymentData() — sheet opens for buyer to select shipping/email/phone')
+    client
+      .loadPaymentData(paymentDataRequest)
       .then(function (paymentData) {
-        // Sheet is now closed — email available
-        console.log('[GooglePay ECM] ===== loadPaymentData resolved =====')
-        console.log('[GooglePay ECM] paymentData:', paymentData)
-        var email = paymentData.email || null
-        console.log('[GooglePay ECM] email from sheet:', email)
+        // Sheet closed — buyer has selected address, email, phone
+        console.log('[GooglePay ECS] ===== loadPaymentData resolved =====')
+        console.log('[GooglePay ECS] paymentData:', paymentData)
 
-        var createBody = { amount: amount, currency: currency, shipping: shipping, scaMethod: sca, email: email }
-        console.log('[GooglePay ECM] calling createOrder API:', urls.createOrder)
-        console.log('[GooglePay ECM] createOrder request body:', createBody)
+        var shippingAddress = paymentData.shippingAddress || null
+        var buyerName  = shippingAddress ? shippingAddress.name        : null
+        var email      = paymentData.email || null
+        var rawPhone   = shippingAddress ? shippingAddress.phoneNumber  : null
+        var isoCountry = shippingAddress ? shippingAddress.countryCode  : null
+        var parsedPhone = parsePhoneNumber(rawPhone, isoCountry)
+
+        console.log('[GooglePay ECS] shippingAddress:', shippingAddress)
+        console.log('[GooglePay ECS] buyerName:', buyerName)
+        console.log('[GooglePay ECS] email:', email)
+        console.log('[GooglePay ECS] rawPhone:', rawPhone, '| isoCountry:', isoCountry, '| parsedPhone:', parsedPhone)
+
+        // Now create order with buyer-selected data
+        var createBody = {
+          amount: amount,
+          currency: currency,
+          scaMethod: sca,
+          shippingAddress: shippingAddress,
+          buyerName: buyerName,
+          email: email,
+          parsedPhone: parsedPhone,
+        }
+        console.log('[GooglePay ECS] calling createOrder API:', urls.createOrder)
+        console.log('[GooglePay ECS] createOrder request body:', createBody)
 
         return fetch(urls.createOrder, {
-          method:  'POST',
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(createBody),
+          body: JSON.stringify(createBody),
         })
-          .then(function (r) { return r.json() })
+          .then(function (r) {
+            return r.json()
+          })
           .then(function (d) {
-            console.log('[GooglePay ECM] ===== createOrder response =====', d)
+            console.log('[GooglePay ECS] ===== createOrder response =====', d)
             if (d.error) throw new Error(d.error)
             currentOrderID = d.id
-            console.log('[GooglePay ECM] order created — orderId:', currentOrderID)
+            console.log('[GooglePay ECS] order created — orderId:', currentOrderID)
             return processPayment(paymentData)
           })
       })
       .catch(function (err) {
         if (err && err.statusCode === 'CANCELED') {
-          console.log('[GooglePay ECM] user cancelled Google Pay sheet')
+          console.log('[GooglePay ECS] user cancelled Google Pay sheet')
           return
         }
-        console.error('[GooglePay ECM] error in button click flow:', err)
+        console.error('[GooglePay ECS] error in button click flow:', err)
         showResult('✗ ' + (err.message || String(err)), 'error')
       })
   }
@@ -270,23 +312,26 @@
   // ─── Core payment orchestration ───────────────────────────────────────────────
 
   function processPayment(paymentData) {
-    console.log('[GooglePay ECM] processPayment() -- inside')
-    console.log('[GooglePay ECM] calling confirmOrder() — orderId:', currentOrderID)
+    console.log('[GooglePay ECS] processPayment() — orderId:', currentOrderID)
 
-    return paypalSDK.Googlepay().confirmOrder({
-      orderId:           currentOrderID,
-      paymentMethodData: paymentData.paymentMethodData,
-    })
+    return paypalSDK
+      .Googlepay()
+      .confirmOrder({
+        orderId: currentOrderID,
+        paymentMethodData: paymentData.paymentMethodData,
+      })
       .then(function (result) {
-        console.log('[GooglePay ECM] ===== confirmOrder() response =====')
-        console.log('[GooglePay ECM] result:', result)
-        console.log('[GooglePay ECM] status:', result.status)
+        console.log('[GooglePay ECS] ===== confirmOrder() response =====')
+        console.log('[GooglePay ECS] result:', result)
+        console.log('[GooglePay ECS] status:', result.status)
 
         if (result.status === 'PAYER_ACTION_REQUIRED') {
-          console.log('[GooglePay ECM] PAYER_ACTION_REQUIRED — calling initiatePayerAction()...')
-          return paypalSDK.Googlepay().initiatePayerAction({ orderId: currentOrderID })
+          console.log('[GooglePay ECS] PAYER_ACTION_REQUIRED — calling initiatePayerAction()...')
+          return paypalSDK
+            .Googlepay()
+            .initiatePayerAction({ orderId: currentOrderID })
             .then(function () {
-              console.log('[GooglePay ECM] initiatePayerAction() completed — fetching order details for 3DS check...')
+              console.log('[GooglePay ECS] initiatePayerAction() completed — fetching order details for 3DS check...')
               return getOrderDetails(currentOrderID)
             })
             .then(function (order) {
@@ -294,7 +339,7 @@
             })
         }
 
-        console.log('[GooglePay ECM] status is "' + result.status + '" — calling doCapture() directly')
+        console.log('[GooglePay ECS] status is "' + result.status + '" — calling doCapture() directly')
         return doCapture(currentOrderID)
       })
   }
@@ -302,69 +347,66 @@
   // ─── Order details fetch ──────────────────────────────────────────────────────
 
   function getOrderDetails(orderID) {
-    console.log('[GooglePay ECM] getOrderDetails() -- inside, orderID:', orderID)
     var url = urls.getOrder + '/' + orderID
-    console.log('[GooglePay ECM] GET', url)
+    console.log('[GooglePay ECS] GET', url)
     return fetch(url)
-      .then(function (r) { return r.json() })
+      .then(function (r) {
+        return r.json()
+      })
       .then(function (order) {
-        console.log('[GooglePay ECM] ===== getOrderDetails() response =====')
-        console.log('[GooglePay ECM] order:', order)
+        console.log('[GooglePay ECS] ===== getOrderDetails() response =====')
+        console.log('[GooglePay ECS] order:', order)
         return order
       })
   }
 
   // ─── 3DS result handling ──────────────────────────────────────────────────────
   //
-  // Google Pay 3DS path differs from ACDC:
-  //   payment_source.google_pay.card.authentication_result  (extra layer: google_pay → card)
-  // No client-side liabilityShift from SDK — must GET order details and read from API response.
+  // Same path as ECM: payment_source.google_pay.card.authentication_result
 
   function handle3DS(order) {
-    console.log('[GooglePay ECM] handle3DS() -- inside')
+    console.log('[GooglePay ECS] handle3DS()')
 
-    var authResult = (
-      order.payment_source &&
-      order.payment_source.google_pay &&
-      order.payment_source.google_pay.card &&
-      order.payment_source.google_pay.card.authentication_result
-    ) || {}
-    var threeDS    = authResult.three_d_secure || {}
-    var ls         = authResult.liability_shift
+    var authResult =
+      (order.payment_source &&
+        order.payment_source.google_pay &&
+        order.payment_source.google_pay.card &&
+        order.payment_source.google_pay.card.authentication_result) ||
+      {}
+    var threeDS = authResult.three_d_secure || {}
+    var ls = authResult.liability_shift
     var enrollment = threeDS.enrollment_status
     var authStatus = threeDS.authentication_status
 
-    console.log('[GooglePay ECM] ===== 3DS authentication_result =====')
-    console.log('[GooglePay ECM] full authResult:', authResult)
-    console.log('[GooglePay ECM] liability_shift:', ls)
-    console.log('[GooglePay ECM] enrollment_status:', enrollment)
-    console.log('[GooglePay ECM] authentication_status:', authStatus)
+    console.log('[GooglePay ECS] liability_shift:', ls)
+    console.log('[GooglePay ECS] enrollment_status:', enrollment)
+    console.log('[GooglePay ECS] authentication_status:', authStatus)
 
     if (ls === 'POSSIBLE') {
-      console.log('[GooglePay ECM] 3DS: liability shifted to issuer — proceeding to capture')
+      console.log('[GooglePay ECS] 3DS: liability shifted — proceeding to capture')
       return doCapture(currentOrderID)
     }
 
     if (ls === 'NO') {
       var notEnrolled = ['N', 'U', 'B']
       if (notEnrolled.indexOf(enrollment) !== -1) {
-        console.log('[GooglePay ECM] 3DS: card not enrolled (enrollment: ' + enrollment + ') — proceeding to capture')
+        console.log('[GooglePay ECS] 3DS: card not enrolled (enrollment: ' + enrollment + ') — proceeding to capture')
         return doCapture(currentOrderID)
       }
       var msg = '3DS rejected · enrollment: ' + enrollment + ' · authStatus: ' + authStatus
-      console.error('[GooglePay ECM]', msg)
+      console.error('[GooglePay ECS]', msg)
       showResult('✗ ' + msg, 'error')
       return Promise.reject(new Error(msg))
     }
 
     if (ls === 'UNKNOWN') {
-      console.warn('[GooglePay ECM] 3DS: UNKNOWN liability_shift — please retry')
+      console.warn('[GooglePay ECS] 3DS: UNKNOWN liability_shift — please retry')
       showResult('✗ 3DS result unknown · Please retry', 'error')
       return Promise.reject(new Error('3DS unknown'))
     }
 
     var fallback = '3DS error · liability_shift: ' + (ls || 'undefined')
-    console.error('[GooglePay ECM] unhandled 3DS state:', fallback)
+    console.error('[GooglePay ECS] unhandled 3DS state:', fallback)
     showResult('✗ ' + fallback, 'error')
     return Promise.reject(new Error(fallback))
   }
@@ -372,35 +414,37 @@
   // ─── Capture order ────────────────────────────────────────────────────────────
 
   function doCapture(orderID) {
-    console.log('[GooglePay ECM] ===== doCapture() -- orderID:', orderID)
-    console.log('[GooglePay ECM] calling captureOrder API:', urls.captureOrder)
+    console.log('[GooglePay ECS] ===== doCapture() — orderID:', orderID)
 
     return fetch(urls.captureOrder, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ orderID: orderID }),
+      body: JSON.stringify({ orderID: orderID }),
     })
-      .then(function (r) { return r.json() })
+      .then(function (r) {
+        return r.json()
+      })
       .then(function (order) {
-        console.log('[GooglePay ECM] ===== captureOrder response =====')
-        console.log('[GooglePay ECM] response:', order)
+        console.log('[GooglePay ECS] ===== captureOrder response =====')
+        console.log('[GooglePay ECS] response:', order)
         if (order.error) throw new Error(order.error)
 
-        var capture = order.purchase_units &&
-                      order.purchase_units[0] &&
-                      order.purchase_units[0].payments &&
-                      order.purchase_units[0].payments.captures &&
-                      order.purchase_units[0].payments.captures[0]
-        console.log('[GooglePay ECM] capture object:', capture)
+        var capture =
+          order.purchase_units &&
+          order.purchase_units[0] &&
+          order.purchase_units[0].payments &&
+          order.purchase_units[0].payments.captures &&
+          order.purchase_units[0].payments.captures[0]
+        console.log('[GooglePay ECS] capture object:', capture)
 
         if (!capture || capture.status !== 'COMPLETED') {
           var status = capture ? capture.status : 'undefined'
-          console.error('[GooglePay ECM] capture NOT COMPLETED — status:', status)
+          console.error('[GooglePay ECS] capture NOT COMPLETED — status:', status)
           showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
           return
         }
 
-        console.log('[GooglePay ECM] ===== capture COMPLETED ===== orderId:', order.id)
+        console.log('[GooglePay ECS] ===== capture COMPLETED ===== orderId:', order.id)
         showResult('✓ Payment captured · Order: ' + order.id, 'success')
       })
   }
@@ -408,19 +452,18 @@
   // ─── Entry point ──────────────────────────────────────────────────────────────
 
   window.addEventListener('load', function () {
-    console.log('[GooglePay ECM] ===== window load =====')
+    console.log('[GooglePay ECS] ===== window load =====')
 
     urls = window.DEMO && window.DEMO.urls
-    console.log('[GooglePay ECM] window.DEMO.urls:', urls)
-    console.log('[GooglePay ECM] window.DEMO.shipping:', window.DEMO && window.DEMO.shipping)
+    console.log('[GooglePay ECS] urls:', urls)
 
     if (typeof paypalSDK === 'undefined') {
-      console.error('[GooglePay ECM] paypalSDK is undefined — SDK failed to load')
+      console.error('[GooglePay ECS] paypalSDK undefined — SDK failed to load')
       showResult('✗ PayPal SDK failed to load', 'error')
       return
     }
     if (typeof google === 'undefined' || !google.payments) {
-      console.error('[GooglePay ECM] google.payments is undefined — Google Pay SDK failed to load')
+      console.error('[GooglePay ECS] google.payments undefined — Google Pay SDK failed to load')
       showResult('✗ Google Pay SDK failed to load', 'error')
       return
     }
@@ -436,27 +479,25 @@
       })
     }
 
-    console.log('[GooglePay ECM] calling getGooglePayConfig()...')
+    console.log('[GooglePay ECS] calling getGooglePayConfig()...')
     getGooglePayConfig()
       .then(function (config) {
-        var client          = getGooglePaymentsClient()
+        var client = getGooglePaymentsClient()
         var isReadyToPayReq = getGoogleIsReadyToPayRequest(config)
-        console.log('[GooglePay ECM] calling isReadyToPay()...')
-        return client.isReadyToPay(isReadyToPayReq)
-          .then(function (resp) {
-            console.log('[GooglePay ECM] ===== isReadyToPay() response =====')
-            console.log('[GooglePay ECM] response:', resp)
-            if (!resp.result) {
-              console.warn('[GooglePay ECM] Google Pay not available on this device/account')
-              var container = document.getElementById('paypal-button-container')
-              container.classList.remove('sdk-loading')
-              container.innerHTML = ''
-              showResult('Google Pay is not available on this device or account.', 'error')
-              return
-            }
-            console.log('[GooglePay ECM] isReadyToPay: true — calling addGooglePayButton()...')
-            addGooglePayButton(config)
-          })
+        console.log('[GooglePay ECS] calling isReadyToPay()...')
+        return client.isReadyToPay(isReadyToPayReq).then(function (resp) {
+          console.log('[GooglePay ECS] isReadyToPay response:', resp)
+          if (!resp.result) {
+            console.warn('[GooglePay ECS] Google Pay not available on this device/account')
+            var container = document.getElementById('paypal-button-container')
+            container.classList.remove('sdk-loading')
+            container.innerHTML = ''
+            showResult('Google Pay is not available on this device or account.', 'error')
+            return
+          }
+          console.log('[GooglePay ECS] isReadyToPay: true — calling addGooglePayButton()')
+          addGooglePayButton(config)
+        })
       })
       .catch(function (err) {
         var container = document.getElementById('paypal-button-container')
@@ -464,7 +505,7 @@
           container.classList.remove('sdk-loading')
           container.innerHTML = ''
         }
-        console.error('[GooglePay ECM] config/init error:', err)
+        console.error('[GooglePay ECS] config/init error:', err)
         showResult('✗ Google Pay config error: ' + (err.message || String(err)), 'error')
       })
   })

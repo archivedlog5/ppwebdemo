@@ -162,7 +162,8 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // 需要完全自定义实现的路由：
 // buttons.js            — 双 SDK（CN + US）
 // acdc.js               — CardFields SDK
-// googlepay-ecm.js      — 双外部 SDK（PayPal + Google Pay）；需传 sandboxShipping 给 EJS；含 SCA；命名函数拆分；3DS 通过 GET order details 解析（无前端 liabilityShift）；EJS 内含 #custom-googlepay-btn，JS 在初始化完成后启用并复用同一点击流程
+// googlepay-ecm.js      — 双外部 SDK（PayPal + Google Pay）；需传 sandboxShipping + sandboxPhone 给 EJS；emailRequired:true（从 sheet 获取）；phone 用 SANDBOX_PHONE 预填；流程：sheet→email→createOrder→processPayment；3DS 通过 GET order details 解析；#custom-googlepay-btn 复用同一点击流程
+// googlepay-ecs.js      — 双外部 SDK；shippingAddressRequired:true + emailRequired:true + phoneNumberRequired:true；买家在 sheet 选地址/email/phone；mapGooglePayAddress 转地址格式；parsePhoneNumber(E.164, isoCountry)→{country_code,national_number}；buyerName/email/parsedPhone 注入 payment_source.google_pay
 // vault-*-setup-only.js — /v3/vault/setup-tokens API
 // vault-return.js       — 用户提供 vault token
 ```
@@ -241,11 +242,17 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
     - **Promise 模式**（当前实现）：`PaymentsClient()` 不传 `paymentDataCallbacks`，`loadPaymentData` 不设 `callbackIntents`。用户授权后 sheet 自动关闭，`loadPaymentData` Promise resolve，此时屏幕干净，`initiatePayerAction` 的 3DS 窗口可正常弹出。
     - 代码结构：`loadPaymentData(req).then(function(paymentData) { return processPayment(paymentData) })`
 
-15. **Google Pay 3DS 路径**（与 ACDC 不同）：Google Pay 无前端 `liabilityShift`，`confirmOrder` 返回 `PAYER_ACTION_REQUIRED` 时需 `initiatePayerAction` → **GET order details** → 从 `payment_source.google_pay.card.authentication_result`（比 ACDC 多一层 `google_pay`）读取 `liability_shift`、`three_d_secure.enrollment_status`、`three_d_secure.authentication_status`，再决定 capture 还是 reject：
+15. **Google Pay 3DS 路径**（与 ACDC 不同，ECM 和 ECS 相同）：Google Pay 无前端 `liabilityShift`，`confirmOrder` 返回 `PAYER_ACTION_REQUIRED` 时需 `initiatePayerAction` → **GET order details** → 从 `payment_source.google_pay.card.authentication_result`（比 ACDC 多一层 `google_pay`）读取 `liability_shift`、`three_d_secure.enrollment_status`、`three_d_secure.authentication_status`，再决定 capture 还是 reject：
     - `liability_shift === 'POSSIBLE'` → capture
     - `liability_shift === 'NO'` + enrollment in `['N','U','B']` → capture（未入会）
     - `liability_shift === 'NO'` + 其他 enrollment → reject
     - `liability_shift === 'UNKNOWN'` → reject（提示重试）
+
+16. **Google Pay ECS 电话格式转换**：Google Pay 返回 E.164（`+14155552671`），PayPal `payment_source.google_pay.phone_number` 需要 `{ country_code: '1', national_number: '4155552671' }`。转换方式：strip 非数字 → 用 `COUNTRY_DIAL[shippingAddress.countryCode]`（ISO→拨号代码）找 dialCode → 若 digits 以 dialCode 开头则剥离，剩余为 `national_number`。`COUNTRY_DIAL` 覆盖所有支持货币对应国家。
+
+17. **Google Pay ECM vs ECS 的 phone 来源不同**：
+    - ECM（`shippingAddressRequired: false`）：sheet 无地址区域，无法收电话 → 用 `demoParams.SANDBOX_PHONE`（商户预填）注入 `payment_source.google_pay.phone_number`
+    - ECS（`shippingAddressRequired: true`）：sheet 收集地址 + 电话 → `paymentData.shippingAddress.phoneNumber` 经 `parsePhoneNumber()` 转换后注入
 
 ## EJS/JS 分离模式
 
@@ -286,8 +293,8 @@ EJS 文件职责：
 | `public/js/paypal/jssdk-v5/vault-setup.js` | vault-paypal-setup-only |
 | `public/js/paypal/jssdk-v5/vault-return.js` | vault-return |
 | `public/js/paypal/jssdk-v5/applepay.js` | applepay-ecm, applepay-ecs（待实现） |
-| `public/js/paypal/jssdk-v5/googlepay-ecm.js` | googlepay-ecm（已实现；命名函数拆分：singleton paymentsClient/googlepayConfig、handle3DS、doCapture；`addGooglePayButton` 同时启用 EJS 里的 `#custom-googlepay-btn` 并绑定 hover/press/click） |
-| `public/js/paypal/jssdk-v5/googlepay-ecs.js` | googlepay-ecs（待实现；需 shippingAddressRequired:true + onPaymentDataChanged） |
+| `public/js/paypal/jssdk-v5/googlepay-ecm.js` | googlepay-ecm（已实现；Promise 模式；`emailRequired:true`；流程：sheet 先开→获取 email→createOrder（email + SANDBOX_PHONE 注入 payment_source）→processPayment；singleton paymentsClient/googlepayConfig、handle3DS、doCapture；custom button 绑定 hover/press/click） |
+| `public/js/paypal/jssdk-v5/googlepay-ecs.js` | googlepay-ecs（已实现；`shippingAddressRequired:true` + `emailRequired:true` + `phoneNumberRequired:true`；`COUNTRY_DIAL` + `parsePhoneNumber()` 把 E.164 → `{ country_code, national_number }`；ECS 流程：sheet 先开→提取 name/email/phone/address→createOrder→processPayment；3DS 路径与 ECM 相同） |
 
 **新增 JS 文件时的规范：**
 - 用 IIFE 包裹（`(function() { 'use strict'; ... })()`）

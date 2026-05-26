@@ -127,6 +127,12 @@ const SANDBOX_BUYER = {
   },
 };
 
+// ── Sandbox 商户预填电话（Google Pay ECM payment_source 场景）──────────
+const SANDBOX_PHONE = {
+  country_code: '1',
+  national_number: '4085551234',
+}
+
 // ── Sandbox 收货地址（purchase_units[0].shipping，pre-fill 到结账页）──
 const SANDBOX_SHIPPING = {
   name: { full_name: "Cross Wen" },
@@ -166,9 +172,7 @@ function validateAmount(amount, currency) {
   if (num < MIN_AMOUNT)
     return `Amount must be at least $${MIN_AMOUNT.toFixed(2)}`;
   if (num > MAX_AMOUNT)
-    return `Amount cannot exceed $${MAX_AMOUNT.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-    })}`;
+    return `Amount cannot exceed $${MAX_AMOUNT.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
   return null;
 }
 
@@ -244,9 +248,10 @@ module.exports = {
   EXPERIENCE_CONTEXT,
   SANDBOX_BUYER,
 
-  // 地址
+  // 地址 & 电话
   SANDBOX_SHIPPING,
   SANDBOX_BILLING,
+  SANDBOX_PHONE,
   VENMO_SHIPPING,
 
   // 工具函数

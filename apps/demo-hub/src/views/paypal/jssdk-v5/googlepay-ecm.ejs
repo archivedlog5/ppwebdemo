@@ -41,12 +41,13 @@
     <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
 
     <div class="field-group">
-      <label class="field-label">Shipping Address <span style="color:var(--fg-muted);font-weight:400">(pre-filled by merchant — not shown in Google Pay sheet)</span></label>
+      <label class="field-label">Shipping Address &amp; Phone <span style="color:var(--fg-muted);font-weight:400">(pre-filled by merchant — not shown in Google Pay sheet)</span></label>
       <div class="field-host" style="padding:10px 12px;color:var(--fg-muted);font-family:var(--font-mono);font-size:13px;line-height:1.6;cursor:default">
         <%= sandboxShipping.name %><br>
         <%= sandboxShipping.addressLine1 %><br>
         <%= sandboxShipping.adminArea2 %>, <%= sandboxShipping.adminArea1 %> <%= sandboxShipping.postalCode %><br>
-        <%= sandboxShipping.countryCode %>
+        <%= sandboxShipping.countryCode %><br>
+        <%= sandboxPhone %>
       </div>
     </div>
 
