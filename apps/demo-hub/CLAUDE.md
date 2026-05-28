@@ -168,7 +168,8 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // applepay-ecs.js       — 自定义路由；ECS 流程；GET 无 sandboxShipping（买家在 sheet 选）；create-order 接收 shippingContact + shippingAmount；payment_source.apple_pay 含 name/email_address/phone_number（national_number only，无 country_code）/experience_context；normalizeContact() 剥离非数字；total = item + shippingAmount
 // vault-paypal-with-purchase.js — 完整自定义路由；GET 调 fetchIdToken() 获取 id_token 注入 data-user-id-token；payment_source 在顶层（含 permit_multiple_payment_tokens/description/attributes.customer.merchant_customer_id/experience_context.brand_name/shipping_preference）；capture 返回 vaultId + customerId
 // vault-acdc-with-purchase.js — 完整自定义路由；saveVault=true 时 attributes 加 vault.store_in_vault:ON_SUCCESS + customer.merchant_customer_id（随机 CUST_ 前缀，randomBytes(6)）；3DS select disabled（沙盒限制）；测试卡 4012 0000 3333 0026
-// vault-*-setup-only.js — /v3/vault/setup-tokens API
+// vault-acdc-setup-only.js  — 完整自定义路由；/v3/vault/setup-tokens；顶层 customer.merchant_customer_id（随机）+ payment_source.card.billing_address + experience_context.return/cancel_url + verification_method（直接挂 card 下）；onApprove：liabilityShift 'YES'|'POSSIBLE' → confirm；否则 GET setup-token → token.status=APPROVED && verification_status=VERIFIED → confirm；GET /api/vault-acdc-setup-only/setup-token/:id 端点；confirm 返回 paymentTokenId + customerId
+// vault-paypal-setup-only.js — /v3/vault/setup-tokens API（PayPal 按钮方式）
 // vault-return.js       — 用户提供 vault token
 ```
 
@@ -320,7 +321,8 @@ EJS 文件职责：
 |---------|--------------|
 | `public/js/paypal/jssdk-v5/spb.js` | spb-ecm, spb-ecs, vault-applepay-with-purchase |
 | `public/js/paypal/jssdk-v5/vault-paypal-with-purchase.js` | vault-paypal-with-purchase（专属；capture 后显示 vaultId + customerId） |
-| `public/js/paypal/jssdk-v5/acdc.js` | acdc, vault-acdc-setup-only |
+| `public/js/paypal/jssdk-v5/acdc.js` | acdc |
+| `public/js/paypal/jssdk-v5/vault-acdc-setup-only.js` | vault-acdc-setup-only（专属；`createVaultSetupToken` callback；onApprove 3DS 决策：`liabilityShift 'YES'|'POSSIBLE'` → 直接 confirm；否则 GET setup token → `token.status==='APPROVED' && verification_status==='VERIFIED'` → confirm；`doConfirm()` + `showVaultResult(paymentTokenId, customerId)`；console.group 分组打印三个字段；前缀 `[ACDC-Setup]`） |
 | `public/js/paypal/jssdk-v5/vault-acdc-with-purchase.js` | vault-acdc-with-purchase（专属；含 `getVaultChecked()` + `showVaultResult()`；`saveVault` 条件 vault attrs；capture 后展示 vault 面板） |
 | `public/js/paypal/jssdk-v5/buttons.js` | buttons（双 SDK：cnSdkUrl + usSdkUrl） |
 | `public/js/paypal/jssdk-v5/vault-paypal-setup-only.js` | vault-paypal-setup-only |

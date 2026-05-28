@@ -818,13 +818,74 @@ const customerId = data.customer?.id || null
 res.json({ paymentTokenId: data.id, customerId, data })
 ```
 
-### vault-acdc-setup-only
+### vault-acdc-setup-only（2026-05-29 完成）
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 | `src/routes/paypal/jssdk-v5/vault-acdc-setup-only.js` | `/v3/vault/setup-tokens`（card body 为空 `{}`） |
-| EJS | `src/views/paypal/jssdk-v5/vault-acdc-setup-only.ejs` | CardFields 结构；`mode: 'vault-setup'` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/acdc.js` | **与 ACDC 共用**；`mode` 影响行为（待实现区分） |
+| 路由 | `src/routes/paypal/jssdk-v5/vault-acdc-setup-only.js` | **完整自定义路由**；4 个端点（见下）；create-setup-token body：顶层 `customer.merchant_customer_id`（随机 CUST_）+ `payment_source.card.billing_address`（SANDBOX_BILLING）+ `experience_context.return_url/cancel_url`（动态）+ `verification_method`（SCA 白名单，直接挂 card 下）；GET setup-token 供前端检查 `verification_status`；confirm-setup-token 提取 `customerId` |
+| EJS | `src/views/paypal/jssdk-v5/vault-acdc-setup-only.ejs` | `sandbox-card--wide`；3DS select（SCA_WHEN_REQUIRED / SCA_ALWAYS，**可切换**）；Number / Expiry / CVV 字段；"Save Card" 按钮；`#vault-result` 面板（payment-token-id + customer-id）；测试卡 `4012 0000 3333 0026` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/vault-acdc-setup-only.js` | **专属 JS 文件**；`createVaultSetupToken`（发送 `scaMethod`）；`onApprove` 3DS 判断逻辑与 vault-acdc-with-purchase 不同（见下）；`doConfirm()` 创建 payment token；`showVaultResult()` |
+
+#### 后端 API（`vault-acdc-setup-only.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/vault-acdc-setup-only` | GET | 渲染页面；传 `sandboxCardholderName`/`sandboxBilling` 给 EJS |
+| `/api/vault-acdc-setup-only/create-setup-token` | POST | 读 `{ scaMethod }`；顶层 `customer.merchant_customer_id`（随机）+ `payment_source.card.billing_address` + `experience_context.return_url/cancel_url`（动态）+ `verification_method`；返回 `{ setupTokenId }` |
+| `/api/vault-acdc-setup-only/setup-token/:setupTokenId` | GET | `GET /v3/vault/setup-tokens/{id}`；返回完整 setup token 数据（前端读 `payment_source.card.verification_status`） |
+| `/api/vault-acdc-setup-only/confirm-setup-token` | POST | 读 `{ setupTokenId }`；`POST /v3/vault/payment-tokens`；返回 `{ paymentTokenId, customerId, data }` |
+
+**create-setup-token body：**
+
+```js
+{
+  customer: {
+    merchant_customer_id: 'CUST_' + randomBytes(6).toString('hex').toUpperCase(),
+  },
+  payment_source: {
+    card: {
+      billing_address: {
+        address_line_1: SANDBOX_BILLING.address_line_1,
+        admin_area_2:   SANDBOX_BILLING.admin_area_2,
+        admin_area_1:   SANDBOX_BILLING.admin_area_1,
+        postal_code:    SANDBOX_BILLING.postal_code,
+        country_code:   SANDBOX_BILLING.country_code,
+      },
+      experience_context: {
+        return_url: `${baseUrl}/paypal/jssdk-v5/vault-acdc-setup-only`,
+        cancel_url: `${baseUrl}/paypal/jssdk-v5/vault-acdc-setup-only`,
+      },
+      verification_method: scaMethod,                  // SCA_WHEN_REQUIRED | SCA_ALWAYS
+    },
+  },
+}
+```
+
+#### onApprove 3DS 判断逻辑（setup-only，与 vault-acdc-with-purchase 不同）
+
+```
+onApprove({ liabilityShift, vaultSetupToken })
+
+  liabilityShift === 'YES' || 'POSSIBLE'
+    → 3DS 通过 → doConfirm(vaultSetupToken)                ✅
+
+  liabilityShift 为其他值（undefined/NO/UNKNOWN）
+    → GET /api/vault-acdc-setup-only/setup-token/:id
+    → 读 token.status + payment_source.card.verification_status
+        token.status === 'APPROVED' && verification_status === 'VERIFIED'
+                    → doConfirm(vaultSetupToken)            ✅
+        其他        → showResult('✗ Card not saved · ...') ✗
+
+注：SCA_WHEN_REQUIRED 不触发 3DS 时（liabilityShift undefined），
+    PayPal API 仍会返回 verification_status: 'VERIFIED'（已验证测试）
+```
+
+**与 vault-acdc-with-purchase 的核心差异：**
+- 使用 `createVaultSetupToken`（不是 `createOrder`）
+- `onApprove` 收到 `vaultSetupToken`（不是 `orderID`）
+- 3DS 判断用 `liabilityShift 'YES'|'POSSIBLE'` + `verification_status`（不是 `authentication_result` + `enrollment_status`）
+- 无 `doCapture`，改为 `doConfirm`（创建 payment token）
+- 无金额/币种（零元签约）
 
 ---
 

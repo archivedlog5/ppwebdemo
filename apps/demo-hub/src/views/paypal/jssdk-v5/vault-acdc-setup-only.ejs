@@ -7,16 +7,22 @@
   <div class="sandbox-header">
     <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · ACDC Vault Setup</span>
     <h1><%= title %></h1>
-    <p>Pure ACDC vault enrollment — no purchase. Card is saved without charging.</p>
+    <p>Save a card to vault without a purchase. Uses <code>/v3/vault/setup-tokens</code> — no charge to the buyer.</p>
   </div>
-  <div class="sandbox-card">
-    <div class="amount-display">
-      <div class="amount-label">Payment</div>
-      <div class="amount-value" style="font-size:22px">Setup Only</div>
-      <span class="sandbox-mode-badge">⚡ Zero-Dollar Auth</span>
+  <div class="sandbox-card sandbox-card--wide">
+    <div class="amount-row">
+      <div class="currency-group">
+        <label class="field-label" for="demo-sca">3DS</label>
+        <select id="demo-sca" class="currency-select" aria-label="3DS SCA method" style="min-width:200px">
+          <option value="SCA_WHEN_REQUIRED" selected>SCA_WHEN_REQUIRED</option>
+          <option value="SCA_ALWAYS">SCA_ALWAYS</option>
+        </select>
+      </div>
     </div>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Zero-Dollar Vault Enrollment</span>
+
     <div class="field-group">
-      <label class="field-label">Card Number</label>
+      <label class="field-label" for="card-number-container">Card Number</label>
       <div class="field-host sdk-loading" id="card-number-container">
         <div class="sdk-spinner"></div><span>Loading...</span>
       </div>
@@ -31,9 +37,20 @@
         <div class="field-host" id="card-cvv-container"></div>
       </div>
     </div>
-    <button id="acdc-pay-btn" class="pay-btn pay-btn-paypal" type="button">Vault Card (No Charge)</button>
+
+    <button id="acdc-save-btn" class="pay-btn pay-btn-paypal" type="button">Save Card</button>
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
-    <div class="test-hint">Test card: <strong>4111 1111 1111 1111</strong> · Any future date · Any CVV</div>
+
+    <div id="vault-result" style="display:none;margin-top:12px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:6px;font-size:13px;line-height:1.8">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:6px">Vault Result</div>
+      <div><span style="color:var(--fg-muted)">Payment Token:&nbsp;</span><span id="payment-token-id" style="font-family:monospace;color:var(--fg)">—</span></div>
+      <div><span style="color:var(--fg-muted)">Customer ID:&nbsp;</span><span id="customer-id" style="font-family:monospace;color:var(--fg)">—</span></div>
+    </div>
+
+    <div class="test-hint">
+      Test card: <strong>4012 0000 3333 0026</strong> · Any future date · Any CVV ·
+      <a href="https://developer.paypal.com/docs/checkout/save-payment-methods/purchase-later/js-sdk/cards/" target="_blank" rel="noopener" style="color:inherit;opacity:0.7">more cards ↗</a>
+    </div>
   </div>
 </div>
 
@@ -41,11 +58,12 @@
   window.DEMO = {
     urls: {
       createSetupToken:  '/paypal/jssdk-v5/api/vault-acdc-setup-only/create-setup-token',
+      getSetupToken:     '/paypal/jssdk-v5/api/vault-acdc-setup-only/setup-token/',
       confirmSetupToken: '/paypal/jssdk-v5/api/vault-acdc-setup-only/confirm-setup-token',
     },
-    mode: 'vault-setup'
+    billing: <%- JSON.stringify(sandboxBilling) %>,
   }
 </script>
-<script src="/js/paypal/jssdk-v5/acdc.js"></script>
+<script src="/js/paypal/jssdk-v5/vault-acdc-setup-only.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>
