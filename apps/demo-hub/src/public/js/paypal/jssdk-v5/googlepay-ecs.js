@@ -5,8 +5,11 @@
  *
  * Key differences from ECM:
  *   - shippingAddressRequired: true, emailRequired: true, phoneNumberRequired: true
- *   - Order created AFTER sheet closes (not before)
- *   - shippingAddress, email, phoneNumber extracted from paymentData and sent to create-order
+ *   - shippingOptionRequired: true — buyer picks shipping method inside the sheet
+ *   - Full callback mode (onPaymentAuthorized + onPaymentDataChanged, callbackIntents includes
+ *     PAYMENT_AUTHORIZATION) — required by Google Pay whenever paymentDataCallbacks is used.
+ *     Omitting PAYMENT_AUTHORIZATION causes OR_BIBED_06.
+ *   - Order created inside onPaymentAuthorized (after user taps Pay) not in button click handler
  *
  * window.DEMO = {
  *   urls: { createOrder, getOrder, captureOrder },
@@ -18,6 +21,11 @@
   // ─── Constants ──────────────────────────────────────────────────────────────
 
   var ZERO_DECIMAL = ['JPY', 'KRW', 'TWD', 'CLP', 'IDR']
+
+  var SHIPPING_OPTIONS = [
+    { id: 'standard', label: 'Standard Shipping', description: 'Arrives in 5–7 days', price: '5.00' },
+    { id: 'express',  label: 'Express Shipping',  description: 'Arrives in 2–3 days', price: '10.00' },
+  ]
 
   // ISO 3166-1 alpha-2 → calling code (covers our currency list + common countries)
   var COUNTRY_DIAL = {
@@ -48,12 +56,25 @@
     apiVersionMinor: 0,
   }
 
+  // ─── Shipping helpers ─────────────────────────────────────────────────────────
+
+  function fmtAmt(num, zd) {
+    return zd ? String(Math.round(num)) : num.toFixed(2)
+  }
+
+  function calcTotal(amount, zd) {
+    var item = parseFloat(amount)
+    var ship = parseFloat(chosenShipping.price)
+    return fmtAmt(item + ship, zd)
+  }
+
   // ─── Module-level state ──────────────────────────────────────────────────────
 
   var paymentsClient = null
   var googlepayConfig = null
   var currentOrderID = null
   var urls = null
+  var chosenShipping = SHIPPING_OPTIONS[0]
 
   // ─── UI helpers ──────────────────────────────────────────────────────────────
 
@@ -128,6 +149,51 @@
     })
   })
 
+  // ─── Google Pay: shipping callback ───────────────────────────────────────────
+
+  function onPaymentDataChanged(intermediatePaymentData) {
+    var currency = getCurrency()
+    var amount   = getAmount()
+    var zd       = isZeroDecimal(currency)
+
+    var trigger = intermediatePaymentData.callbackTrigger
+    if (trigger === 'SHIPPING_OPTION') {
+      var id = intermediatePaymentData.shippingOptionData && intermediatePaymentData.shippingOptionData.id
+      var opt = SHIPPING_OPTIONS.filter(function (o) { return o.id === id })[0] || SHIPPING_OPTIONS[0]
+      chosenShipping = opt
+    }
+    // INITIALIZE / SHIPPING_ADDRESS: chosenShipping stays as SHIPPING_OPTIONS[0] (reset on button click)
+
+    var total = calcTotal(amount, zd)
+    var update = {}
+
+    // Google Pay requires newShippingOptionParameters only on INITIALIZE / SHIPPING_ADDRESS,
+    // not on SHIPPING_OPTION (where the user already selected one).
+    if (trigger === 'INITIALIZE' || trigger === 'SHIPPING_ADDRESS') {
+      update.newShippingOptionParameters = {
+        defaultSelectedOptionId: chosenShipping.id,
+        // Google Pay shippingOptions only accept id/label/description — no price/selected
+        shippingOptions: SHIPPING_OPTIONS.map(function (o) {
+          return { id: o.id, label: o.label, description: o.description }
+        }),
+      }
+    }
+
+    update.newTransactionInfo = {
+      countryCode:      'US',
+      currencyCode:     currency,
+      totalPriceStatus: 'FINAL',
+      totalPrice:       total,
+      totalPriceLabel:  'Total',
+      displayItems: [
+        { label: 'Item total', type: 'SUBTOTAL', price: fmtAmt(parseFloat(amount), zd) },
+        { label: chosenShipping.label, type: 'LINE_ITEM', price: chosenShipping.price },
+      ],
+    }
+
+    return Promise.resolve(update)
+  }
+
   // ─── Google Pay: client singleton ────────────────────────────────────────────
 
   function getGooglePaymentsClient() {
@@ -136,6 +202,10 @@
       console.log('[GooglePay ECS] creating new PaymentsClient (environment: TEST)')
       paymentsClient = new google.payments.api.PaymentsClient({
         environment: 'TEST',
+        paymentDataCallbacks: {
+          onPaymentAuthorized: onPaymentAuthorized,
+          onPaymentDataChanged: onPaymentDataChanged,
+        },
       })
     }
     return paymentsClient
@@ -164,22 +234,38 @@
     })
   }
 
-  function getGooglePaymentDataRequest(config, amount, currency) {
+  function getGooglePaymentDataRequest(config, amount, currency, zd) {
+    // Initial total is item-only; shipping will be added in onPaymentDataChanged(INITIALIZE).
+    // totalPriceStatus must be ESTIMATED when the total will change after shipping selection.
+    var itemPrice = fmtAmt(parseFloat(amount), zd)
     return Object.assign({}, BASE_REQUEST, {
       allowedPaymentMethods: config.allowedPaymentMethods,
       merchantInfo: config.merchantInfo,
       transactionInfo: {
         countryCode: 'US',
         currencyCode: currency,
-        totalPriceStatus: 'FINAL',
-        totalPrice: amount,
+        totalPriceStatus: 'ESTIMATED',
+        totalPrice: itemPrice,
         totalPriceLabel: 'Total',
+        displayItems: [
+          { label: 'Item total', type: 'SUBTOTAL', price: itemPrice },
+        ],
       },
       shippingAddressRequired: true,
       shippingAddressParameters: {
         phoneNumberRequired: true,
       },
       emailRequired: true,
+      shippingOptionRequired: true,
+      shippingOptionParameters: {
+        defaultSelectedOptionId: SHIPPING_OPTIONS[0].id,
+        // Google Pay shippingOptions only accept id/label/description — no price/selected
+        shippingOptions: SHIPPING_OPTIONS.map(function (o) {
+          return { id: o.id, label: o.label, description: o.description }
+        }),
+      },
+      // SHIPPING_ADDRESS is required for INITIALIZE trigger to fire onPaymentDataChanged
+      callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION', 'PAYMENT_AUTHORIZATION'],
     })
   }
 
@@ -229,10 +315,15 @@
     }
   }
 
-  // ─── ECS flow: sheet first, then create order ─────────────────────────────────
+  // ─── ECS flow: callback mode ──────────────────────────────────────────────────
   //
-  // ECM: createOrder → loadPaymentData → processPayment
-  // ECS: loadPaymentData → extract address/email/phone → createOrder → processPayment
+  // loadPaymentData → Google Pay calls onPaymentDataChanged (INITIALIZE / SHIPPING_OPTION)
+  //                 → user taps Pay → Google Pay calls onPaymentAuthorized
+  //                 → createOrder → processPayment (confirmOrder → 3DS → capture)
+  //                 → resolve { transactionState: 'SUCCESS' | 'ERROR' }
+  //
+  // Google Pay requires PAYMENT_AUTHORIZATION in callbackIntents whenever
+  // paymentDataCallbacks is registered — omitting it causes OR_BIBED_06.
 
   function onGooglePaymentButtonClicked(config) {
     console.log('[GooglePay ECS] ===== Google Pay button clicked =====')
@@ -245,68 +336,81 @@
     var amount = getAmount()
     var currency = getCurrency()
     var sca = getSCA()
+    var zd = isZeroDecimal(currency)
     console.log('[GooglePay ECS] amount:', amount, '| currency:', currency, '| scaMethod:', sca)
 
-    var paymentDataRequest = getGooglePaymentDataRequest(config, amount, currency)
+    chosenShipping = SHIPPING_OPTIONS[0]
+    var paymentDataRequest = getGooglePaymentDataRequest(config, amount, currency, zd)
     var client = getGooglePaymentsClient()
 
-    console.log('[GooglePay ECS] calling loadPaymentData() — sheet opens for buyer to select shipping/email/phone')
-    client
-      .loadPaymentData(paymentDataRequest)
-      .then(function (paymentData) {
-        // Sheet closed — buyer has selected address, email, phone
-        console.log('[GooglePay ECS] ===== loadPaymentData resolved =====')
-        console.log('[GooglePay ECS] paymentData:', paymentData)
+    console.log('[GooglePay ECS] calling loadPaymentData() — sheet opens (callback mode)')
+    client.loadPaymentData(paymentDataRequest)
+  }
 
-        var shippingAddress = paymentData.shippingAddress || null
-        var buyerName  = shippingAddress ? shippingAddress.name        : null
-        var email      = paymentData.email || null
-        var rawPhone   = shippingAddress ? shippingAddress.phoneNumber  : null
-        var isoCountry = shippingAddress ? shippingAddress.countryCode  : null
-        var parsedPhone = parsePhoneNumber(rawPhone, isoCountry)
+  // ─── Payment authorization callback ──────────────────────────────────────────
+  //
+  // Google Pay calls this after the user taps Pay. Sheet stays in "processing"
+  // state until we resolve. Must return Promise<{ transactionState }>.
 
-        console.log('[GooglePay ECS] shippingAddress:', shippingAddress)
-        console.log('[GooglePay ECS] buyerName:', buyerName)
-        console.log('[GooglePay ECS] email:', email)
-        console.log('[GooglePay ECS] rawPhone:', rawPhone, '| isoCountry:', isoCountry, '| parsedPhone:', parsedPhone)
+  function onPaymentAuthorized(paymentData) {
+    console.log('[GooglePay ECS] ===== onPaymentAuthorized =====')
+    console.log('[GooglePay ECS] paymentData:', paymentData)
 
-        // Now create order with buyer-selected data
-        var createBody = {
-          amount: amount,
-          currency: currency,
-          scaMethod: sca,
-          shippingAddress: shippingAddress,
-          buyerName: buyerName,
-          email: email,
-          parsedPhone: parsedPhone,
-        }
-        console.log('[GooglePay ECS] calling createOrder API:', urls.createOrder)
-        console.log('[GooglePay ECS] createOrder request body:', createBody)
+    var amount = getAmount()
+    var currency = getCurrency()
+    var sca = getSCA()
 
-        return fetch(urls.createOrder, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(createBody),
+    return new Promise(function (resolve) {
+      var shippingAddress = paymentData.shippingAddress || null
+      var buyerName  = shippingAddress ? shippingAddress.name       : null
+      var email      = paymentData.email || null
+      var rawPhone   = shippingAddress ? shippingAddress.phoneNumber : null
+      var isoCountry = shippingAddress ? shippingAddress.countryCode : null
+      var parsedPhone = parsePhoneNumber(rawPhone, isoCountry)
+
+      var selectedShippingId = paymentData.shippingOptionData && paymentData.shippingOptionData.id
+      var finalShipping = SHIPPING_OPTIONS.filter(function (o) { return o.id === selectedShippingId })[0] || chosenShipping
+
+      console.log('[GooglePay ECS] shippingAddress:', shippingAddress)
+      console.log('[GooglePay ECS] buyerName:', buyerName, '| email:', email)
+      console.log('[GooglePay ECS] rawPhone:', rawPhone, '| isoCountry:', isoCountry, '| parsedPhone:', parsedPhone)
+      console.log('[GooglePay ECS] shippingOptionData:', paymentData.shippingOptionData, '| finalShipping:', finalShipping)
+
+      var createBody = {
+        amount: amount,
+        currency: currency,
+        scaMethod: sca,
+        shippingAddress: shippingAddress,
+        buyerName: buyerName,
+        email: email,
+        parsedPhone: parsedPhone,
+        shippingAmount: finalShipping.price,
+      }
+      console.log('[GooglePay ECS] calling createOrder:', urls.createOrder)
+      console.log('[GooglePay ECS] createOrder body:', createBody)
+
+      fetch(urls.createOrder, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createBody),
+      })
+        .then(function (r) { return r.json() })
+        .then(function (d) {
+          console.log('[GooglePay ECS] ===== createOrder response =====', d)
+          if (d.error) throw new Error(d.error)
+          currentOrderID = d.id
+          console.log('[GooglePay ECS] order created — orderId:', currentOrderID)
+          return processPayment(paymentData)
         })
-          .then(function (r) {
-            return r.json()
-          })
-          .then(function (d) {
-            console.log('[GooglePay ECS] ===== createOrder response =====', d)
-            if (d.error) throw new Error(d.error)
-            currentOrderID = d.id
-            console.log('[GooglePay ECS] order created — orderId:', currentOrderID)
-            return processPayment(paymentData)
-          })
-      })
-      .catch(function (err) {
-        if (err && err.statusCode === 'CANCELED') {
-          console.log('[GooglePay ECS] user cancelled Google Pay sheet')
-          return
-        }
-        console.error('[GooglePay ECS] error in button click flow:', err)
-        showResult('✗ ' + (err.message || String(err)), 'error')
-      })
+        .then(function () {
+          resolve({ transactionState: 'SUCCESS' })
+        })
+        .catch(function (err) {
+          console.error('[GooglePay ECS] onPaymentAuthorized error:', err)
+          showResult('✗ ' + (err.message || String(err)), 'error')
+          resolve({ transactionState: 'ERROR' })
+        })
+    })
   }
 
   // ─── Core payment orchestration ───────────────────────────────────────────────
@@ -439,9 +543,10 @@
 
         if (!capture || capture.status !== 'COMPLETED') {
           var status = capture ? capture.status : 'undefined'
+          var msg = 'Capture failed · status: ' + (capture ? capture.status : 'unknown')
           console.error('[GooglePay ECS] capture NOT COMPLETED — status:', status)
-          showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
-          return
+          showResult('✗ ' + msg, 'error')
+          throw new Error(msg)
         }
 
         console.log('[GooglePay ECS] ===== capture COMPLETED ===== orderId:', order.id)

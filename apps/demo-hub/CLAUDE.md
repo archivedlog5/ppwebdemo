@@ -163,7 +163,7 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // buttons.js            — 双 SDK（CN + US）
 // acdc.js               — CardFields SDK
 // googlepay-ecm.js      — 双外部 SDK（PayPal + Google Pay）；需传 sandboxShipping + sandboxPhone 给 EJS；emailRequired:true（从 sheet 获取）；phone 用 SANDBOX_PHONE 预填；流程：sheet→email→createOrder→processPayment；3DS 通过 GET order details 解析；#custom-googlepay-btn 复用同一点击流程
-// googlepay-ecs.js      — 双外部 SDK；shippingAddressRequired:true + emailRequired:true + phoneNumberRequired:true；买家在 sheet 选地址/email/phone；mapGooglePayAddress 转地址格式；parsePhoneNumber(E.164, isoCountry)→{country_code,national_number}；buyerName/email/parsedPhone 注入 payment_source.google_pay
+// googlepay-ecs.js      — 双外部 SDK；shippingAddressRequired:true + emailRequired:true + phoneNumberRequired:true + shippingOptionRequired:true；SHIPPING_OPTIONS 数组（Standard $5 / Express $10）；Full Callback 模式（paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }；callbackIntents:['SHIPPING_ADDRESS','SHIPPING_OPTION','PAYMENT_AUTHORIZATION']）；onPaymentAuthorized：用户授权后 Google Pay 调用，createOrder 在此回调内执行，返回 Promise<{transactionState}>；onPaymentDataChanged：INITIALIZE/SHIPPING_ADDRESS→返回 newTransactionInfo+newShippingOptionParameters，SHIPPING_OPTION→仅返回 newTransactionInfo；parsePhoneNumber(E.164, isoCountry)→{country_code,national_number}；buyerName/email/parsedPhone/shippingAmount 注入 create-order；total = item + shippingAmount
 // applepay-ecm.js       — 自定义路由；GET 传 sandboxShipping 给 EJS；create-order 含 payment_source.apple_pay.experience_context（return_url/cancel_url；token 由 confirmOrder 注入）；capture-order 标准；extraScripts 加载 `https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js`
 // applepay-ecs.js       — 自定义路由；ECS 流程；GET 无 sandboxShipping（买家在 sheet 选）；create-order 接收 shippingContact + shippingAmount；payment_source.apple_pay 含 name/email_address/phone_number（national_number only，无 country_code）/experience_context；normalizeContact() 剥离非数字；total = item + shippingAmount
 // vault-*-setup-only.js — /v3/vault/setup-tokens API
@@ -239,10 +239,26 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
       return
     }
     ```
-14. **Google Pay 必须用 Promise 模式，不能用 Callback 模式**（3DS 场景）：
-    - **Callback 模式**（`paymentDataCallbacks: { onPaymentAuthorized }` + `callbackIntents: ['PAYMENT_AUTHORIZATION']`）：Google Pay sheet 会等 callback 的 Promise resolve 才关闭。`initiatePayerAction` 触发 3DS 窗口时 sheet 仍覆盖屏幕，3DS 被挡住，sheet 超时报错。
-    - **Promise 模式**（当前实现）：`PaymentsClient()` 不传 `paymentDataCallbacks`，`loadPaymentData` 不设 `callbackIntents`。用户授权后 sheet 自动关闭，`loadPaymentData` Promise resolve，此时屏幕干净，`initiatePayerAction` 的 3DS 窗口可正常弹出。
-    - 代码结构：`loadPaymentData(req).then(function(paymentData) { return processPayment(paymentData) })`
+14. **Google Pay ECM 用 Promise 模式，ECS 用 Full Callback 模式**：
+
+    **ECM — Promise 模式**（当前 ECM 实现，无任何 callbacks）：
+    - 不传 `paymentDataCallbacks`，不设 `callbackIntents`
+    - 代码：`loadPaymentData(req).then(function(paymentData) { createOrder → processPayment })`
+    - 用户授权后 sheet 自动关闭，Promise resolve，屏幕干净，3DS 窗口可正常弹出
+
+    **ECS — Full Callback 模式**（当前 ECS 实现，因 `onPaymentDataChanged` 需要）：
+    - ECS 需要 `onPaymentDataChanged` 在 sheet 内动态更新运费，只要注册 `paymentDataCallbacks`，Google Pay 就强制进入 Full Callback 模式
+    - `PaymentsClient` 传 `paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }`
+    - `callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION', 'PAYMENT_AUTHORIZATION']`
+    - 用户 tap Pay → Google Pay 调 `onPaymentAuthorized` → sheet 转为"处理中"转圈状态 → createOrder 在此回调内执行 → 3DS popup 在 sheet 处理中状态下弹出（可正常交互）
+    - `onPaymentAuthorized` 必须返回 `Promise<{ transactionState: 'SUCCESS' | 'ERROR' }>`，只能 resolve（失败用 ERROR，不能 reject）
+
+    **Google Pay API 强制规则（违反 → OR_BIBED_06）：**
+    - 只要构造 `PaymentsClient` 时传入 `paymentDataCallbacks`（哪怕只有 `onPaymentDataChanged`），`callbackIntents` **必须**包含 `'PAYMENT_AUTHORIZATION'`，且**必须**提供 `onPaymentAuthorized` → 否则 OR_BIBED_06
+    - `'SHIPPING_ADDRESS'` 必须在 `callbackIntents` 里才能触发 `INITIALIZE` 回调（sheet 打开时立即调用，展示初始运费选项）
+    - `shippingOptions` 对象只允许 `{id, label, description}`，不能含 `price`、`selected` 等额外字段
+    - `onPaymentDataChanged` 返回规则：INITIALIZE/SHIPPING_ADDRESS → 同时返回 `newTransactionInfo` + `newShippingOptionParameters`；SHIPPING_OPTION → 只返回 `newTransactionInfo`（不传 `newShippingOptionParameters`）
+    - 初始请求 `totalPriceStatus: 'ESTIMATED'`（总价会变化），`onPaymentDataChanged` 回调里用 `'FINAL'`（运费已选定，总价确定）
 
 15. **Google Pay 3DS 路径**（与 ACDC 不同，ECM 和 ECS 相同）：Google Pay 无前端 `liabilityShift`，`confirmOrder` 返回 `PAYER_ACTION_REQUIRED` 时需 `initiatePayerAction` → **GET order details** → 从 `payment_source.google_pay.card.authentication_result`（比 ACDC 多一层 `google_pay`）读取 `liability_shift`、`three_d_secure.enrollment_status`、`three_d_secure.authentication_status`，再决定 capture 还是 reject：
     - `liability_shift === 'POSSIBLE'` → capture
@@ -308,7 +324,7 @@ EJS 文件职责：
 | `public/js/paypal/jssdk-v5/applepay-ecm.js` | applepay-ecm（已实现；完整 ApplePaySession 流程；`confirmOrder` 响应 `{ approveApplePayPayment }` 解包后检查 `.status === 'APPROVED'`；3DS 由 Apple Pay 协议内部处理；ECM 无 shippingFields） |
 | `public/js/paypal/jssdk-v5/applepay-ecs.js` | applepay-ecs（已实现；ECS 流程；`SHIPPING_METHODS` 数组；`onshippingmethodselected` + `onshippingcontactselected`；`normalizeContact()` 剥离非数字；createOrder 带 shippingContact + shippingAmount；`payment_source.apple_pay` 含 name/email/phone） |
 | `public/js/paypal/jssdk-v5/googlepay-ecm.js` | googlepay-ecm（已实现；Promise 模式；`emailRequired:true`；流程：sheet 先开→获取 email→createOrder（email + SANDBOX_PHONE 注入 payment_source）→processPayment；singleton paymentsClient/googlepayConfig、handle3DS、doCapture；custom button 绑定 hover/press/click） |
-| `public/js/paypal/jssdk-v5/googlepay-ecs.js` | googlepay-ecs（已实现；`shippingAddressRequired:true` + `emailRequired:true` + `phoneNumberRequired:true`；`COUNTRY_DIAL` + `parsePhoneNumber()` 把 E.164 → `{ country_code, national_number }`；ECS 流程：sheet 先开→提取 name/email/phone/address→createOrder→processPayment；3DS 路径与 ECM 相同） |
+| `public/js/paypal/jssdk-v5/googlepay-ecs.js` | googlepay-ecs（已实现；`shippingAddressRequired:true` + `emailRequired:true` + `phoneNumberRequired:true` + `shippingOptionRequired:true`；`SHIPPING_OPTIONS` 数组（Standard $5 / Express $10）；`chosenShipping` 模块状态；**Full Callback 模式**：`paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }`，`callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION', 'PAYMENT_AUTHORIZATION']`；`onPaymentAuthorized`：createOrder 在此回调内执行，返回 `Promise<{transactionState}>`；`onPaymentDataChanged`：INITIALIZE/SHIPPING_ADDRESS→`newTransactionInfo+newShippingOptionParameters`，SHIPPING_OPTION→仅 `newTransactionInfo`；`shippingOptions` 只含 `{id,label,description}`；`COUNTRY_DIAL` + `parsePhoneNumber()` 把 E.164 → `{ country_code, national_number }`；3DS 路径与 ECM 相同） |
 
 **新增 JS 文件时的规范：**
 - 用 IIFE 包裹（`(function() { 'use strict'; ... })()`）

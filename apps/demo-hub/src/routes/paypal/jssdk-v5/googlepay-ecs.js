@@ -51,24 +51,29 @@ router.get('/googlepay-ecs', (req, res) => {
 
 router.post('/api/googlepay-ecs/create-order', async (req, res) => {
   try {
-    const amount = req.body.amount || demoParams.DEFAULT_AMOUNT
-    const currency = resolveCurrency(req.body.currency)
-    const scaMethod   = SCA_METHODS.includes(req.body.scaMethod) ? req.body.scaMethod : 'SCA_WHEN_REQUIRED'
-    const shippingRaw = req.body.shippingAddress || null
-    const buyerName   = req.body.buyerName   || null
-    const email       = req.body.email       || null
-    const parsedPhone = req.body.parsedPhone || null  // { country_code, national_number }
+    const amount        = req.body.amount || demoParams.DEFAULT_AMOUNT
+    const currency      = resolveCurrency(req.body.currency)
+    const scaMethod     = SCA_METHODS.includes(req.body.scaMethod) ? req.body.scaMethod : 'SCA_WHEN_REQUIRED'
+    const shippingRaw   = req.body.shippingAddress || null
+    const buyerName     = req.body.buyerName   || null
+    const email         = req.body.email       || null
+    const parsedPhone   = req.body.parsedPhone || null  // { country_code, national_number }
+    const shippingAmount = req.body.shippingAmount || '0.00'
 
     const amountErr = demoParams.validateAmount(amount, currency)
     if (amountErr) return res.status(400).json({ error: amountErr })
 
     console.log('[GooglePay ECS] create-order — buyerName:', buyerName, '| email:', email, '| parsedPhone:', parsedPhone)
-    console.log('[GooglePay ECS] shippingAddress from sheet:', shippingRaw)
+    console.log('[GooglePay ECS] shippingAddress from sheet:', shippingRaw, '| shippingAmount:', shippingAmount)
 
-    const token = await getCNToken()
-    const zd = demoParams.isZeroDecimal(currency)
-    const value = zd ? String(Math.round(parseFloat(amount))) : parseFloat(amount).toFixed(2)
-    const amtObj = (c) => ({ currency_code: c, value })
+    const token    = await getCNToken()
+    const zd       = demoParams.isZeroDecimal(currency)
+    const value    = zd ? String(Math.round(parseFloat(amount))) : parseFloat(amount).toFixed(2)
+    const shipVal  = zd ? String(Math.round(parseFloat(shippingAmount))) : parseFloat(shippingAmount).toFixed(2)
+    const totalVal = zd
+      ? String(Math.round(parseFloat(value) + parseFloat(shipVal)))
+      : (parseFloat(value) + parseFloat(shipVal)).toFixed(2)
+    const amtObj = (c, v) => ({ currency_code: c, value: v })
 
     const shippingPayPal = mapGooglePayAddress(shippingRaw)
 
@@ -83,10 +88,13 @@ router.post('/api/googlepay-ecs/create-order', async (req, res) => {
           soft_descriptor: demoParams.DEMO_SOFT_DESCRIPTOR,
           amount: {
             currency_code: currency,
-            value,
-            breakdown: { item_total: amtObj(currency) },
+            value: totalVal,
+            breakdown: {
+              item_total: amtObj(currency, value),
+              shipping:   amtObj(currency, shipVal),
+            },
           },
-          items: [{ ...demoParams.DEMO_ITEM, unit_amount: amtObj(currency) }],
+          items: [{ ...demoParams.DEMO_ITEM, unit_amount: amtObj(currency, value) }],
           ...(shippingPayPal ? { shipping: shippingPayPal } : {}),
         },
       ],
