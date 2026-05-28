@@ -1,13 +1,14 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl
+  sidebarProducts, showSidebar, sdkUrl,
+  extraScripts: [{ url: 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js' }]
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
     <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · Apple Pay</span>
     <h1><%= title %></h1>
-    <p>Apple Pay via PayPal. Requires Safari + Apple Wallet card.</p>
+    <p>Apple Pay via PayPal — Express Checkout Shortcut. Buyer selects shipping address, email, phone, and shipping method inside the Apple Pay sheet. Requires Safari and an Apple Pay–linked card.</p>
   </div>
   <div class="sandbox-card">
     <div class="amount-row">
@@ -31,9 +32,25 @@
     </div>
     <div class="amount-error" id="amount-error" role="alert"></div>
     <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+
+    <div class="field-group" style="margin-bottom:16px">
+      <div class="field-host" style="padding:10px 12px;color:var(--fg-muted);font-size:13px;line-height:1.6;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07)">
+        <span style="color:var(--fg-subtle);font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase">Buyer selects in sheet</span><br>
+        Shipping address · Email address · Phone number · Shipping method
+      </div>
+    </div>
+
     <div id="paypal-button-container" class="sdk-loading">
       <div class="sdk-spinner"></div><span>Loading Apple Pay...</span>
     </div>
+
+    <div style="margin-top:12px">
+      <button id="custom-applepay-btn" type="button" disabled
+        style="width:100%;min-height:44px;padding:0 16px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;color:var(--fg);font-size:13px;font-weight:500;font-family:inherit;letter-spacing:0.02em;cursor:not-allowed;opacity:0.45;transition:background 150ms ease,border-color 150ms ease,transform 100ms ease"
+      >Custom Apple Pay Button<span style="font-size:10px;padding:2px 5px;background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.25);border-radius:3px;color:#c97a10;letter-spacing:0.06em;font-weight:600;line-height:1.4">DEMO</span></button>
+      <p style="margin:6px 0 0;font-size:11px;color:var(--fg-muted);text-align:center;opacity:.7">Functional but not recommended for production</p>
+    </div>
+
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
   </div>
 </div>
@@ -43,9 +60,9 @@
     urls: {
       createOrder:  '/paypal/jssdk-v5/api/applepay-ecs/create-order',
       captureOrder: '/paypal/jssdk-v5/api/applepay-ecs/capture-order',
-    }
+    },
   }
 </script>
-<%# applepay.js 待实现 %>
+<script src="/js/paypal/jssdk-v5/applepay-ecs.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>

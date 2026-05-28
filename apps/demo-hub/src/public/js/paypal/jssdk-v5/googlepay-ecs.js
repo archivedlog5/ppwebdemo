@@ -208,12 +208,12 @@
       customBtn.style.opacity = '1'
       customBtn.style.cursor = 'pointer'
       customBtn.addEventListener('mouseenter', function () {
-        this.style.background = 'rgba(255,255,255,0.09)'
-        this.style.borderColor = 'rgba(255,255,255,0.18)'
+        this.style.background = 'var(--border)'
+        this.style.borderColor = 'var(--border-hi)'
       })
       customBtn.addEventListener('mouseleave', function () {
-        this.style.background = 'rgba(255,255,255,0.05)'
-        this.style.borderColor = 'rgba(255,255,255,0.10)'
+        this.style.background = 'var(--surface2)'
+        this.style.borderColor = 'var(--border-hi)'
       })
       customBtn.addEventListener('mousedown', function () {
         this.style.transform = 'scale(0.98)'

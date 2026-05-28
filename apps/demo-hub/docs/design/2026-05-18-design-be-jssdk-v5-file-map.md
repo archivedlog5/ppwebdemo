@@ -120,18 +120,229 @@ liabilityShift 来自 onApprove data（客户端）：
 
 ---
 
-## Apple Pay（工厂路由）
+## Apple Pay（自定义路由）
 
-### applepay-ecm / applepay-ecs
+### applepay-ecm — Apple Pay Express Checkout Mark（2026-05-28 完成）
+
+> ECM = 商户侧预填收货地址，买家在 Apple Pay sheet 里提供账单信息，`requiredBillingContactFields` 只含 billing 字段，无 shippingFields。
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 applepay-ecm | `src/routes/paypal/jssdk-v5/applepay-ecm.js` | `sdkParams: 'components=applepay&currency=USD'`；create/capture 同工厂 |
-| 路由 applepay-ecs | `src/routes/paypal/jssdk-v5/applepay-ecs.js` | 同 ECM，可在 orderBody 加 experience_context |
-| EJS 视图 | `src/views/paypal/jssdk-v5/applepay-ecm.ejs` | `window.DEMO.urls`；`#paypal-button-container` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/applepay.js` | **⏳ 待实现**：`paypalSDK.Applepay()`、`ApplePaySession`、`validateMerchant`、`paymentauthorized` 回调 |
+| 路由 + API | `src/routes/paypal/jssdk-v5/applepay-ecm.js` | **自定义路由**（非工厂）；GET 传 `sandboxShipping` 给 EJS；create-order 含 `payment_source.apple_pay.experience_context`（return_url/cancel_url；token 仍由 `confirmOrder` 注入）；capture-order 标准；SDK 参数 `components=applepay` |
+| EJS 视图 | `src/views/paypal/jssdk-v5/applepay-ecm.ejs` | `extraScripts` 加载 `apple-pay-sdk.js`（`applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js`，注册 `<apple-pay-button>` web component）；currency + amount 选择器；只读 Shipping 展示区；`#paypal-button-container`（放 `<apple-pay-button>` web component）；`#custom-applepay-btn`（初始 `disabled`）；加载 `applepay-ecm.js` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/applepay-ecm.js` | ECM 专用；完整 console.log 日志；见下方函数一览 |
 
-**前提条件：** Safari on macOS/iOS、Apple Wallet 测试卡、domain 验证
+**前提条件：** Safari on macOS/iOS、Apple Wallet 测试卡、domain 验证（sandbox 下 localhost 可用）
+
+---
+
+#### 后端 API（`applepay-ecm.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/applepay-ecm` | GET | 渲染页面；传 `sandboxShipping`（camelCase 格式，同 Google Pay ECM）给 EJS |
+| `/api/applepay-ecm/create-order` | POST | 读 `{ amount, currency }`；标准 order body（无 `payment_source`）；返回 `{ id }` |
+| `/api/applepay-ecm/capture-order` | POST | 读 `{ orderID }`；capture 并返回完整 order JSON |
+
+**create-order body（`payment_source.apple_pay.experience_context`；token 由 `confirmOrder` 注入）：**
+
+```js
+{
+  intent: 'CAPTURE',
+  purchase_units: [{
+    reference_id:    demoParams.DEMO_REFERENCE_ID,
+    description:     demoParams.DEMO_DESCRIPTION,
+    invoice_id:      `INV-${Date.now()}`,
+    custom_id:       demoParams.DEMO_CUSTOM_ID,
+    soft_descriptor: demoParams.DEMO_SOFT_DESCRIPTOR,
+    amount: { currency_code, value, breakdown: { item_total } },
+    items:  [{ ...demoParams.DEMO_ITEM, unit_amount }],
+    shipping: demoParams.SANDBOX_SHIPPING,   // 商户预填，不出现在 Apple Pay sheet
+  }],
+  payment_source: {
+    apple_pay: {
+      experience_context: {   // return_url / cancel_url；token 无需在此指定
+        return_url: `${protocol}://${host}/paypal/jssdk-v5/applepay-ecm`,
+        cancel_url: `${protocol}://${host}/paypal/jssdk-v5/applepay-ecm`,
+      },
+    },
+  },
+}
+```
+
+---
+
+#### 前端函数一览（`applepay-ecm.js`）
+
+| 函数 | 类型 | 职责 |
+|------|------|------|
+| `getCurrency()` | UI helper | 读 `#demo-currency` |
+| `getAmount()` | UI helper | 读 `#demo-amount` |
+| `isZeroDecimal(currency)` | UI helper | 判断零小数位货币 |
+| `validateAmount()` | UI helper | 金额校验（$1–$30,000，零小数位校验） |
+| `showResult(text, type)` | UI helper | 写 `#result` 展示结果 |
+| `clearLoading()` | UI helper | 清空 `#paypal-button-container` loading 状态 |
+| `setupApplepay()` | setup | 检测 `ApplePaySession.supportsVersion(4)` + `canMakePayments()` → `paypalSDK.Applepay().config()` → 创建 `<apple-pay-button>` web component → 启用 `#custom-applepay-btn` |
+| `onApplePayButtonClicked()` | handler | 验证金额 → 构建 `paymentRequest`（`requiredBillingContactFields`）→ `new ApplePaySession(4, ...)` → 注册 3 个事件处理器 → `session.begin()` |
+| `onvalidatemerchant handler` | session event | `applepayInstance.validateMerchant({ validationUrl })` → `session.completeMerchantValidation(payload.merchantSession)` |
+| `onpaymentmethodselected handler` | session event | `session.completePaymentMethodSelection({ newTotal })` |
+| `onpaymentauthorized handler` | session event | createOrder → `confirmOrder({ orderId, token, billingContact, shippingContact })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `.status === 'APPROVED'` → captureOrder → 检查 `COMPLETED` → `session.completePayment(STATUS_SUCCESS/FAILURE)` |
+
+---
+
+#### Apple Pay ECM 完整 SDK 调用链
+
+```
+window load
+  ├─ [LOG] urls
+  ├─ 检测 ApplePaySession.supportsVersion(4) + canMakePayments()
+  ├─ paypalSDK.Applepay().config()
+  │   └─ [LOG] countryCode, merchantCapabilities, supportedNetworks
+  ├─ 创建 <apple-pay-button> web component（type=buy，buttonstyle=black）
+  └─ 启用 #custom-applepay-btn，绑定 hover/press/click
+
+onApplePayButtonClicked()   ← 按钮点击
+  ├─ validateAmount()
+  ├─ [LOG] amount, currency, value
+  ├─ 构建 paymentRequest（requiredBillingContactFields: ['name','phone','email','postalAddress']）
+  ├─ new ApplePaySession(4, paymentRequest)
+  └─ session.begin()
+
+onvalidatemerchant
+  ├─ applepayInstance.validateMerchant({ validationUrl: event.validationURL })
+  │   └─ [LOG] merchantSession
+  └─ session.completeMerchantValidation(payload.merchantSession)
+
+onpaymentmethodselected
+  └─ session.completePaymentMethodSelection({ newTotal })
+
+onpaymentauthorized                        ← 用户 Touch ID / Face ID 授权后触发
+  ├─ [LOG] event.payment（token, billingContact, shippingContact）
+  ├─ fetch createOrder（body: { amount, currency }）
+  │   └─ [LOG] response + orderId → createdOrderId
+  ├─ applepayInstance.confirmOrder({ orderId, token, billingContact, shippingContact })
+  │   └─ [LOG] confirmResult → confirmResult.approveApplePayPayment, status
+  ├─ 检查 confirmResult.approveApplePayPayment.status === 'APPROVED'（否则 → STATUS_FAILURE）
+  ├─ fetch captureOrder（body: { orderID: createdOrderId }）
+  │   └─ [LOG] order, capture 对象
+  ├─ 检查 captures[0].status === 'COMPLETED'
+  ├─ session.completePayment({ status: STATUS_SUCCESS })  ← 成功
+  └─ showResult('✓ Payment captured · Order: <id>', 'success')
+
+oncancel
+  └─ [LOG] session cancelled
+```
+
+---
+
+#### Apple Pay ECM vs Google Pay ECM 关键差异
+
+| 维度 | Apple Pay ECM | Google Pay ECM |
+|------|--------------|----------------|
+| 外部 SDK | 无额外 script（内置于 Safari/WebKit）| `pay.google.com/gp/p/js/pay.js` |
+| 按钮元素 | `<apple-pay-button>` web component + CSS | `google.payments.api.PaymentsClient().createButton()` |
+| 3DS 处理 | Apple Pay 协议内部处理（无需 initiatePayerAction）| `initiatePayerAction` → GET order → 解析 `authentication_result` |
+| create-order 时机 | **onpaymentauthorized 内部**（sheet 已显示 → 用户授权 → 然后 createOrder）| sheet 关闭后（loadPaymentData Promise resolve 后）→ createOrder |
+| payment_source in create-order | **有**（`payment_source.apple_pay.experience_context`；token 由 confirmOrder 注入，无需指定 apple_pay token）| **有**（`payment_source.google_pay`：email、phone、experience_context、attributes） |
+| 3DS 检查方式 | 无（Apple Pay 负责）| GET order details → `payment_source.google_pay.card.authentication_result` |
+| completePayment 要求 | **必须始终调用** `session.completePayment()`（success 或 failure）| 无对应机制 |
+
+### applepay-ecs — Apple Pay Express Checkout Shortcut（2026-05-28 完成）
+
+> ECS = 买家在 Apple Pay sheet 里选择收货地址、email、电话，并选择 shipping 方式。`shippingContact` 从 `onpaymentauthorized` 提取注入 order。
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 + API | `src/routes/paypal/jssdk-v5/applepay-ecs.js` | **自定义路由**；GET 无 sandboxShipping（买家 sheet 里选）；create-order 接收 `{ amount, currency, shippingContact, billingContact, shippingAmount }`；`mapApplePayShipping()` 转地址格式；`parseApplePayPhone()` 只返回 `{ national_number: digits }`（无 country_code）；`payment_source.apple_pay` 含 name/email/phone/experience_context；total = item + shippingAmount |
+| EJS 视图 | `src/views/paypal/jssdk-v5/applepay-ecs.ejs` | `extraScripts` 加载 `apple-pay-sdk.js`；currency + amount 选择器；"Buyer selects in sheet" 信息区（shipping address / email / phone / shipping method）；`#paypal-button-container` + `#custom-applepay-btn` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/applepay-ecs.js` | ECS 专用；含 `SHIPPING_METHODS`、`normalizeContact()`、`fmtAmt()`、`calcTotal()` |
+
+#### 后端 API（`applepay-ecs.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/applepay-ecs` | GET | 渲染页面（无 sandboxShipping） |
+| `/api/applepay-ecs/create-order` | POST | 读 `{ amount, currency, shippingContact, billingContact, shippingAmount }`；`mapApplePayShipping(sc)` 转 PayPal shipping；`parseApplePayPhone(sc.phoneNumber)` → `{ national_number: digits }`；total = item + shipping；`payment_source.apple_pay` 含 name/email_address/phone_number/experience_context；返回 `{ id }` |
+| `/api/applepay-ecs/capture-order` | POST | 读 `{ orderID }`；capture 并返回完整 order JSON |
+
+**create-order body（`payment_source.apple_pay` 含 name/email/phone，与 ECM 不同）：**
+
+```js
+{
+  intent: 'CAPTURE',
+  purchase_units: [{
+    reference_id, description, invoice_id, custom_id, soft_descriptor,
+    amount: {
+      currency_code: currency, value: totalVal,
+      breakdown: {
+        item_total: { currency_code, value },
+        shipping:   { currency_code, value: shipVal },
+      },
+    },
+    items:    [{ ...DEMO_ITEM, unit_amount }],
+    shipping: mapApplePayShipping(shippingContact),   // 买家在 sheet 选的地址
+  }],
+  payment_source: {
+    apple_pay: {
+      ...(buyerName ? { name:          buyerName } : {}),
+      ...(email     ? { email_address: email }     : {}),
+      ...(phone     ? { phone_number:  phone }     : {}),  // { national_number: digits }
+      experience_context: { return_url, cancel_url },
+    },
+  },
+}
+```
+
+**地址格式转换 `mapApplePayShipping(sc)`：**
+
+```
+Apple Pay shippingContact:     →   PayPal shipping:
+  givenName + familyName       →     name.full_name
+  addressLines[0]              →     address.address_line_1
+  locality                     →     address.admin_area_2
+  administrativeArea           →     address.admin_area_1
+  postalCode                   →     address.postal_code
+  countryCode                  →     address.country_code
+```
+
+**电话格式转换（`parseApplePayPhone`）：**
+
+Apple Pay `shippingContact.phoneNumber` 可能是 E.164 格式（`+14089741010`）。PayPal `payment_source.apple_pay.phone_number` 只需 `{ national_number: digits }`（无 `country_code`，与 Google Pay 不同）。
+
+```
+rawPhone: "+14089741010"
+  digits = rawPhone.replace(/\D/g, '')  → "14089741010"
+  return { national_number: "14089741010" }
+  // 不剥离 dial code，不需要 country_code
+```
+
+前端 `normalizeContact()` 同理（剥离非数字，PayPal `confirmOrder` 内部映射会拒绝 "+"）：
+
+```js
+function normalizeContact(contact) {
+  if (!contact || !contact.phoneNumber) return contact
+  var phone = String(contact.phoneNumber)
+  if (phone.charAt(0) !== '+') return contact
+  var copy = {}
+  for (var k in contact) { if (Object.prototype.hasOwnProperty.call(contact, k)) copy[k] = contact[k] }
+  copy.phoneNumber = phone.replace(/\D/g, '')
+  return copy
+}
+```
+
+#### Apple Pay ECS vs ECM 关键差异
+
+| 维度 | Apple Pay ECM | Apple Pay ECS |
+|------|--------------|----------------|
+| `requiredShippingContactFields` | 无 | `['name','phone','email','postalAddress']` |
+| `shippingMethods` in paymentRequest | 无 | `[{ label, amount, detail, identifier }]` |
+| `shippingType` | 无 | `'shipping'` |
+| `onshippingmethodselected` | 无 | 更新 `chosenShipping`，调 `completeShippingMethodSelection({ newTotal, newLineItems })` |
+| `onshippingcontactselected` | 无 | 调 `completeShippingContactSelection({ newTotal, newLineItems })`（本 demo 不按地址重算） |
+| shipping 来源 | 商户预填 `SANDBOX_SHIPPING` | `event.payment.shippingContact` → `mapApplePayShipping()` |
+| name/email/phone in payment_source | 无 | 从 `shippingContact` 提取 |
+| total 计算 | 只含 item | item + `chosenShipping.amount`（`breakdown` 含 `shipping`） |
+| `normalizeContact()` | 无需（ECM 不需剥非数字） | 需要（Apple Pay E.164 → 纯数字，`confirmOrder` 拒绝 "+"）|
 
 ---
 
@@ -422,7 +633,7 @@ rawPhone: "+14155552671"  +  isoCountry: "US"
 |------|------|---------|
 | 路由 | `src/routes/paypal/jssdk-v5/vault-applepay-with-purchase.js` | `paymentSource.apple_pay.attributes.vault.store_in_vault: 'ON_SUCCESS'` |
 | EJS | `src/views/paypal/jssdk-v5/vault-applepay-with-purchase.ejs` | `sdkUrl` 含 `vault=true` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/applepay.js` | **⏳ 待实现**（同 applepay-ecm 共用） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/applepay-ecm.js` | `applepay-ecm.js` 目前只含 ECM 逻辑；vault-applepay 需独立实现或扩展 |
 
 ---
 
@@ -469,7 +680,8 @@ rawPhone: "+14155552671"  +  isoCountry: "US"
 | **spb-ecs** | `components=buttons&commit=false&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort` | ECS：`commit=false` 显示 "Continue" |
 | **buttons** | CN: `components=buttons,funding-eligibility&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort&currency=${currency}` / US: 同 CN + `&enable-funding=venmo` | 双 SDK，`funding-eligibility` 组件必须，`isEligible()` 依赖它；currency 由路由注入 |
 | **acdc** | `components=card-fields` | 不能和 buttons 混用 |
-| **applepay-ecm/ecs** | `components=applepay` | 需 Safari + Apple Wallet |
+| **applepay-ecm** | `components=applepay&currency=${currency}` + extraScripts: `applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js` | 自定义路由；需 Safari + Apple Wallet |
+| **applepay-ecs** | `components=applepay&currency=${currency}` + extraScripts: `applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js` | 自定义路由；ECS 流程；`shippingMethods` 选择；`normalizeContact()` 剥非数字；buyer 在 sheet 选地址/email/phone |
 | **googlepay-ecm** | `components=googlepay&currency=${currency}` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 自定义路由；需 Chrome + Google Pay 卡；3DS select `#demo-sca` |
 | **googlepay-ecs** | `components=googlepay&currency=${currency}` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 自定义路由；`shippingAddressRequired: true`；ECS 流程（sheet 先开）；email + phone + name 从 sheet 获取 |
 | **vault-paypal-with-purchase** | `components=buttons&vault=true` | vault=true 才能 store_in_vault |
@@ -699,6 +911,8 @@ spb.js onApprove callback 收到结果
 | buttons | 自定义路由，双 SDK（cnSdkUrl + usSdkUrl） | 4 个 `Buttons()` 分别 render | 两套 token：getCNToken/getUSToken |
 | vault-*-with-purchase | `createVaultWithPurchaseRoute`，`payment_source` 含 vault 指令 | 同对应产品的 JS | capture 返回值含 `vaultId` |
 | vault-*-setup-only | 自定义路由，`/v3/vault/setup-tokens` | `Buttons({ createVaultSetupToken })` | 无 capture，返回 `paymentTokenId` |
+| applepay-ecm | 自定义路由，`components=applepay`；Apple Pay button CSS from `applepay.cdn-apple.com` | `setupApplepay()` → `ApplePaySession` → `validateMerchant` → `completeMerchantValidation` | **onpaymentauthorized 内**：createOrder（含 `payment_source.apple_pay.experience_context`）→ `confirmOrder({ orderId, token, billingContact, shippingContact })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `APPROVED` → capture；3DS 由 Apple Pay 协议内部处理；`session.completePayment()` 必须始终调用 |
+| applepay-ecs | 自定义路由，`components=applepay`；双按钮（`<apple-pay-button>` + `#custom-applepay-btn`） | `setupApplepay()` → `ApplePaySession`（含 `shippingMethods`、`requiredShippingContactFields`）；`onshippingmethodselected` + `onshippingcontactselected` 更新 total/lineItems | **onpaymentauthorized 内**：提取 shippingContact → createOrder（`mapApplePayShipping` + `parseApplePayPhone`→`{national_number}` → `payment_source.apple_pay` 含 name/email/phone）→ `confirmOrder({ orderId, token, billingContact: normalizeContact(bc), shippingContact: normalizeContact(sc) })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `APPROVED` → capture → COMPLETED |
 | googlepay-ecm | 自定义路由，`components=googlepay`，双外部 SDK（PayPal + Google Pay） | sheet 先开（`emailRequired:true`）→ 获取 email → createOrder（email + SANDBOX_PHONE 注入 payment_source）→ processPayment → confirmOrder → doCapture | `shippingAddressRequired: false`；**Promise 模式**；phone 商户预填 SANDBOX_PHONE；email 从 sheet 获取；3DS 需 GET order details |
 | googlepay-ecs | 自定义路由，同 ECM 双外部 SDK | sheet 先开（`shippingAddressRequired: true`，`emailRequired: true`，`phoneNumberRequired: true`）→ 获取 name/email/phone/address → parsePhoneNumber（E.164→PayPal）→ createOrder → processPayment | address 由买家在 sheet 选；name/email/phone 全部注入 payment_source.google_pay；3DS 路径同 ECM |
 | vault-return | 自定义路由，`/v2/checkout/orders` + capture 一步完成 | 无 SDK，纯 fetch | 无 PayPal 弹窗，纯服务端 |
@@ -849,8 +1063,8 @@ router.post('/api/<product>/create-order', async (req, res) => {
 |------------|------|----------------|
 | `spb-ecm.js` | 工厂 | ✅ 已迁移 |
 | `spb-ecs.js` | 工厂 | ⏳ 待迁移 |
-| `applepay-ecm.js` | 工厂 | ⏳ 待迁移 |
-| `applepay-ecs.js` | 工厂 | ⏳ 待迁移 |
+| `applepay-ecm.js` | **自定义** | N/A（直接控制 POST handler）|
+| `applepay-ecs.js` | **自定义** | N/A（直接控制 POST handler）|
 | `googlepay-ecm.js` | 自定义（已改） | N/A（直接控制 POST handler）|
 | `googlepay-ecs.js` | 工厂 | ⏳ 待迁移（或改自定义） |
 | `vault-paypal-with-purchase.js` | 工厂 | ⏳ 待迁移 |

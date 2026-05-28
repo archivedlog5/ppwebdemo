@@ -164,6 +164,8 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // acdc.js               — CardFields SDK
 // googlepay-ecm.js      — 双外部 SDK（PayPal + Google Pay）；需传 sandboxShipping + sandboxPhone 给 EJS；emailRequired:true（从 sheet 获取）；phone 用 SANDBOX_PHONE 预填；流程：sheet→email→createOrder→processPayment；3DS 通过 GET order details 解析；#custom-googlepay-btn 复用同一点击流程
 // googlepay-ecs.js      — 双外部 SDK；shippingAddressRequired:true + emailRequired:true + phoneNumberRequired:true；买家在 sheet 选地址/email/phone；mapGooglePayAddress 转地址格式；parsePhoneNumber(E.164, isoCountry)→{country_code,national_number}；buyerName/email/parsedPhone 注入 payment_source.google_pay
+// applepay-ecm.js       — 自定义路由；GET 传 sandboxShipping 给 EJS；create-order 含 payment_source.apple_pay.experience_context（return_url/cancel_url；token 由 confirmOrder 注入）；capture-order 标准；extraScripts 加载 `https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js`
+// applepay-ecs.js       — 自定义路由；ECS 流程；GET 无 sandboxShipping（买家在 sheet 选）；create-order 接收 shippingContact + shippingAmount；payment_source.apple_pay 含 name/email_address/phone_number（national_number only，无 country_code）/experience_context；normalizeContact() 剥离非数字；total = item + shippingAmount
 // vault-*-setup-only.js — /v3/vault/setup-tokens API
 // vault-return.js       — 用户提供 vault token
 ```
@@ -250,6 +252,17 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 
 16. **Google Pay ECS 电话格式转换**：Google Pay 返回 E.164（`+14155552671`），PayPal `payment_source.google_pay.phone_number` 需要 `{ country_code: '1', national_number: '4155552671' }`。转换方式：strip 非数字 → 用 `COUNTRY_DIAL[shippingAddress.countryCode]`（ISO→拨号代码）找 dialCode → 若 digits 以 dialCode 开头则剥离，剩余为 `national_number`。`COUNTRY_DIAL` 覆盖所有支持货币对应国家。
 
+18. **Apple Pay 流程关键规则**：
+    - **ECM `create-order` 含 `payment_source.apple_pay.experience_context`（return_url/cancel_url）**；token 仍由 `confirmOrder` 注入，无需在 create-order 里指定 Apple Pay token
+    - **ECS `create-order` 的 `payment_source.apple_pay`** 还额外包含从 `shippingContact` 提取的 `name`、`email_address`、`phone_number`（仅 `{ national_number: digits }`，无 `country_code`）
+    - **create-order 在 `onpaymentauthorized` 内部执行**（与 Google Pay 不同，Google Pay 在 sheet 关闭后先 createOrder）；Apple Pay 的整个 createOrder→confirmOrder→capture 链都在 `onpaymentauthorized` 回调中
+    - **必须始终调用 `session.completePayment()`**：无论成功还是失败，否则 Apple Pay sheet 卡住；成功用 `STATUS_SUCCESS`，失败用 `STATUS_FAILURE`
+    - **`confirmOrder` 返回 `{ approveApplePayPayment: { status, ... } }`**；取 `confirmResult.approveApplePayPayment`，再检查 `.status === 'APPROVED'`
+    - **3DS 由 Apple Pay 协议内部处理**（设备 + Touch ID/Face ID），无需 `initiatePayerAction` 或 GET order details
+    - **ECM**: `requiredBillingContactFields: ['name','phone','email','postalAddress']`，无 shippingFields
+    - **ECS**: 额外加 `requiredShippingContactFields: ['name','phone','email','postalAddress']`；`shippingMethods` 数组；`onshippingmethodselected` + `onshippingcontactselected`；`normalizeContact()` 剥离 phoneNumber 中非数字（E.164 含 `+` → 纯数字）
+    - **Apple Pay `phone_number` 格式**：仅 `{ national_number: digits }`，无 `country_code`（与 Google Pay 不同，Google Pay 需要两个字段）
+
 17. **Google Pay ECM vs ECS 的 phone 来源不同**：
     - ECM（`shippingAddressRequired: false`）：sheet 无地址区域，无法收电话 → 用 `demoParams.SANDBOX_PHONE`（商户预填）注入 `payment_source.google_pay.phone_number`
     - ECS（`shippingAddressRequired: true`）：sheet 收集地址 + 电话 → `paymentData.shippingAddress.phoneNumber` 经 `parsePhoneNumber()` 转换后注入
@@ -292,7 +305,8 @@ EJS 文件职责：
 | `public/js/paypal/jssdk-v5/buttons.js` | buttons（双 SDK：cnSdkUrl + usSdkUrl） |
 | `public/js/paypal/jssdk-v5/vault-setup.js` | vault-paypal-setup-only |
 | `public/js/paypal/jssdk-v5/vault-return.js` | vault-return |
-| `public/js/paypal/jssdk-v5/applepay.js` | applepay-ecm, applepay-ecs（待实现） |
+| `public/js/paypal/jssdk-v5/applepay-ecm.js` | applepay-ecm（已实现；完整 ApplePaySession 流程；`confirmOrder` 响应 `{ approveApplePayPayment }` 解包后检查 `.status === 'APPROVED'`；3DS 由 Apple Pay 协议内部处理；ECM 无 shippingFields） |
+| `public/js/paypal/jssdk-v5/applepay-ecs.js` | applepay-ecs（已实现；ECS 流程；`SHIPPING_METHODS` 数组；`onshippingmethodselected` + `onshippingcontactselected`；`normalizeContact()` 剥离非数字；createOrder 带 shippingContact + shippingAmount；`payment_source.apple_pay` 含 name/email/phone） |
 | `public/js/paypal/jssdk-v5/googlepay-ecm.js` | googlepay-ecm（已实现；Promise 模式；`emailRequired:true`；流程：sheet 先开→获取 email→createOrder（email + SANDBOX_PHONE 注入 payment_source）→processPayment；singleton paymentsClient/googlepayConfig、handle3DS、doCapture；custom button 绑定 hover/press/click） |
 | `public/js/paypal/jssdk-v5/googlepay-ecs.js` | googlepay-ecs（已实现；`shippingAddressRequired:true` + `emailRequired:true` + `phoneNumberRequired:true`；`COUNTRY_DIAL` + `parsePhoneNumber()` 把 E.164 → `{ country_code, national_number }`；ECS 流程：sheet 先开→提取 name/email/phone/address→createOrder→processPayment；3DS 路径与 ECM 相同） |
 

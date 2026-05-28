@@ -32,7 +32,8 @@
 - [x] **`buttons.js`** — 多按钮双 SDK（PayPal/PayLater/BCDC + Venmo）
 - [x] **`vault-setup.js`** — Vault setup-only（createVaultSetupToken + confirm）
 - [x] **`vault-return.js`** — Return buyer（纯 fetch，无 SDK）
-- [ ] **`applepay.js`** — Apple Pay（ApplePaySession + validateMerchant，待实现）
+- [x] **`applepay-ecm.js`** — Apple Pay ECM（`ApplePaySession.supportsVersion(4)` + `canMakePayments()` 检测；`paypalSDK.Applepay().config()` → 创建 `<apple-pay-button>` web component + `#custom-applepay-btn`；流程：`onvalidatemerchant` → `validateMerchant()` → `completeMerchantValidation()`；`onpaymentmethodselected` → `completePaymentMethodSelection()`；`onpaymentauthorized` → createOrder（body: `{ amount, currency }`）→ `confirmOrder({ orderId, token, billingContact, shippingContact })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `.status === 'APPROVED'` → capture → 检查 COMPLETED → `completePayment(STATUS_SUCCESS/FAILURE)`；3DS 由 Apple Pay 协议内部处理，无需 `initiatePayerAction`；`requiredBillingContactFields: ['name','phone','email','postalAddress']`（ECM 无 shippingFields））
+- [x] **`applepay-ecs.js`** — Apple Pay ECS（`requiredShippingContactFields: ['name','phone','email','postalAddress']`；`SHIPPING_METHODS` 数组（Standard $5 / Express $10）；`onshippingmethodselected` → 更新 `chosenShipping` → `completeShippingMethodSelection({ newTotal, newLineItems })`；`onshippingcontactselected` → `completeShippingContactSelection({ newTotal, newLineItems })`（不按地址重算）；`normalizeContact()` 剥离 phoneNumber 中非数字（E.164 `+14089741010` → `14089741010`）；`fmtAmt()` + `calcTotal()` 含运费总价；ECS 流程：`onpaymentauthorized` → createOrder（body: `{ amount, currency, shippingContact, billingContact, shippingAmount: chosenShipping.amount }`）→ `confirmOrder({ orderId, token, billingContact: normalizeContact(bc), shippingContact: normalizeContact(sc) })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `.status === 'APPROVED'` → capture → 检查 COMPLETED）
 - [x] **`googlepay-ecm.js`** — Google Pay ECM（命名函数拆分；**Promise 模式**：`PaymentsClient` 无 `paymentDataCallbacks`，`loadPaymentData` 无 `callbackIntents`，sheet 关闭后 Promise resolve 再调 `processPayment`，3DS 窗口不被 sheet 遮挡；`confirmOrder` → PAYER_ACTION_REQUIRED 时 `initiatePayerAction` → `getOrderDetails` → `handle3DS`（解析 `payment_source.google_pay.card.authentication_result`，比 ACDC 多一层 `google_pay`）；`doCapture` 检查 COMPLETED；含 SCA 下拉、完整 console.log 日志；`addGooglePayButton` 额外启用 `#custom-googlepay-btn` 并绑定 hover/press/click）
 - [x] **`googlepay-ecs.js`** — Google Pay ECS（`shippingAddressRequired: true`，`emailRequired: true`，`phoneNumberRequired: true`；ECS 流程：sheet 先开 → 拿到 shippingAddress/email/phone → createOrder → processPayment；`COUNTRY_DIAL` + `parsePhoneNumber()` 把 E.164 电话转成 PayPal `{ country_code, national_number }`；buyerName/email/parsedPhone 注入 `payment_source.google_pay.name/email_address/phone_number`；3DS 逻辑与 ECM 相同）
 
@@ -43,11 +44,12 @@
 - [x] **Task 11** — acdc（使用 `acdc.js`）
 - [x] **Task 14** — vault-paypal-with-purchase（使用 `spb.js`）
 - [x] **Task 14** — vault-acdc-with-purchase（使用 `acdc.js`）
-- [x] **Task 14** — vault-applepay-with-purchase（结构完成，等 `applepay.js`）
+- [x] **Task 14** — vault-applepay-with-purchase（结构完成；`applepay.js` 已创建，可接入）
 - [x] **Task 15** — vault-paypal-setup-only（使用 `vault-setup.js`）
 - [x] **Task 15** — vault-acdc-setup-only（使用 `acdc.js`）
 - [x] **Task 16** — vault-return（使用 `vault-return.js`）
-- [ ] **Task 12** — applepay-ecm, applepay-ecs（等 `applepay.js` 实现）
+- [x] **Task 12a** — applepay-ecm（自定义路由；`sandboxShipping` 传给 EJS 展示；create-order 含 `payment_source.apple_pay.experience_context`（return_url/cancel_url）；`applepay-ecm.js` 处理完整 session 流程；`confirmOrder` 响应解包：`confirmResult.approveApplePayPayment.status === 'APPROVED'`；Apple Pay button CSS from `applepay.cdn-apple.com`）
+- [x] **Task 12b** — applepay-ecs（自定义路由；ECS 流程；`shippingMethods` 选择；`onshippingmethodselected` + `onshippingcontactselected`；`normalizeContact()` 剥非数字；create-order 接收 shippingContact + shippingAmount；`payment_source.apple_pay` 含 name/email_address/phone_number（`national_number` only，无 country_code）/experience_context；total = item + shippingAmount）
 - [x] **Task 13a** — googlepay-ecm（自定义路由：SCA 下拉、reference_id/invoice_id/custom_id/soft_descriptor、return_url+cancel_url、merchant 预填 shipping；Custom Button（#custom-googlepay-btn）；**Promise 模式（无 callbackIntents）**；流程改为先开 sheet（emailRequired:true）→ 获取 email → createOrder（email + SANDBOX_PHONE 注入 payment_source.google_pay.email_address/phone_number）→ processPayment；3DS via GET order details；EJS 地址区显示预填 shipping + 电话）
 - [x] **Task 13b** — googlepay-ecs（已实现：ECS 流程；email/phone/name 从 sheet 获取；parsePhoneNumber E.164 → PayPal 格式；mapGooglePayAddress Google Pay → PayPal 格式；3DS 与 ECM 相同路径）
 
