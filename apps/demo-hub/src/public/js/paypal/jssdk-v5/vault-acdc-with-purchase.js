@@ -1,11 +1,15 @@
 /**
- * PayPal Advanced Credit/Debit Card (ACDC) — CardFields
- * 用于：acdc, vault-acdc-with-purchase, vault-acdc-setup-only
+ * PayPal ACDC Vault with Purchase
+ * 用于：vault-acdc-with-purchase
  *
  * window.DEMO = {
- *   urls: { createOrder: '/...', captureOrder: '/...' },
- *   mode: 'standard' | 'vault-purchase' | 'vault-setup',
- *   defaultAmount: '100.00'
+ *   urls: {
+ *     createOrder:  '/paypal/jssdk-v5/api/vault-acdc-with-purchase/create-order',
+ *     captureOrder: '/paypal/jssdk-v5/api/vault-acdc-with-purchase/capture-order',
+ *     getOrder:     '/paypal/jssdk-v5/api/vault-acdc-with-purchase/order/:orderID',
+ *   },
+ *   billing:       { addressLine1, adminArea2, adminArea1, postalCode, countryCode },
+ *   defaultAmount: '100.00',
  * }
  */
 ;(function () {
@@ -13,14 +17,12 @@
 
   var ZERO_DECIMAL = ['JPY', 'KRW', 'TWD', 'CLP', 'IDR']
 
-  // emittedBy value → container element ID (used for onFocus/onBlur)
   var CONTAINER_BY_EMITTED = {
     number: 'card-number-container',
     expiry: 'card-expiry-container',
     cvv:    'card-cvv-container',
   }
 
-  // stateObject.fields key → container element ID (used for onChange validation)
   var CONTAINER_BY_FIELD = {
     cardNumberField: 'card-number-container',
     cardExpiryField: 'card-expiry-container',
@@ -42,11 +44,15 @@
     return input ? input.value.trim() : ''
   }
 
-function isZeroDecimal(currency) {
+  function getVaultChecked() {
+    var cb = document.getElementById('save-card')
+    return cb ? cb.checked : false
+  }
+
+  function isZeroDecimal(currency) {
     return ZERO_DECIMAL.indexOf(currency) !== -1
   }
 
-  // Currency change → reload page with ?currency=X&amount=Y
   document.addEventListener('DOMContentLoaded', function () {
     var currencySel = document.getElementById('demo-currency')
     if (!currencySel) return
@@ -64,6 +70,16 @@ function isZeroDecimal(currency) {
     if (!el) return
     el.className = 'result-msg ' + type
     el.textContent = text
+  }
+
+  function showVaultResult(vaultId, customerId) {
+    var panel      = document.getElementById('vault-result')
+    var vaultEl    = document.getElementById('vault-id')
+    var customerEl = document.getElementById('customer-id')
+    if (!panel) return
+    if (vaultEl)    vaultEl.textContent    = vaultId    || '(not returned)'
+    if (customerEl) customerEl.textContent = customerId || '(not returned)'
+    panel.style.display = 'block'
   }
 
   function getAmount() {
@@ -109,7 +125,6 @@ function isZeroDecimal(currency) {
     el.innerHTML = ''
   }
 
-  // Update container border class based on per-field validity state
   function updateFieldStates(fields) {
     Object.keys(CONTAINER_BY_FIELD).forEach(function (key) {
       var el = document.getElementById(CONTAINER_BY_FIELD[key])
@@ -133,7 +148,6 @@ function isZeroDecimal(currency) {
       return
     }
 
-    // Format amount on blur
     var amountInput = document.getElementById('demo-amount')
     if (amountInput) {
       amountInput.addEventListener('blur', function () {
@@ -166,6 +180,7 @@ function isZeroDecimal(currency) {
             return
           }
           showResult('✓ Payment captured · Order: ' + order.id, 'success')
+          showVaultResult(order.vaultId, order.customerId)
         })
     }
 
@@ -175,7 +190,14 @@ function isZeroDecimal(currency) {
         return fetch(urls.createOrder, {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ amount: getAmount(), currency: getCurrency(), scaMethod: getSCA(), cardholderName: getName(), billingAddress: (window.DEMO && window.DEMO.billing) || {} }),
+          body:    JSON.stringify({
+            amount:         getAmount(),
+            currency:       getCurrency(),
+            scaMethod:      getSCA(),
+            cardholderName: getName(),
+            billingAddress: (window.DEMO && window.DEMO.billing) || {},
+            saveVault:      getVaultChecked(),
+          }),
         })
           .then(function (r) { return r.json() })
           .then(function (d) {
@@ -185,15 +207,12 @@ function isZeroDecimal(currency) {
       },
       onApprove: function (data) {
         var liabilityShift = data.liabilityShift
-        console.log('[ACDC] 3DS liabilityShift (client):', liabilityShift)
+        console.log('[ACDC-Vault] 3DS liabilityShift (client):', liabilityShift)
 
-        // POSSIBLE → liability shifts to issuer; undefined → 3DS not triggered → capture
         if (!liabilityShift || liabilityShift === 'POSSIBLE') {
           return doCapture(data.orderID)
         }
 
-        // Otherwise fetch server-side enrollment_status + authentication_status
-        // and apply the recommended action table
         var getOrderUrl = urls.getOrder.replace(':orderID', data.orderID)
         return fetch(getOrderUrl)
           .then(function (r) { return r.json() })
@@ -203,16 +222,12 @@ function isZeroDecimal(currency) {
             var ls         = authResult.liability_shift
             var enrollment = threeDS.enrollment_status
             var authStatus = threeDS.authentication_status
-            console.log('[ACDC] 3DS server — liabilityShift:', ls,
+            console.log('[ACDC-Vault] 3DS server — liabilityShift:', ls,
               '| enrollment:', enrollment, '| auth:', authStatus)
 
-            // Continue cases from recommended action table:
-            // enrollment N / U / B with liability_shift NO → continue
             if (ls === 'NO' && (enrollment === 'N' || enrollment === 'U' || enrollment === 'B')) {
               return doCapture(data.orderID)
             }
-
-            // All other cases: do not continue
             if (ls === 'UNKNOWN') {
               showResult('✗ 3D Secure unavailable — please retry.', 'error')
             } else {
@@ -224,13 +239,11 @@ function isZeroDecimal(currency) {
       onError: function (err) {
         showResult('✗ ' + (err.message || String(err)), 'error')
       },
-
       onCancel: function () {
         showResult('3D Secure cancelled — payment not completed.', 'error')
         var payBtn = document.getElementById('acdc-pay-btn')
         if (payBtn) payBtn.disabled = false
       },
-
       style: {
         input: {
           'font-family': "'Space Mono', monospace",
@@ -241,22 +254,18 @@ function isZeroDecimal(currency) {
           color: '#EF4444',
         },
       },
-
       inputEvents: {
         onChange: function (data) {
-          // Card type detection → console
           if (data.cards && data.cards.length > 0) {
             var card = data.cards[0]
-            console.log('[ACDC] Card type:', card.niceType, '(' + card.type + ')')
-            console.log('[ACDC]', card.code.name + ':', card.code.size + ' digits | form valid:', data.isFormValid)
+            console.log('[ACDC-Vault] Card type:', card.niceType, '(' + card.type + ')')
+            console.log('[ACDC-Vault]', card.code.name + ':', card.code.size + ' digits | form valid:', data.isFormValid)
             if (data.errors && data.errors.length > 0) {
-              console.log('[ACDC] Errors:', data.errors.join(', '))
+              console.log('[ACDC-Vault] Errors:', data.errors.join(', '))
             }
           }
-          // Per-field valid/invalid border state
           if (data.fields) updateFieldStates(data.fields)
         },
-
         onFocus: function (data) {
           var id = CONTAINER_BY_EMITTED[data.emittedBy]
           if (id) {
@@ -264,7 +273,6 @@ function isZeroDecimal(currency) {
             if (el) el.classList.add('focused')
           }
         },
-
         onBlur: function (data) {
           var id = CONTAINER_BY_EMITTED[data.emittedBy]
           if (id) {
@@ -276,7 +284,7 @@ function isZeroDecimal(currency) {
     })
 
     if (cardFields.isEligible()) {
-      cardFields.NumberField({ placeholder: '4032030176760800' }).render('#card-number-container')
+      cardFields.NumberField({ placeholder: '4012000033330026' }).render('#card-number-container')
       cardFields.ExpiryField({ placeholder: 'MM / YY' }).render('#card-expiry-container')
       cardFields.CVVField({ placeholder: '•••' }).render('#card-cvv-container')
     } else {

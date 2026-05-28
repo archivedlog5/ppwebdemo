@@ -167,6 +167,7 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // applepay-ecm.js       — 自定义路由；GET 传 sandboxShipping 给 EJS；create-order 含 payment_source.apple_pay.experience_context（return_url/cancel_url；token 由 confirmOrder 注入）；capture-order 标准；extraScripts 加载 `https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js`
 // applepay-ecs.js       — 自定义路由；ECS 流程；GET 无 sandboxShipping（买家在 sheet 选）；create-order 接收 shippingContact + shippingAmount；payment_source.apple_pay 含 name/email_address/phone_number（national_number only，无 country_code）/experience_context；normalizeContact() 剥离非数字；total = item + shippingAmount
 // vault-paypal-with-purchase.js — 完整自定义路由；GET 调 fetchIdToken() 获取 id_token 注入 data-user-id-token；payment_source 在顶层（含 permit_multiple_payment_tokens/description/attributes.customer.merchant_customer_id/experience_context.brand_name/shipping_preference）；capture 返回 vaultId + customerId
+// vault-acdc-with-purchase.js — 完整自定义路由；saveVault=true 时 attributes 加 vault.store_in_vault:ON_SUCCESS + customer.merchant_customer_id（随机 CUST_ 前缀，randomBytes(6)）；3DS select disabled（沙盒限制）；测试卡 4012 0000 3333 0026
 // vault-*-setup-only.js — /v3/vault/setup-tokens API
 // vault-return.js       — 用户提供 vault token
 ```
@@ -319,7 +320,8 @@ EJS 文件职责：
 |---------|--------------|
 | `public/js/paypal/jssdk-v5/spb.js` | spb-ecm, spb-ecs, vault-applepay-with-purchase |
 | `public/js/paypal/jssdk-v5/vault-paypal-with-purchase.js` | vault-paypal-with-purchase（专属；capture 后显示 vaultId + customerId） |
-| `public/js/paypal/jssdk-v5/acdc.js` | acdc, vault-acdc-with-purchase, vault-acdc-setup-only |
+| `public/js/paypal/jssdk-v5/acdc.js` | acdc, vault-acdc-setup-only |
+| `public/js/paypal/jssdk-v5/vault-acdc-with-purchase.js` | vault-acdc-with-purchase（专属；含 `getVaultChecked()` + `showVaultResult()`；`saveVault` 条件 vault attrs；capture 后展示 vault 面板） |
 | `public/js/paypal/jssdk-v5/buttons.js` | buttons（双 SDK：cnSdkUrl + usSdkUrl） |
 | `public/js/paypal/jssdk-v5/vault-paypal-setup-only.js` | vault-paypal-setup-only |
 | `public/js/paypal/jssdk-v5/vault-return.js` | vault-return |
