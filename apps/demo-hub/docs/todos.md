@@ -42,10 +42,10 @@
 - [x] **Task 8/9** — spb-ecm, spb-ecs（使用 `spb.js`）
 - [x] **Task 10** — buttons（使用 `buttons.js`，双 SDK）
 - [x] **Task 11** — acdc（使用 `acdc.js`）
-- [x] **Task 14** — vault-paypal-with-purchase（使用 `spb.js`）
+- [x] **Task 14** — vault-paypal-with-purchase（**完整自定义路由**；GET 调 `fetchIdToken()` 注入 `data-user-id-token`；SDK URL 含 `buyer-country=US&vault=true&enable-funding=paylater&disable-funding=...`；`payment_source` 在顶层（含 `store_in_vault:ON_SUCCESS`、`usage_type:MERCHANT`、`customer_type:CONSUMER`、`permit_multiple_payment_tokens:false`、`description`、`attributes.customer.merchant_customer_id`、`experience_context.brand_name`、`shipping_preference:SET_PROVIDED_ADDRESS`）；capture 返回 `vaultId` + `customerId`；`vault-paypal-with-purchase.js` 专属 JS 展示 Vault Result 面板）
 - [x] **Task 14** — vault-acdc-with-purchase（使用 `acdc.js`）
 - [x] **Task 14** — vault-applepay-with-purchase（结构完成；`applepay.js` 已创建，可接入）
-- [x] **Task 15** — vault-paypal-setup-only（使用 `vault-setup.js`）
+- [x] **Task 15** — vault-paypal-setup-only（自定义路由；GET 调 `fetchIdToken()` 注入 `data-user-id-token`；create-setup-token body 含 `customer.merchant_customer_id`、`description`、`permit_multiple_payment_tokens:false`、`usage_pattern:IMMEDIATE`、`customer_type:CONSUMER`、`experience_context.shipping_preference:NO_SHIPPING`、`payment_method_preference:IMMEDIATE_PAYMENT_REQUIRED`、动态 return_url/cancel_url；confirm-setup-token 返回 `paymentTokenId` + `customerId`；EJS 加 `#vault-result` 面板；`vault-paypal-setup-only.js` 加 `showVaultResult()`）
 - [x] **Task 15** — vault-acdc-setup-only（使用 `acdc.js`）
 - [x] **Task 16** — vault-return（使用 `vault-return.js`）
 - [x] **Task 12a** — applepay-ecm（自定义路由；`sandboxShipping` 传给 EJS 展示；create-order 含 `payment_source.apple_pay.experience_context`（return_url/cancel_url）；`applepay-ecm.js` 处理完整 session 流程；`confirmOrder` 响应解包：`confirmResult.approveApplePayPayment.status === 'APPROVED'`；Apple Pay button CSS from `applepay.cdn-apple.com`）

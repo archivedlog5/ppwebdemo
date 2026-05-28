@@ -166,6 +166,7 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // googlepay-ecs.js      — 双外部 SDK；shippingAddressRequired:true + emailRequired:true + phoneNumberRequired:true + shippingOptionRequired:true；SHIPPING_OPTIONS 数组（Standard $5 / Express $10）；Full Callback 模式（paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }；callbackIntents:['SHIPPING_ADDRESS','SHIPPING_OPTION','PAYMENT_AUTHORIZATION']）；onPaymentAuthorized：用户授权后 Google Pay 调用，createOrder 在此回调内执行，返回 Promise<{transactionState}>；onPaymentDataChanged：INITIALIZE/SHIPPING_ADDRESS→返回 newTransactionInfo+newShippingOptionParameters，SHIPPING_OPTION→仅返回 newTransactionInfo；parsePhoneNumber(E.164, isoCountry)→{country_code,national_number}；buyerName/email/parsedPhone/shippingAmount 注入 create-order；total = item + shippingAmount
 // applepay-ecm.js       — 自定义路由；GET 传 sandboxShipping 给 EJS；create-order 含 payment_source.apple_pay.experience_context（return_url/cancel_url；token 由 confirmOrder 注入）；capture-order 标准；extraScripts 加载 `https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js`
 // applepay-ecs.js       — 自定义路由；ECS 流程；GET 无 sandboxShipping（买家在 sheet 选）；create-order 接收 shippingContact + shippingAmount；payment_source.apple_pay 含 name/email_address/phone_number（national_number only，无 country_code）/experience_context；normalizeContact() 剥离非数字；total = item + shippingAmount
+// vault-paypal-with-purchase.js — 完整自定义路由；GET 调 fetchIdToken() 获取 id_token 注入 data-user-id-token；payment_source 在顶层（含 permit_multiple_payment_tokens/description/attributes.customer.merchant_customer_id/experience_context.brand_name/shipping_preference）；capture 返回 vaultId + customerId
 // vault-*-setup-only.js — /v3/vault/setup-tokens API
 // vault-return.js       — 用户提供 vault token
 ```
@@ -316,10 +317,11 @@ EJS 文件职责：
 
 | JS 文件 | 使用的产品 EJS |
 |---------|--------------|
-| `public/js/paypal/jssdk-v5/spb.js` | spb-ecm, spb-ecs, vault-paypal-with-purchase, vault-applepay-with-purchase |
+| `public/js/paypal/jssdk-v5/spb.js` | spb-ecm, spb-ecs, vault-applepay-with-purchase |
+| `public/js/paypal/jssdk-v5/vault-paypal-with-purchase.js` | vault-paypal-with-purchase（专属；capture 后显示 vaultId + customerId） |
 | `public/js/paypal/jssdk-v5/acdc.js` | acdc, vault-acdc-with-purchase, vault-acdc-setup-only |
 | `public/js/paypal/jssdk-v5/buttons.js` | buttons（双 SDK：cnSdkUrl + usSdkUrl） |
-| `public/js/paypal/jssdk-v5/vault-setup.js` | vault-paypal-setup-only |
+| `public/js/paypal/jssdk-v5/vault-paypal-setup-only.js` | vault-paypal-setup-only |
 | `public/js/paypal/jssdk-v5/vault-return.js` | vault-return |
 | `public/js/paypal/jssdk-v5/applepay-ecm.js` | applepay-ecm（已实现；完整 ApplePaySession 流程；`confirmOrder` 响应 `{ approveApplePayPayment }` 解包后检查 `.status === 'APPROVED'`；3DS 由 Apple Pay 协议内部处理；ECM 无 shippingFields） |
 | `public/js/paypal/jssdk-v5/applepay-ecs.js` | applepay-ecs（已实现；ECS 流程；`SHIPPING_METHODS` 数组；`onshippingmethodselected` + `onshippingcontactselected`；`normalizeContact()` 剥离非数字；createOrder 带 shippingContact + shippingAmount；`payment_source.apple_pay` 含 name/email/phone） |
@@ -393,13 +395,17 @@ module.exports = createStandardRoute({
 ```
 
 **Vault with-purchase（带购买的 Vault）：**
+
+`vault-paypal-with-purchase` 已改为**完整自定义路由**（不再用工厂）：GET 获取 id_token → 注入 `data-user-id-token`；create-order 的 `payment_source` 在**顶层**（含 vault 完整参数）；capture 返回 `vaultId` + `customerId`。
+
+其余 vault-with-purchase 产品仍可用工厂：
 ```js
 const { createVaultWithPurchaseRoute } = require('./_factory')
 module.exports = createVaultWithPurchaseRoute({
-  productKey: 'vault-xxx-with-purchase',
-  sdkParams:  'components=buttons&vault=true&currency=USD',
-  view:       'paypal/jssdk-v5/vault-xxx-with-purchase',
-  paymentSource: { paypal: { attributes: { vault: { store_in_vault: 'ON_SUCCESS' } } } }
+  productKey: 'vault-acdc-with-purchase',
+  sdkParams:  'components=card-fields&vault=true',
+  view:       'paypal/jssdk-v5/vault-acdc-with-purchase',
+  paymentSource: { card: { attributes: { vault: { store_in_vault: 'ON_SUCCESS' } } } }
 })
 ```
 

@@ -10,7 +10,7 @@
   <script src="/js/theme.js"></script>
   <%# Primary PayPal SDK (single account) %>
   <% if (typeof sdkUrl !== 'undefined' && sdkUrl) { %>
-    <script src="<%= sdkUrl %>" data-namespace="paypalSDK"></script>
+    <script src="<%= sdkUrl %>" data-namespace="paypalSDK"<% if (typeof sdkUserIdToken !== 'undefined' && sdkUserIdToken) { %> data-user-id-token="<%= sdkUserIdToken %>"<% } %>></script>
   <% } %>
   <%# Extra scripts (e.g. Google Pay needs pay.google.com/gp/p/js/pay.js) %>
   <% if (typeof extraScripts !== 'undefined' && extraScripts.length > 0) { %>

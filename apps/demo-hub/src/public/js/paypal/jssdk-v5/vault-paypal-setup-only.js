@@ -19,6 +19,16 @@
     el.textContent = text
   }
 
+  function showVaultResult(paymentTokenId, customerId) {
+    var panel      = document.getElementById('vault-result')
+    var tokenEl    = document.getElementById('payment-token-id')
+    var customerEl = document.getElementById('customer-id')
+    if (!panel) return
+    if (tokenEl)    tokenEl.textContent    = paymentTokenId || '(not returned)'
+    if (customerEl) customerEl.textContent = customerId     || '(not returned)'
+    panel.style.display = 'block'
+  }
+
   function clearLoading(id) {
     var el = document.getElementById(id || 'paypal-button-container')
     if (!el) return
@@ -54,6 +64,7 @@
           .then(function (res) {
             if (res.error) throw new Error(res.error)
             showResult('✓ Vault enrolled · Payment Token: ' + res.paymentTokenId, 'success')
+            showVaultResult(res.paymentTokenId, res.customerId)
           })
       },
       onError: function (err) {

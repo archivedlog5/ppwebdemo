@@ -673,16 +673,81 @@ rawPhone: "+14155552671"  +  isoCountry: "US"
 
 ---
 
-## Vault with-purchase（工厂路由）
+## Vault with-purchase
 
-### vault-paypal-with-purchase
+### vault-paypal-with-purchase（2026-05-28 完成，已改为自定义路由）
+
+> 首次购买同时完成 Vault 签约，`store_in_vault: ON_SUCCESS`。GET 时后端调 `/v1/oauth2/token?response_type=id_token` 获取 id_token，注入 `data-user-id-token` 到 SDK script，PayPal SDK 才能显示 Vault 授权弹窗。
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 | `src/routes/paypal/jssdk-v5/vault-paypal-with-purchase.js` | `createVaultWithPurchaseRoute`；`paymentSource.paypal.attributes.vault.store_in_vault: 'ON_SUCCESS'` |
-| 后端逻辑 | `_factory.js` → `createVaultWithPurchaseRoute` | order body 含 `payment_source`；capture 返回 `vaultId` |
-| EJS | `src/views/paypal/jssdk-v5/vault-paypal-with-purchase.ejs` | 同 spb-ecm 结构；SDK 参数需 `vault=true` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/spb.js` | **与 ECM 共用**；captureOrder 返回值包含 `vaultId` 字段 |
+| 路由 + API | `src/routes/paypal/jssdk-v5/vault-paypal-with-purchase.js` | **完整自定义路由**；GET 调 `fetchIdToken()` 获取 id_token；SDK URL 含 `buyer-country=US&components=buttons&vault=true&disable-funding=...&enable-funding=paylater`；create-order `payment_source` 在**顶层**（非 purchase_units 内）；capture-order 提取 `vaultId` + `customerId` |
+| EJS 视图 | `src/views/paypal/jssdk-v5/vault-paypal-with-purchase.ejs` | 传 `sdkUserIdToken` 给 header；currency/amount 选择器；Vault Behavior 信息框；`#paypal-button-container`；`#vault-result`（capture 后显示 vault token + customer ID） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/vault-paypal-with-purchase.js` | **专属 JS 文件**（不共用 spb.js）；capture 后调 `showVaultResult(order.vaultId, order.customerId)` 展示 vault token 和 customer ID |
+| header.ejs | `src/views/partials/header.ejs` | SDK script 支持 `data-user-id-token="<%= sdkUserIdToken %>"`（存在时注入） |
+
+#### 后端 API（`vault-paypal-with-purchase.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/vault-paypal-with-purchase` | GET | 调 `fetchIdToken()`；渲染页面；传 `sdkUserIdToken` + `sdkUrl`（含 `vault=true`）给 EJS |
+| `/api/vault-paypal-with-purchase/create-order` | POST | 读 `{ amount, currency }`；`payment_source` 在**顶层**（不在 purchase_units 内）；返回 `{ id }` |
+| `/api/vault-paypal-with-purchase/capture-order` | POST | 读 `{ orderID }`；capture；从 `payment_source.paypal.attributes.vault` 提取 `vaultId` 和 `customerId`；返回 `{ ...data, vaultId, customerId }` |
+
+**create-order body（`payment_source` 顶层，purchase_units 标准）：**
+
+```js
+{
+  intent: 'CAPTURE',
+  payment_source: {
+    paypal: {
+      attributes: {
+        vault: {
+          store_in_vault:               'ON_SUCCESS',
+          usage_type:                   'MERCHANT',
+          customer_type:                'CONSUMER',
+          permit_multiple_payment_tokens: false,
+          description:                  'After Purchase Your Payment Method Will Be Saved to Cross Wen China Store',
+        },
+        customer: {
+          merchant_customer_id: 'MERCHANT_CUST_001',
+        },
+      },
+      experience_context: {
+        brand_name:          'Cross Wen China Store',
+        shipping_preference: 'SET_PROVIDED_ADDRESS',
+        return_url: `${req.protocol}://${req.get('host')}/paypal/jssdk-v5/vault-paypal-with-purchase`,
+        cancel_url: `${req.protocol}://${req.get('host')}/paypal/jssdk-v5/vault-paypal-with-purchase`,
+      },
+    },
+  },
+  purchase_units: [{
+    amount: { currency_code, value, breakdown: { item_total } },
+    description: DEMO_DESCRIPTION,
+    items:       [{ ...DEMO_ITEM, unit_amount }],
+    shipping:    SANDBOX_SHIPPING,
+    // ← 注意：无 payment_source（payment_source 在顶层）
+  }],
+}
+```
+
+**capture-order 返回值提取：**
+
+```js
+const vaultInfo  = data?.payment_source?.paypal?.attributes?.vault
+const vaultId    = vaultInfo?.id            || null   // 支付 Token
+const customerId = vaultInfo?.customer?.id  || null   // PayPal Customer ID
+res.json({ ...data, vaultId, customerId })
+```
+
+**id_token 获取（`fetchIdToken()`）：**
+
+```js
+// 首次买家无 target_customer_id，只需 response_type=id_token
+POST /v1/oauth2/token
+  grant_type=client_credentials&response_type=id_token
+→ data.id_token  （注入 data-user-id-token）
+```
 
 ### vault-acdc-with-purchase
 
@@ -708,9 +773,50 @@ rawPhone: "+14155552671"  +  isoCountry: "US"
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 | `src/routes/paypal/jssdk-v5/vault-paypal-setup-only.js` | `/v3/vault/setup-tokens` + `/v3/vault/payment-tokens`（非 v2/checkout） |
-| EJS | `src/views/paypal/jssdk-v5/vault-paypal-setup-only.ejs` | `window.DEMO.urls.createSetupToken`/`confirmSetupToken` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/vault-setup.js` | `Buttons({ createVaultSetupToken, onApprove })` |
+| 路由 | `src/routes/paypal/jssdk-v5/vault-paypal-setup-only.js` | **完整自定义路由**；GET 调 `fetchIdToken()` 注入 `data-user-id-token`；`/v3/vault/setup-tokens`（含 `customer.merchant_customer_id`、`description`、`permit_multiple_payment_tokens`、`usage_pattern:IMMEDIATE`、`customer_type:CONSUMER`、`experience_context.shipping_preference:NO_SHIPPING`、`payment_method_preference:IMMEDIATE_PAYMENT_REQUIRED`、动态 return_url/cancel_url）；`/v3/vault/payment-tokens` 返回 `paymentTokenId` + `customerId` |
+| EJS | `src/views/paypal/jssdk-v5/vault-paypal-setup-only.ejs` | 传 `sdkUserIdToken` 给 header；Vault Behavior 说明框（`usage_pattern:IMMEDIATE`/`NO_SHIPPING`）；`#vault-result` 面板（payment-token-id + customer-id，默认隐藏）；`window.DEMO.urls.createSetupToken`/`confirmSetupToken` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/vault-paypal-setup-only.js` | `Buttons({ createVaultSetupToken, onApprove, onError })`；`showVaultResult(paymentTokenId, customerId)` 在 `onApprove` 成功后展示 `#vault-result` 面板 |
+
+**后端 API：**
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/vault-paypal-setup-only` | GET | 获取 `id_token` → 注入 `sdkUserIdToken`；渲染页面 |
+| `/api/vault-paypal-setup-only/create-setup-token` | POST | 调 `/v3/vault/setup-tokens`；返回 `{ setupTokenId, approveLink }` |
+| `/api/vault-paypal-setup-only/confirm-setup-token` | POST | 读 `{ setupTokenId }`；调 `/v3/vault/payment-tokens`；返回 `{ paymentTokenId, customerId, data }` |
+
+**create-setup-token body：**
+
+```js
+{
+  customer: {
+    merchant_customer_id: 'MERCHANT_CUST_001',
+  },
+  payment_source: {
+    paypal: {
+      description:                  'Your PayPal will be saved to Cross Wen for future purchases',
+      permit_multiple_payment_tokens: false,
+      usage_pattern:                'IMMEDIATE',
+      usage_type:                   'MERCHANT',
+      customer_type:                'CONSUMER',
+      experience_context: {
+        shipping_preference:         'NO_SHIPPING',
+        payment_method_preference:   'IMMEDIATE_PAYMENT_REQUIRED',
+        brand_name:                  'Cross Wen',
+        return_url: `${protocol}://${host}/paypal/jssdk-v5/vault-paypal-setup-only`,
+        cancel_url: `${protocol}://${host}/paypal/jssdk-v5/vault-paypal-setup-only`,
+      },
+    },
+  },
+}
+```
+
+**confirm-setup-token 返回值提取：**
+
+```js
+const customerId = data.customer?.id || null
+res.json({ paymentTokenId: data.id, customerId, data })
+```
 
 ### vault-acdc-setup-only
 
@@ -744,16 +850,16 @@ rawPhone: "+14155552671"  +  isoCountry: "US"
 | **spb-ecm** | `components=buttons&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort` | ECM：`commit=true` 显示 "Pay Now" |
 | **spb-ecs** | `components=buttons&commit=false&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort` | ECS：`commit=false` 显示 "Continue" |
 | **buttons** | CN: `components=buttons,funding-eligibility&commit=true&buyer-country=US&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort&currency=${currency}` / US: 同 CN + `&enable-funding=venmo` | 双 SDK，`funding-eligibility` 组件必须，`isEligible()` 依赖它；currency 由路由注入 |
-| **acdc** | `components=card-fields` | 不能和 buttons 混用 |
+| **acdc** | `components=card-fields&currency=${currency}` | 自定义路由；不能和 buttons 混用；currency 动态注入 |
 | **applepay-ecm** | `components=applepay&currency=${currency}` + extraScripts: `applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js` | 自定义路由；需 Safari + Apple Wallet |
 | **applepay-ecs** | `components=applepay&currency=${currency}` + extraScripts: `applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js` | 自定义路由；ECS 流程；`shippingMethods` 选择；`normalizeContact()` 剥非数字；buyer 在 sheet 选地址/email/phone |
 | **googlepay-ecm** | `components=googlepay&currency=${currency}` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 自定义路由；需 Chrome + Google Pay 卡；3DS select `#demo-sca` |
 | **googlepay-ecs** | `components=googlepay&currency=${currency}` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 自定义路由；`shippingAddressRequired: true` + `shippingOptionRequired: true`；Full Callback 模式；`callbackIntents:['SHIPPING_ADDRESS','SHIPPING_OPTION','PAYMENT_AUTHORIZATION']`；`onPaymentAuthorized`（createOrder 在内）+ `onPaymentDataChanged`（运费动态更新）；email + phone + name + 运费方式从 sheet 获取 |
-| **vault-paypal-with-purchase** | `components=buttons&vault=true` | vault=true 才能 store_in_vault |
+| **vault-paypal-with-purchase** | `buyer-country=US&components=buttons&vault=true&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort&enable-funding=paylater` | **自定义路由**；GET 时后端先获取 id_token，注入 `data-user-id-token` 到 SDK script；`vault=true` 必须；`enable-funding=paylater` 启用分期 |
 | **vault-acdc-with-purchase** | `components=card-fields&vault=true` | |
 | **vault-applepay-with-purchase** | `components=applepay&vault=true` | |
-| **vault-paypal-setup-only** | `components=buttons&vault=true` | 路由文件中手动构建完整 sdkUrl |
-| **vault-acdc-setup-only** | `components=card-fields&vault=true` | 同上 |
+| **vault-paypal-setup-only** | `buyer-country=US&components=buttons&currency=USD` | 自定义路由；GET 后端先获取 id_token，注入 `data-user-id-token`；**无 `vault=true`**；`currency=USD` 固定（非动态）；`NO_SHIPPING` 无运费 |
+| **vault-acdc-setup-only** | `components=card-fields&vault=true&currency=USD` | 自定义路由；`currency=USD` 固定（同上） |
 | **vault-return** | 无 SDK（server-side only）| 不加载任何 SDK |
 
 ---
@@ -974,7 +1080,8 @@ spb.js onApprove callback 收到结果
 | spb-ecs | `createStandardRoute` + `orderBody`（PAY_NOW） | 同 ECM（共用 spb.js） | 同 ECM（order body 不同） |
 | acdc | 自定义路由，`components=card-fields` | `paypalSDK.CardFields()`，`cardFields.submit()` | 同 ECM（同 REST API） |
 | buttons | 自定义路由，双 SDK（cnSdkUrl + usSdkUrl） | 4 个 `Buttons()` 分别 render | 两套 token：getCNToken/getUSToken |
-| vault-*-with-purchase | `createVaultWithPurchaseRoute`，`payment_source` 含 vault 指令 | 同对应产品的 JS | capture 返回值含 `vaultId` |
+| vault-paypal-with-purchase | **自定义路由**；GET 调 `fetchIdToken()`；SDK URL 含 `vault=true&buyer-country=US&enable-funding=paylater`；`data-user-id-token` 注入 SDK script | `vault-paypal-with-purchase.js`（专属）；capture 后显示 `#vault-result` 面板 | `payment_source` 在**顶层**（非 purchase_units 内）；`permit_multiple_payment_tokens:false`；`attributes.customer.merchant_customer_id`；capture 返回 `vaultId` + `customerId` |
+| vault-acdc-with-purchase / vault-applepay-with-purchase | `createVaultWithPurchaseRoute`，`payment_source` 含 vault 指令 | 同对应产品的 JS | capture 返回值含 `vaultId` |
 | vault-*-setup-only | 自定义路由，`/v3/vault/setup-tokens` | `Buttons({ createVaultSetupToken })` | 无 capture，返回 `paymentTokenId` |
 | applepay-ecm | 自定义路由，`components=applepay`；Apple Pay button CSS from `applepay.cdn-apple.com` | `setupApplepay()` → `ApplePaySession` → `validateMerchant` → `completeMerchantValidation` | **onpaymentauthorized 内**：createOrder（含 `payment_source.apple_pay.experience_context`）→ `confirmOrder({ orderId, token, billingContact, shippingContact })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `APPROVED` → capture；3DS 由 Apple Pay 协议内部处理；`session.completePayment()` 必须始终调用 |
 | applepay-ecs | 自定义路由，`components=applepay`；双按钮（`<apple-pay-button>` + `#custom-applepay-btn`） | `setupApplepay()` → `ApplePaySession`（含 `shippingMethods`、`requiredShippingContactFields`）；`onshippingmethodselected` + `onshippingcontactselected` 更新 total/lineItems | **onpaymentauthorized 内**：提取 shippingContact → createOrder（`mapApplePayShipping` + `parseApplePayPhone`→`{national_number}` → `payment_source.apple_pay` 含 name/email/phone）→ `confirmOrder({ orderId, token, billingContact: normalizeContact(bc), shippingContact: normalizeContact(sc) })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `APPROVED` → capture → COMPLETED |
@@ -1132,7 +1239,7 @@ router.post('/api/<product>/create-order', async (req, res) => {
 | `applepay-ecs.js` | **自定义** | N/A（直接控制 POST handler）|
 | `googlepay-ecm.js` | 自定义（已改） | N/A（直接控制 POST handler）|
 | `googlepay-ecs.js` | **自定义**（已改） | N/A（直接控制 POST handler）|
-| `vault-paypal-with-purchase.js` | 工厂 | ⏳ 待迁移 |
+| `vault-paypal-with-purchase.js` | **自定义**（已改） | N/A（完整自定义路由；GET 调 `fetchIdToken()`；`payment_source` 在顶层；capture 返回 `vaultId` + `customerId`） |
 | `vault-acdc-with-purchase.js` | 工厂 | ⏳ 待迁移 |
 | `vault-applepay-with-purchase.js` | 工厂 | ⏳ 待迁移 |
 | `buttons.js` | 自定义 | N/A（直接控制 POST handler）|
