@@ -188,7 +188,7 @@ apps/demo-hub/
 │   │           ├── vault-acdc-with-purchase.js     # Uses createVaultWithPurchaseRoute
 │   │           ├── vault-acdc-setup-only.js        # Custom: /v3/vault/setup-tokens API
 │   │           ├── vault-applepay-with-purchase.js # Custom: virtual product + vault + recurringPaymentRequest
-│   │           └── vault-return.js                 # Custom: user-provided vault token
+│   │           └── vault-return.js                 # Custom: list /v3/vault/payment-tokens on demand; PayPal SDK Buttons (returning payer); card/apple_pay Pay Now via vault_id; Apple Pay disabled
 │   ├── views/
 │   │   ├── partials/
 │   │   │   ├── header.ejs                      # HTML head + topbar + sidebar open (replaces layout.ejs)
@@ -230,7 +230,7 @@ apps/demo-hub/
 | buttons.js | ❌ Custom | Dual SDK (CN + US), 4 buttons |
 | acdc.js | ❌ Custom | CardFields SDK, different frontend |
 | vault-*-setup-only.js | ❌ Custom | /v3/vault/setup-tokens API |
-| vault-return.js | ❌ Custom | User-provided vault token |
+| vault-return.js | ❌ Custom | List saved methods via button → GET `/api/vault-return/payment-tokens`; PayPal SDK Buttons (returning payer, fundingSource:PAYPAL); card → Pay Now via vault_id; apple_pay → disabled (Apple guidelines) |
 
 `createStandardRoute` needs `extraScripts?: Array<{url: string, namespace?: string}>` parameter for Google Pay.
 

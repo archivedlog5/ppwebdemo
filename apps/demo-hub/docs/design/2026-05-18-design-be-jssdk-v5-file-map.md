@@ -895,9 +895,9 @@ onApprove({ liabilityShift, vaultSetupToken })
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 | `src/routes/paypal/jssdk-v5/vault-return.js` | 纯服务端，接收 `paymentTokenId`，create-order（`payment_source.token`）+ capture 一步完成 |
-| EJS | `src/views/paypal/jssdk-v5/vault-return.ejs` | `#payment-token-input` 输入框；`#vault-return-btn` 按钮；`window.DEMO.urls.createAndCapture` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/vault-return.js` | 无 SDK，纯 fetch；从输入框读 token，POST 到后端 |
+| 路由 | `src/routes/paypal/jssdk-v5/vault-return.js` | GET: 后端调 `fetchIdToken()` 获取 id_token 注入 PayPal SDK（`data-user-id-token`）；GET `/api/vault-return/payment-tokens` 按需加载已保存支付方式（`/v3/vault/payment-tokens?customer_id=crosswen5`）；POST `create-and-capture`（card/apple_pay，`payment_source.card.vault_id` 或 `payment_source.apple_pay.vault_id`，含 `PayPal-Request-Id` 头、`shipping`，CAPTURE intent 直接返回 COMPLETED）；POST `create-order`（PayPal 回头买家，`payment_source.paypal.experience_context`，含 `PayPal-Request-Id` 头、`shipping`，与 spb-ecm 参数一致；**SDK 通过 `data-user-id-token` 自动识别回头买家，无需在 payment_source 中指定 vault_id**）；POST `capture-order`（PayPal `onApprove` 后调用） |
+| EJS | `src/views/paypal/jssdk-v5/vault-return.ejs` | 客户横幅含 "Get Vaulted Payment Methods" 按钮；`#payment-methods-list`（JS 按需渲染 radio 卡片）；`#paypal-btn-wrap`（PayPal SDK Buttons，PayPal token 选中后显示）；`#pay-now-btn`（card 选中后显示）；`window.DEMO.urls.{paymentTokens, createAndCapture, createOrder, captureOrder}` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/vault-return.js` | 点击 "Get Vaulted Payment Methods" → GET `/api/vault-return/payment-tokens` → 渲染 radio 卡片；PayPal token → `paypalSDK.Buttons({ fundingSource: PAYPAL })`；card token → Pay Now（POST `create-and-capture` 含 `tokenType: 'card'`）；apple_pay token → radio 禁用 + 说明（Apple 指南限制）；`setLabelStyle()` 选中高亮 |
 
 ---
 
@@ -921,7 +921,7 @@ onApprove({ liabilityShift, vaultSetupToken })
 | **vault-applepay-with-purchase** | `components=applepay&vault=true&currency=USD`（硬编码，非动态）+ extraScripts: `applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js` | 自定义路由；虚拟产品（无 shipping）；硬编码 USD；`stored_credential` + `attributes.vault`；recurringPaymentRequest 在前端 paymentRequest 构建 |
 | **vault-paypal-setup-only** | `buyer-country=US&components=buttons&currency=USD` | 自定义路由；GET 后端先获取 id_token，注入 `data-user-id-token`；**无 `vault=true`**；`currency=USD` 固定（非动态）；`NO_SHIPPING` 无运费 |
 | **vault-acdc-setup-only** | `components=card-fields&vault=true&currency=USD` | 自定义路由；`currency=USD` 固定（同上） |
-| **vault-return** | 无 SDK（server-side only）| 不加载任何 SDK |
+| **vault-return** | `buyer-country=US&commit=true&components=buttons&currency=${currency}` | GET 时后端获取 id_token 注入 `data-user-id-token`；**`commit=true` 是关键**：缺少此参数会导致 PayPal 弹出登录 popup 而非回头买家一键体验；`buyer-country=US`（沙盒必须）；apple_pay token 禁用（Apple 指南限制） |
 
 ---
 
@@ -1149,7 +1149,7 @@ spb.js onApprove callback 收到结果
 | applepay-ecs | 自定义路由，`components=applepay`；双按钮（`<apple-pay-button>` + `#custom-applepay-btn`） | `setupApplepay()` → `ApplePaySession`（含 `shippingMethods`、`requiredShippingContactFields`）；`onshippingmethodselected` + `onshippingcontactselected` 更新 total/lineItems | **onpaymentauthorized 内**：提取 shippingContact → createOrder（`mapApplePayShipping` + `parseApplePayPhone`→`{national_number}` → `payment_source.apple_pay` 含 name/email/phone）→ `confirmOrder({ orderId, token, billingContact: normalizeContact(bc), shippingContact: normalizeContact(sc) })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `APPROVED` → capture → COMPLETED |
 | googlepay-ecm | 自定义路由，`components=googlepay`，双外部 SDK（PayPal + Google Pay） | sheet 先开（`emailRequired:true`）→ 获取 email → createOrder（email + SANDBOX_PHONE 注入 payment_source）→ processPayment → confirmOrder → doCapture | `shippingAddressRequired: false`；**Promise 模式**；phone 商户预填 SANDBOX_PHONE；email 从 sheet 获取；3DS 需 GET order details |
 | googlepay-ecs | 自定义路由，同 ECM 双外部 SDK | **Full Callback 模式**（paymentDataCallbacks:{ onPaymentAuthorized, onPaymentDataChanged }；callbackIntents:['SHIPPING_ADDRESS','SHIPPING_OPTION','PAYMENT_AUTHORIZATION']）；sheet 先开 → 买家选地址/email/phone/运费方式 → 用户授权 → `onPaymentAuthorized`：createOrder（含 shippingAmount）→ processPayment | address 由买家在 sheet 选；name/email/phone/shippingAmount 全部注入 create-order；total = item + shipping；payment_source.google_pay 含 name/email/phone；3DS 路径同 ECM（onPaymentAuthorized 运行时 sheet 转为处理中状态，3DS popup 可正常弹出）|
-| vault-return | 自定义路由，`/v2/checkout/orders` + capture 一步完成 | 无 SDK，纯 fetch | 无 PayPal 弹窗，纯服务端 |
+| vault-return | 自定义路由；GET 调 `fetchIdToken()` 获取 id_token；GET `/api/vault-return/payment-tokens` 按需加载 | PayPal token → `paypalSDK.Buttons({ fundingSource: PAYPAL })`；card/apple_pay → Pay Now | PayPal：`payment_source.paypal.experience_context`（无 vault_id；SDK 通过 `data-user-id-token` 识别回头买家）+ `create-order` + `capture-order`；card：`payment_source.card.vault_id`（CAPTURE 直接 COMPLETED）；`PayPal-Request-Id: randomUUID()` 头；`shipping: SANDBOX_SHIPPING`；apple_pay radio 禁用；**`commit=true&buyer-country=US` 在 SDK URL 中必须，否则弹出登录 popup** |
 
 ---
 
@@ -1308,7 +1308,7 @@ router.post('/api/<product>/create-order', async (req, res) => {
 | `acdc.js` | 自定义 | N/A |
 | `vault-paypal-setup-only.js` | 自定义 | N/A（无 purchase body）|
 | `vault-acdc-setup-only.js` | 自定义 | N/A |
-| `vault-return.js` | 自定义 | N/A |
+| `vault-return.js` | **自定义** | N/A（完整自定义路由；GET 调 `fetchIdToken()`；4 个 API 端点；card/apple_pay 用 `vault_id`；PayPal 用 `experience_context`（无 vault_id）；`PayPal-Request-Id` 头；Apple Pay radio 禁用；**SDK URL 必须含 `commit=true&buyer-country=US`**） |
 
 ---
 

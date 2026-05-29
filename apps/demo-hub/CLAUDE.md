@@ -171,7 +171,7 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // vault-acdc-setup-only.js  — 完整自定义路由；/v3/vault/setup-tokens；顶层 customer.merchant_customer_id（随机）+ payment_source.card.billing_address + experience_context.return/cancel_url + verification_method（直接挂 card 下）；onApprove：liabilityShift 'YES'|'POSSIBLE' → confirm；否则 GET setup-token → token.status=APPROVED && verification_status=VERIFIED → confirm；GET /api/vault-acdc-setup-only/setup-token/:id 端点；confirm 返回 paymentTokenId + customerId
 // vault-applepay-with-purchase.js — 完整自定义路由；虚拟产品（purchase_unit 无 shipping）；SDK URL 硬编码 `currency=USD&vault=true`；payment_source.apple_pay 含 experience_context（return/cancel_url）+ stored_credential（CUSTOMER/RECURRING/`usage:FIRST`）+ attributes.vault.store_in_vault:ON_SUCCESS；capture 提取 payment_source.apple_pay.attributes.vault：{id→vaultId, customer.id→customerId, status→vaultStatus}；返回 { ...data, vaultId, customerId, vaultStatus }；前端：硬编码 TRIAL_AMOUNT="25.00" / REGULAR_AMOUNT="40.00" / CURRENCY="USD"；requiredShippingContactFields:['email']；paymentRequest 含 recurringPaymentRequest（trial 7天$25 + regular 每7天$40，billingAgreement/managementURL）+ lineItems（paymentTiming:recurring）+ total（含 recurring 字段）；recurringPaymentIntervalUnit:"day"（Apple Pay 无 "week"）；ApplePaySession(4, paymentRequest)；button type "subscribe"
 // vault-paypal-setup-only.js — /v3/vault/setup-tokens API（PayPal 按钮方式）
-// vault-return.js       — 用户提供 vault token
+// vault-return.js       — 自定义；GET payment-tokens 按钮触发；PayPal → SDK Buttons（fundingSource:PAYPAL，payment_source.paypal.experience_context 无 vault_id，SDK 通过 data-user-id-token 识别回头买家）；card → Pay Now（vault_id）；apple_pay → 禁用（Apple 指南限制）；PayPal-Request-Id 头；shipping:SANDBOX_SHIPPING；**SDK URL 必须含 commit=true&buyer-country=US，否则弹出登录 popup**
 ```
 
 ## Supabase 产品配置
@@ -286,6 +286,12 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 17. **Google Pay ECM vs ECS 的 phone 来源不同**：
     - ECM（`shippingAddressRequired: false`）：sheet 无地址区域，无法收电话 → 用 `demoParams.SANDBOX_PHONE`（商户预填）注入 `payment_source.google_pay.phone_number`
     - ECS（`shippingAddressRequired: true`）：sheet 收集地址 + 电话 → `paymentData.shippingAddress.phoneNumber` 经 `parsePhoneNumber()` 转换后注入
+
+19. **Vault Return Buyer SDK 必须加 `commit=true`**：
+    - PayPal 回头买家（`data-user-id-token`）若 SDK URL 缺少 `commit=true`，点击 PayPal 按钮会弹出完整登录 popup，而非一键确认（one-click）体验
+    - 正确 SDK URL：`...&buyer-country=US&commit=true&components=buttons&currency=${currency}`
+    - `create-order` 的 `payment_source` 只需 `{ paypal: { experience_context } }`，**不需要 vault_id**；SDK 通过 `data-user-id-token` 自动识别回头买家身份
+    - `data-user-id-token` 由后端调 `POST /v1/oauth2/token?response_type=id_token&target_customer_id=<customerId>` 获取并注入 SDK script 标签
 
 ## EJS/JS 分离模式
 

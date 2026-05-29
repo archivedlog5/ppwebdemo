@@ -1,16 +1,32 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar
+  sidebarProducts, showSidebar, sdkUrl, sdkUserIdToken
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
     <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · Vault Return</span>
     <h1><%= title %></h1>
-    <p>Enter a Payment Token ID to charge amount server-side — no buyer interaction.</p>
+    <p>Returning buyer — select a saved payment method and charge without re-entering details. PayPal uses the SDK button; cards and Apple Pay charge server-side instantly.</p>
   </div>
+
   <div class="sandbox-card">
-    <div class="amount-row">
+
+    <%# ── Customer banner ──────────────────────────────────────────────── %>
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(34,197,94,0.05);border:1px solid rgba(34,197,94,0.18);border-radius:10px;margin-bottom:22px">
+      <div style="width:34px;height:34px;border-radius:50%;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--accent);flex-shrink:0">R</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--fg)">Customer: <code style="background:rgba(34,197,94,0.1);padding:1px 5px;border-radius:4px;color:var(--accent)"><%= customerId %></code></div>
+        <div id="token-count-label" style="font-size:11px;color:var(--fg-muted);margin-top:2px">Click to load payment methods</div>
+      </div>
+      <button id="get-tokens-btn" type="button" style="padding:6px 12px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.35);border-radius:6px;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:opacity 150ms">
+        Get Vaulted Payment Methods
+      </button>
+      <span class="sandbox-mode-badge">⚡ Returning Buyer</span>
+    </div>
+
+    <%# ── Amount + Currency ─────────────────────────────────────────────── %>
+    <div class="amount-row" style="margin-bottom:6px">
       <div class="currency-group">
         <label class="field-label" for="demo-currency">Currency</label>
         <select id="demo-currency" class="currency-select" aria-label="Select currency">
@@ -24,32 +40,51 @@
         <label class="field-label" for="demo-amount">Amount</label>
         <div class="amount-input-wrapper">
           <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
-            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
-            aria-label="Payment amount" />
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00" aria-label="Payment amount" />
         </div>
       </div>
     </div>
-    <div class="amount-error" id="amount-error" role="alert"></div>
-    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+    <div class="amount-error" id="amount-error" role="alert" style="margin-bottom:18px"></div>
+
+    <%# ── Payment methods list (rendered by JS after button click) ─────── %>
+    <div style="font-size:11px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:10px">Saved Payment Methods</div>
+    <div id="payment-methods-list"></div>
+
+    <%# ── PayPal Buttons (returning payer, shown on PayPal radio select) ── %>
+    <div id="paypal-btn-wrap" style="display:none;margin-top:16px">
+      <div style="font-size:11px;color:var(--fg-muted);margin-bottom:8px">Saved PayPal account — click to confirm payment</div>
+      <div id="paypal-button-container" class="sdk-loading" style="min-height:44px">
+        <div class="sdk-spinner"></div><span>Loading PayPal...</span>
+      </div>
     </div>
-    <div class="field-group">
-      <label class="field-label" for="payment-token-input">Payment Token ID</label>
-      <input id="payment-token-input" class="token-input" type="text" placeholder="e.g. PAYMENT-TOKEN-xxxx" aria-label="Payment Token ID" />
-    </div>
-    <button id="vault-return-btn" class="pay-btn" style="background:var(--accent);color:#0F172A;margin-top:8px" type="button">
-      Charge with Vaulted Method
+
+    <%# ── Pay Now button (card / Apple Pay) ──────────────────────────── %>
+    <button id="pay-now-btn" type="button" style="display:none;width:100%;margin-top:16px;padding:13px 20px;background:var(--accent);color:#0F172A;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;transition:opacity 150ms ease,transform 100ms ease">
+      Pay Now
     </button>
+
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
-    <div class="test-hint">Get a Payment Token ID from the Vault Setup demos above.</div>
+
+    <div class="test-hint" style="margin-top:14px">
+      Get vault tokens from: <code>vault-paypal-setup-only</code>, <code>vault-acdc-setup-only</code>, <code>vault-paypal-with-purchase</code>, <code>vault-acdc-with-purchase</code>, <code>vault-applepay-with-purchase</code>.
+    </div>
+
   </div>
 </div>
 
 <script>
   window.DEMO = {
+    customerId:      '<%= customerId %>',
+    currency:        '<%= currency %>',
+    defaultAmount:   '<%= defaultAmount %>',
+    sdkUserIdToken:  '<%- sdkUserIdToken || "" %>',
+    sdkClientId:     '<%= clientId %>',
     urls: {
+      paymentTokens:    '/paypal/jssdk-v5/api/vault-return/payment-tokens',
       createAndCapture: '/paypal/jssdk-v5/api/vault-return/create-and-capture',
+      createOrder:      '/paypal/jssdk-v5/api/vault-return/create-order',
+      captureOrder:     '/paypal/jssdk-v5/api/vault-return/capture-order',
     },
-    defaultAmount: '<%= defaultAmount || "100.00" %>',
   }
 </script>
 <script src="/js/paypal/jssdk-v5/vault-return.js"></script>
