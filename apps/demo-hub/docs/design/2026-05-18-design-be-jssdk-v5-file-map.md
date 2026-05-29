@@ -761,9 +761,9 @@ POST /v1/oauth2/token
 
 | 文件 | 路径 | 关键内容 |
 |------|------|---------|
-| 路由 | `src/routes/paypal/jssdk-v5/vault-applepay-with-purchase.js` | `paymentSource.apple_pay.attributes.vault.store_in_vault: 'ON_SUCCESS'` |
-| EJS | `src/views/paypal/jssdk-v5/vault-applepay-with-purchase.ejs` | `sdkUrl` 含 `vault=true` |
-| SDK JS | `src/public/js/paypal/jssdk-v5/applepay-ecm.js` | `applepay-ecm.js` 目前只含 ECM 逻辑；vault-applepay 需独立实现或扩展 |
+| 路由 | `src/routes/paypal/jssdk-v5/vault-applepay-with-purchase.js` | **完整自定义路由**；虚拟产品（purchase_unit 无 shipping）；GET 硬编码 SDK URL `currency=USD&vault=true`；create-order：`payment_source.apple_pay` 含 `experience_context`（动态 return/cancel_url）+ `stored_credential`（CUSTOMER/RECURRING/`usage:FIRST`）+ `attributes.vault.store_in_vault:ON_SUCCESS`；capture-order：提取 `payment_source.apple_pay.attributes.vault` → `{id→vaultId, customer.id→customerId, status→vaultStatus}`；返回 `{ ...data, vaultId, customerId, vaultStatus }` |
+| EJS | `src/views/paypal/jssdk-v5/vault-applepay-with-purchase.ejs` | **无** amount/currency 选择器；订阅套餐卡片（7-Day Trial $25.00 / Then weekly $40.00 USD/week / Cancel anytime）；extraScripts 加载 `applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js`；"⚡ Vault + Purchase" badge；虚拟产品说明（email + billing only）；`#paypal-button-container` + `#custom-applepay-btn`；`#vault-result` 面板含 vault-id / customer-id / vault-status（默认隐藏） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/vault-applepay-with-purchase.js` | **专属 JS 文件**（不与 applepay-ecm.js 共用）；硬编码 `TRIAL_AMOUNT="25.00"` / `REGULAR_AMOUNT="40.00"` / `CURRENCY="USD"`；`requiredShippingContactFields:['email']`；paymentRequest 含 `recurringPaymentRequest`（trial 7天$25 + regular 每7天$40）+ `lineItems`（`paymentTiming:recurring`）+ `total`（含 recurring 字段）；`recurringPaymentIntervalUnit:"day"`（Apple Pay 无 "week"）；`ApplePaySession(4, paymentRequest)`；button type `"subscribe"`；capture 成功后调 `showVaultResult(order.vaultId, order.customerId, order.vaultStatus)`；console.log 前缀 `[Apple Pay Vault]` |
 
 ---
 
@@ -918,7 +918,7 @@ onApprove({ liabilityShift, vaultSetupToken })
 | **googlepay-ecs** | `components=googlepay&currency=${currency}` + extraScripts: `pay.google.com/gp/p/js/pay.js` | 自定义路由；`shippingAddressRequired: true` + `shippingOptionRequired: true`；Full Callback 模式；`callbackIntents:['SHIPPING_ADDRESS','SHIPPING_OPTION','PAYMENT_AUTHORIZATION']`；`onPaymentAuthorized`（createOrder 在内）+ `onPaymentDataChanged`（运费动态更新）；email + phone + name + 运费方式从 sheet 获取 |
 | **vault-paypal-with-purchase** | `buyer-country=US&components=buttons&vault=true&disable-funding=bancontact,blik,eps,giropay,ideal,mercadopago,mybank,p24,sepa,sofort&enable-funding=paylater` | **自定义路由**；GET 时后端先获取 id_token，注入 `data-user-id-token` 到 SDK script；`vault=true` 必须；`enable-funding=paylater` 启用分期 |
 | **vault-acdc-with-purchase** | `components=card-fields&vault=true&currency=${currency}` | 自定义路由；3DS select disabled（沙盒限制）；saveVault 时 `attributes` 含 `vault` + `customer.merchant_customer_id`（随机）；测试卡 `4012 0000 3333 0026` |
-| **vault-applepay-with-purchase** | `components=applepay&vault=true` | |
+| **vault-applepay-with-purchase** | `components=applepay&vault=true&currency=USD`（硬编码，非动态）+ extraScripts: `applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js` | 自定义路由；虚拟产品（无 shipping）；硬编码 USD；`stored_credential` + `attributes.vault`；recurringPaymentRequest 在前端 paymentRequest 构建 |
 | **vault-paypal-setup-only** | `buyer-country=US&components=buttons&currency=USD` | 自定义路由；GET 后端先获取 id_token，注入 `data-user-id-token`；**无 `vault=true`**；`currency=USD` 固定（非动态）；`NO_SHIPPING` 无运费 |
 | **vault-acdc-setup-only** | `components=card-fields&vault=true&currency=USD` | 自定义路由；`currency=USD` 固定（同上） |
 | **vault-return** | 无 SDK（server-side only）| 不加载任何 SDK |
@@ -1143,7 +1143,7 @@ spb.js onApprove callback 收到结果
 | buttons | 自定义路由，双 SDK（cnSdkUrl + usSdkUrl） | 4 个 `Buttons()` 分别 render | 两套 token：getCNToken/getUSToken |
 | vault-paypal-with-purchase | **自定义路由**；GET 调 `fetchIdToken()`；SDK URL 含 `vault=true&buyer-country=US&enable-funding=paylater`；`data-user-id-token` 注入 SDK script | `vault-paypal-with-purchase.js`（专属）；capture 后显示 `#vault-result` 面板 | `payment_source` 在**顶层**（非 purchase_units 内）；`permit_multiple_payment_tokens:false`；`attributes.customer.merchant_customer_id`；capture 返回 `vaultId` + `customerId` |
 | vault-acdc-with-purchase | **自定义路由**；GET 传 `sandboxCardholderName`/`sandboxBilling`/`currency`；saveVault 时 `attributes` 含 `vault.store_in_vault:ON_SUCCESS` + `customer.merchant_customer_id`（随机 CUST_ 前缀）；`vault-acdc-with-purchase.js` 专属 | `vault-acdc-with-purchase.js`；3DS select disabled；checkbox 控制 saveVault | capture 提取 `payment_source.card.attributes.vault` → `vaultId` + `customerId` |
-| vault-applepay-with-purchase | `createVaultWithPurchaseRoute`，`payment_source` 含 vault 指令 | 同 applepay 的 JS | capture 返回值含 `vaultId` |
+| vault-applepay-with-purchase | **完整自定义路由**；虚拟产品（无 shipping）；GET 硬编码 SDK URL `currency=USD&vault=true`；`stored_credential:CUSTOMER/RECURRING/usage:FIRST`；`vault-applepay-with-purchase.js`（专属） | `ApplePaySession(4, paymentRequest)`；硬编码 $25/$40 USD；`recurringPaymentRequest` + `lineItems(paymentTiming:recurring)`；`recurringPaymentIntervalUnit:"day"`；button type `"subscribe"`；`requiredShippingContactFields:['email']` | capture 提取 `payment_source.apple_pay.attributes.vault` → `{vaultId, customerId, vaultStatus}`；`showVaultResult(vaultId, customerId, vaultStatus)` |
 | vault-*-setup-only | 自定义路由，`/v3/vault/setup-tokens` | `Buttons({ createVaultSetupToken })` | 无 capture，返回 `paymentTokenId` |
 | applepay-ecm | 自定义路由，`components=applepay`；Apple Pay button CSS from `applepay.cdn-apple.com` | `setupApplepay()` → `ApplePaySession` → `validateMerchant` → `completeMerchantValidation` | **onpaymentauthorized 内**：createOrder（含 `payment_source.apple_pay.experience_context`）→ `confirmOrder({ orderId, token, billingContact, shippingContact })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `APPROVED` → capture；3DS 由 Apple Pay 协议内部处理；`session.completePayment()` 必须始终调用 |
 | applepay-ecs | 自定义路由，`components=applepay`；双按钮（`<apple-pay-button>` + `#custom-applepay-btn`） | `setupApplepay()` → `ApplePaySession`（含 `shippingMethods`、`requiredShippingContactFields`）；`onshippingmethodselected` + `onshippingcontactselected` 更新 total/lineItems | **onpaymentauthorized 内**：提取 shippingContact → createOrder（`mapApplePayShipping` + `parseApplePayPhone`→`{national_number}` → `payment_source.apple_pay` 含 name/email/phone）→ `confirmOrder({ orderId, token, billingContact: normalizeContact(bc), shippingContact: normalizeContact(sc) })` → 解包 `confirmResult.approveApplePayPayment` → 检查 `APPROVED` → capture → COMPLETED |
@@ -1303,7 +1303,7 @@ router.post('/api/<product>/create-order', async (req, res) => {
 | `googlepay-ecs.js` | **自定义**（已改） | N/A（直接控制 POST handler）|
 | `vault-paypal-with-purchase.js` | **自定义**（已改） | N/A（完整自定义路由；GET 调 `fetchIdToken()`；`payment_source` 在顶层；capture 返回 `vaultId` + `customerId`） |
 | `vault-acdc-with-purchase.js` | **自定义** | N/A（完整自定义路由；saveVault 时含 `attributes.customer.merchant_customer_id` 随机值）|
-| `vault-applepay-with-purchase.js` | 工厂 | ⏳ 待迁移 |
+| `vault-applepay-with-purchase.js` | **自定义** | N/A（完整自定义路由；虚拟产品；硬编码 USD；`stored_credential usage:FIRST`；`recurringPaymentRequest`；`recurringPaymentIntervalUnit:"day"`） |
 | `buttons.js` | 自定义 | N/A（直接控制 POST handler）|
 | `acdc.js` | 自定义 | N/A |
 | `vault-paypal-setup-only.js` | 自定义 | N/A（无 purchase body）|

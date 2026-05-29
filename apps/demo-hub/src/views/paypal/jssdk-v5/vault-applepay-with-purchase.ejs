@@ -1,41 +1,57 @@
 <%- include('../../partials/header', {
   title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl
+  sidebarProducts, showSidebar, sdkUrl,
+  extraScripts: [{ url: 'https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js' }]
 }) %>
 
 <div class="sandbox-page">
   <div class="sandbox-header">
     <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · Apple Pay Vault</span>
     <h1><%= title %></h1>
-    <p>Apple Pay Vault with purchase. Requires Safari + Apple Wallet card.</p>
+    <p>Apple Pay via PayPal — virtual subscription with vault. Card is saved on first payment (<code>store_in_vault: ON_SUCCESS</code>). Recurring billing info appears inside the Apple Pay sheet. Requires Safari and an Apple Pay–linked card.</p>
   </div>
   <div class="sandbox-card">
-    <div class="amount-row">
-      <div class="currency-group">
-        <label class="field-label" for="demo-currency">Currency</label>
-        <select id="demo-currency" class="currency-select" aria-label="Select currency">
-          <% var _cur = currency || 'USD' %>
-          <% ['USD','EUR','GBP','CAD','AUD','BRL','CHF','CZK','DKK','HKD','HUF','ILS','JPY','MXN','NOK','NZD','PHP','PLN','SEK','SGD','THB','TWD','KRW','CLP','SAR','UYU','COP','IDR','PEN','AED'].forEach(function(c) { %>
-            <option value="<%= c %>" <%= _cur === c ? 'selected' : '' %>><%= c %></option>
-          <% }) %>
-        </select>
+
+    <div style="border:1px solid var(--border-hi);border-radius:10px;padding:20px;margin-bottom:20px;background:rgba(255,255,255,0.02)">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:14px">Subscription Plan</div>
+
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+        <span style="font-size:13px;color:var(--fg-muted)">7-Day Trial</span>
+        <span style="font-size:22px;font-weight:600;font-family:var(--font-mono);color:var(--fg)">$25.00 <span style="font-size:12px;font-weight:400;color:var(--fg-muted)">USD</span></span>
       </div>
-      <div class="amount-group">
-        <label class="field-label" for="demo-amount">Amount</label>
-        <div class="amount-input-wrapper">
-          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
-            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
-            aria-label="Payment amount" />
-        </div>
+
+      <div style="border-top:1px solid var(--border);margin:12px 0"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px">
+        <span style="font-size:13px;color:var(--fg-muted)">Then weekly</span>
+        <span style="font-size:18px;font-weight:500;font-family:var(--font-mono);color:var(--fg)">$40.00 <span style="font-size:12px;font-weight:400;color:var(--fg-muted)">USD / week</span></span>
       </div>
+
+      <div style="font-size:11px;color:var(--fg-subtle);text-align:center">Cancel anytime · Billed via Apple Pay · Card saved on first payment</div>
     </div>
-    <div class="amount-error" id="amount-error" role="alert"></div>
-    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
-    </div>
+
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Vault + Purchase</span>
+    <p style="font-size:12px;color:var(--fg-muted);margin:0 0 16px">Virtual product — Apple Pay sheet collects email + billing address only.</p>
+
     <div id="paypal-button-container" class="sdk-loading">
       <div class="sdk-spinner"></div><span>Loading Apple Pay...</span>
     </div>
+
+    <div style="margin-top:12px">
+      <button id="custom-applepay-btn" type="button" disabled
+        style="width:100%;min-height:44px;padding:0 16px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;color:var(--fg);font-size:13px;font-weight:500;font-family:inherit;letter-spacing:0.02em;cursor:not-allowed;opacity:0.45;transition:background 150ms ease,border-color 150ms ease,transform 100ms ease"
+      >Custom Apple Pay Button<span style="font-size:10px;padding:2px 5px;background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.25);border-radius:3px;color:#c97a10;letter-spacing:0.06em;font-weight:600;line-height:1.4">DEMO</span></button>
+      <p style="margin:6px 0 0;font-size:11px;color:var(--fg-muted);text-align:center;opacity:.7">Functional but not recommended for production</p>
+    </div>
+
     <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+
+    <div id="vault-result" style="display:none;margin-top:12px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:6px;font-size:13px;line-height:1.8">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:6px">Vault Result</div>
+      <div><span style="color:var(--fg-muted)">Vault Token:&nbsp;</span><span id="vault-id" style="font-family:monospace;color:var(--fg)">—</span></div>
+      <div><span style="color:var(--fg-muted)">Customer ID:&nbsp;</span><span id="customer-id" style="font-family:monospace;color:var(--fg)">—</span></div>
+      <div><span style="color:var(--fg-muted)">Vault Status:&nbsp;</span><span id="vault-status" style="font-family:monospace;color:var(--fg)">—</span></div>
+    </div>
   </div>
 </div>
 
@@ -44,11 +60,9 @@
     urls: {
       createOrder:  '/paypal/jssdk-v5/api/vault-applepay-with-purchase/create-order',
       captureOrder: '/paypal/jssdk-v5/api/vault-applepay-with-purchase/capture-order',
-    }
-    defaultAmount: '<%= defaultAmount || "100.00" %>',
+    },
   }
 </script>
-<%# Apple Pay 视图逻辑与 applepay-ecm.ejs 共用同一 JS 文件（待创建 applepay.js） %>
-<script src="/js/paypal/jssdk-v5/applepay.js"></script>
+<script src="/js/paypal/jssdk-v5/vault-applepay-with-purchase.js"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>

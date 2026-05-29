@@ -32,22 +32,31 @@
 
 | JS 文件 | 使用的产品 |
 |---------|-----------|
-| `spb.js` | spb-ecm, spb-ecs, vault-paypal-with-purchase, vault-applepay-with-purchase |
-| `acdc.js` | acdc, vault-acdc-with-purchase, vault-acdc-setup-only |
+| `spb.js` | spb-ecm, spb-ecs |
+| `acdc.js` | acdc |
 | `buttons.js` | buttons（双 SDK：CN + US） |
-| `vault-setup.js` | vault-paypal-setup-only |
+| `vault-paypal-setup-only.js` | vault-paypal-setup-only |
+| `vault-paypal-with-purchase.js` | vault-paypal-with-purchase（专属） |
+| `vault-acdc-with-purchase.js` | vault-acdc-with-purchase（专属） |
+| `vault-acdc-setup-only.js` | vault-acdc-setup-only（专属） |
+| `vault-applepay-with-purchase.js` | vault-applepay-with-purchase（专属；虚拟产品 + recurringPaymentRequest） |
 | `vault-return.js` | vault-return |
-| `applepay.js` | applepay-ecm, applepay-ecs（待实现） |
-| `googlepay.js` | googlepay-ecm, googlepay-ecs（待实现） |
+| `applepay-ecm.js` | applepay-ecm |
+| `applepay-ecs.js` | applepay-ecs |
+| `googlepay-ecm.js` | googlepay-ecm（Promise 模式） |
+| `googlepay-ecs.js` | googlepay-ecs（Full Callback 模式） |
 
-### 实际完成状态（2026-05-18）
+> **注**：原始计划的共用 JS 策略（`applepay.js` / `googlepay.js` / `spb.js` 复用）在实现中改为各产品独立 JS 文件，避免条件分支复杂度。
+
+### 实际完成状态（2026-05-29）
 
 - ✅ 全部 14 个路由文件（工厂 + 自定义）
-- ✅ 全部静态 JS 文件（5 个已完成，2 个待实现）
+- ✅ 全部静态 JS 文件（13 个，各产品独立 JS，无共用）
 - ✅ 全部 14 个 EJS 视图（window.DEMO 模式）
 - ✅ Supabase demohub schema 已建表 + seed 数据
 - ✅ 生产 gateway（根目录 server.js）
-- ⏳ applepay.js / googlepay.js 待实现（需测试 Apple/Google Pay sandbox 环境）
+- ✅ applepay-ecm.js / applepay-ecs.js / googlepay-ecm.js / googlepay-ecs.js 已实现
+- ✅ vault-applepay-with-purchase.js 已实现（虚拟产品，recurringPaymentRequest，硬编码 $25/$40 USD）
 - ⏳ 浏览器验证各产品支付流程
 
 ## Design Review Decisions (2026-05-18)
@@ -178,7 +187,7 @@ apps/demo-hub/
 │   │           ├── vault-paypal-setup-only.js      # Custom: /v3/vault/setup-tokens API
 │   │           ├── vault-acdc-with-purchase.js     # Uses createVaultWithPurchaseRoute
 │   │           ├── vault-acdc-setup-only.js        # Custom: /v3/vault/setup-tokens API
-│   │           ├── vault-applepay-with-purchase.js # Uses createVaultWithPurchaseRoute
+│   │           ├── vault-applepay-with-purchase.js # Custom: virtual product + vault + recurringPaymentRequest
 │   │           └── vault-return.js                 # Custom: user-provided vault token
 │   ├── views/
 │   │   ├── partials/
