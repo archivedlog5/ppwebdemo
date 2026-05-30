@@ -176,20 +176,7 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
   // buildBody 优先；无 buildBody 时用 paymentSource
 
 // 需要完全自定义实现的路由：
-// buttons.js            — 双 SDK（CN + US）
-// acdc.js               — CardFields SDK
-// googlepay-ecm.js      — 双外部 SDK（PayPal + Google Pay）；需传 sandboxShipping + sandboxPhone 给 EJS；emailRequired:true（从 sheet 获取）；phone 用 SANDBOX_PHONE 预填；流程：sheet→email→createOrder→processPayment；3DS 通过 GET order details 解析；#custom-googlepay-btn 复用同一点击流程
-// googlepay-ecs.js      — 双外部 SDK；shippingAddressRequired:true + emailRequired:true + phoneNumberRequired:true + shippingOptionRequired:true；SHIPPING_OPTIONS 数组（Standard $5 / Express $10）；Full Callback 模式（paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }；callbackIntents:['SHIPPING_ADDRESS','SHIPPING_OPTION','PAYMENT_AUTHORIZATION']）；onPaymentAuthorized：用户授权后 Google Pay 调用，createOrder 在此回调内执行，返回 Promise<{transactionState}>；onPaymentDataChanged：INITIALIZE/SHIPPING_ADDRESS→返回 newTransactionInfo+newShippingOptionParameters，SHIPPING_OPTION→仅返回 newTransactionInfo；parsePhoneNumber(E.164, isoCountry)→{country_code,national_number}；buyerName/email/parsedPhone/shippingAmount 注入 create-order；total = item + shippingAmount
-// applepay-ecm.js       — 自定义路由；GET 传 sandboxShipping 给 EJS；create-order 含 payment_source.apple_pay.experience_context（return_url/cancel_url；token 由 confirmOrder 注入）；capture-order 标准；extraScripts 加载 `https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js`
-// applepay-ecs.js       — 自定义路由；ECS 流程；GET 无 sandboxShipping（买家在 sheet 选）；create-order 接收 shippingContact + shippingAmount；payment_source.apple_pay 含 name/email_address/phone_number（national_number only，无 country_code）/experience_context；normalizeContact() 剥离非数字；total = item + shippingAmount
-// vault-paypal-with-purchase.js — 完整自定义路由；GET 调 fetchIdToken() 获取 id_token 注入 data-user-id-token；payment_source 在顶层（含 permit_multiple_payment_tokens/description/attributes.customer.merchant_customer_id/experience_context.brand_name/shipping_preference）；capture 返回 vaultId + customerId
-// vault-acdc-with-purchase.js — 完整自定义路由；saveVault=true 时 attributes 加 vault.store_in_vault:ON_SUCCESS + customer.merchant_customer_id（随机 CUST_ 前缀，randomBytes(6)）；3DS select disabled（沙盒限制）；测试卡 4012 0000 3333 0026
-// vault-acdc-setup-only.js  — 完整自定义路由；/v3/vault/setup-tokens；顶层 customer.merchant_customer_id（随机）+ payment_source.card.billing_address + experience_context.return/cancel_url + verification_method（直接挂 card 下）；onApprove：liabilityShift 'YES'|'POSSIBLE' → confirm；否则 GET setup-token → token.status=APPROVED && verification_status=VERIFIED → confirm；GET /api/vault-acdc-setup-only/setup-token/:id 端点；confirm 返回 paymentTokenId + customerId
-// vault-applepay-with-purchase.js — 完整自定义路由；虚拟产品（purchase_unit 无 shipping）；SDK URL 硬编码 `currency=USD&vault=true`；payment_source.apple_pay 含 experience_context（return/cancel_url）+ stored_credential（CUSTOMER/RECURRING/`usage:FIRST`）+ attributes.vault.store_in_vault:ON_SUCCESS；capture 提取 payment_source.apple_pay.attributes.vault：{id→vaultId, customer.id→customerId, status→vaultStatus}；返回 { ...data, vaultId, customerId, vaultStatus }；前端：硬编码 TRIAL_AMOUNT="25.00" / REGULAR_AMOUNT="40.00" / CURRENCY="USD"；requiredShippingContactFields:['email']；paymentRequest 含 recurringPaymentRequest（trial 7天$25 + regular 每7天$40，billingAgreement/managementURL）+ lineItems（paymentTiming:recurring）+ total（含 recurring 字段）；recurringPaymentIntervalUnit:"day"（Apple Pay 无 "week"）；ApplePaySession(4, paymentRequest)；button type "subscribe"
-// vault-paypal-setup-only.js — /v3/vault/setup-tokens API（PayPal 按钮方式）
-// vault-return.js       — 自定义；GET payment-tokens 按钮触发；PayPal → SDK Buttons（fundingSource:PAYPAL，payment_source.paypal.experience_context 无 vault_id，SDK 通过 data-user-id-token 识别回头买家）；card → Pay Now（vault_id）；apple_pay → 禁用（Apple 指南限制）；PayPal-Request-Id 头；shipping:SANDBOX_SHIPPING；**SDK URL 必须含 commit=true&buyer-country=US，否则弹出登录 popup**
-// plm-div.js            — 工厂路由；sdkParams:"components=messages"；EJS 国家选择器（US/AU/DE/ES/FR/IT/GB/CA）；服务端 COUNTRY_TO_CUR 映射；优先读 ?country param（保留 ES/FR/IT 选择）；`data-pp-buyercountry` 注入每个 message div；3 text + 2 flex 布局；无按钮；max-width:680px
-// plm-js.js             — 工厂路由；同 plm-div 国家选择；JS API 方式：`paypalSDK.Messages({amount, placement, buyerCountry, style, onRender, onClick, onApply}).render('#plm-js-container')`；金额变化重新调 Messages()；Event Log 面板；Current Config 展示
+// 各产品路由实现备注 → src/routes/paypal/jssdk-v5/CLAUDE.md
 ```
 
 ## Supabase 产品配置
@@ -262,55 +249,7 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
       return
     }
     ```
-14. **Google Pay ECM 用 Promise 模式，ECS 用 Full Callback 模式**：
-
-    **ECM — Promise 模式**（当前 ECM 实现，无任何 callbacks）：
-    - 不传 `paymentDataCallbacks`，不设 `callbackIntents`
-    - 代码：`loadPaymentData(req).then(function(paymentData) { createOrder → processPayment })`
-    - 用户授权后 sheet 自动关闭，Promise resolve，屏幕干净，3DS 窗口可正常弹出
-
-    **ECS — Full Callback 模式**（当前 ECS 实现，因 `onPaymentDataChanged` 需要）：
-    - ECS 需要 `onPaymentDataChanged` 在 sheet 内动态更新运费，只要注册 `paymentDataCallbacks`，Google Pay 就强制进入 Full Callback 模式
-    - `PaymentsClient` 传 `paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }`
-    - `callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION', 'PAYMENT_AUTHORIZATION']`
-    - 用户 tap Pay → Google Pay 调 `onPaymentAuthorized` → sheet 转为"处理中"转圈状态 → createOrder 在此回调内执行 → 3DS popup 在 sheet 处理中状态下弹出（可正常交互）
-    - `onPaymentAuthorized` 必须返回 `Promise<{ transactionState: 'SUCCESS' | 'ERROR' }>`，只能 resolve（失败用 ERROR，不能 reject）
-
-    **Google Pay API 强制规则（违反 → OR_BIBED_06）：**
-    - 只要构造 `PaymentsClient` 时传入 `paymentDataCallbacks`（哪怕只有 `onPaymentDataChanged`），`callbackIntents` **必须**包含 `'PAYMENT_AUTHORIZATION'`，且**必须**提供 `onPaymentAuthorized` → 否则 OR_BIBED_06
-    - `'SHIPPING_ADDRESS'` 必须在 `callbackIntents` 里才能触发 `INITIALIZE` 回调（sheet 打开时立即调用，展示初始运费选项）
-    - `shippingOptions` 对象只允许 `{id, label, description}`，不能含 `price`、`selected` 等额外字段
-    - `onPaymentDataChanged` 返回规则：INITIALIZE/SHIPPING_ADDRESS → 同时返回 `newTransactionInfo` + `newShippingOptionParameters`；SHIPPING_OPTION → 只返回 `newTransactionInfo`（不传 `newShippingOptionParameters`）
-    - 初始请求 `totalPriceStatus: 'ESTIMATED'`（总价会变化），`onPaymentDataChanged` 回调里用 `'FINAL'`（运费已选定，总价确定）
-
-15. **Google Pay 3DS 路径**（与 ACDC 不同，ECM 和 ECS 相同）：Google Pay 无前端 `liabilityShift`，`confirmOrder` 返回 `PAYER_ACTION_REQUIRED` 时需 `initiatePayerAction` → **GET order details** → 从 `payment_source.google_pay.card.authentication_result`（比 ACDC 多一层 `google_pay`）读取 `liability_shift`、`three_d_secure.enrollment_status`、`three_d_secure.authentication_status`，再决定 capture 还是 reject：
-    - `liability_shift === 'POSSIBLE'` → capture
-    - `liability_shift === 'NO'` + enrollment in `['N','U','B']` → capture（未入会）
-    - `liability_shift === 'NO'` + 其他 enrollment → reject
-    - `liability_shift === 'UNKNOWN'` → reject（提示重试）
-
-16. **Google Pay ECS 电话格式转换**：Google Pay 返回 E.164（`+14155552671`），PayPal `payment_source.google_pay.phone_number` 需要 `{ country_code: '1', national_number: '4155552671' }`。转换方式：strip 非数字 → 用 `COUNTRY_DIAL[shippingAddress.countryCode]`（ISO→拨号代码）找 dialCode → 若 digits 以 dialCode 开头则剥离，剩余为 `national_number`。`COUNTRY_DIAL` 覆盖所有支持货币对应国家。
-
-18. **Apple Pay 流程关键规则**：
-    - **ECM `create-order` 含 `payment_source.apple_pay.experience_context`（return_url/cancel_url）**；token 仍由 `confirmOrder` 注入，无需在 create-order 里指定 Apple Pay token
-    - **ECS `create-order` 的 `payment_source.apple_pay`** 还额外包含从 `shippingContact` 提取的 `name`、`email_address`、`phone_number`（仅 `{ national_number: digits }`，无 `country_code`）
-    - **create-order 在 `onpaymentauthorized` 内部执行**（与 Google Pay 不同，Google Pay 在 sheet 关闭后先 createOrder）；Apple Pay 的整个 createOrder→confirmOrder→capture 链都在 `onpaymentauthorized` 回调中
-    - **必须始终调用 `session.completePayment()`**：无论成功还是失败，否则 Apple Pay sheet 卡住；成功用 `STATUS_SUCCESS`，失败用 `STATUS_FAILURE`
-    - **`confirmOrder` 返回 `{ approveApplePayPayment: { status, ... } }`**；取 `confirmResult.approveApplePayPayment`，再检查 `.status === 'APPROVED'`
-    - **3DS 由 Apple Pay 协议内部处理**（设备 + Touch ID/Face ID），无需 `initiatePayerAction` 或 GET order details
-    - **ECM**: `requiredBillingContactFields: ['name','phone','email','postalAddress']`，无 shippingFields
-    - **ECS**: 额外加 `requiredShippingContactFields: ['name','phone','email','postalAddress']`；`shippingMethods` 数组；`onshippingmethodselected` + `onshippingcontactselected`；`normalizeContact()` 剥离 phoneNumber 中非数字（E.164 含 `+` → 纯数字）
-    - **Apple Pay `phone_number` 格式**：仅 `{ national_number: digits }`，无 `country_code`（与 Google Pay 不同，Google Pay 需要两个字段）
-
-17. **Google Pay ECM vs ECS 的 phone 来源不同**：
-    - ECM（`shippingAddressRequired: false`）：sheet 无地址区域，无法收电话 → 用 `demoParams.SANDBOX_PHONE`（商户预填）注入 `payment_source.google_pay.phone_number`
-    - ECS（`shippingAddressRequired: true`）：sheet 收集地址 + 电话 → `paymentData.shippingAddress.phoneNumber` 经 `parsePhoneNumber()` 转换后注入
-
-19. **Vault Return Buyer SDK 必须加 `commit=true`**：
-    - PayPal 回头买家（`data-user-id-token`）若 SDK URL 缺少 `commit=true`，点击 PayPal 按钮会弹出完整登录 popup，而非一键确认（one-click）体验
-    - 正确 SDK URL：`...&buyer-country=US&commit=true&components=buttons&currency=${currency}`
-    - `create-order` 的 `payment_source` 只需 `{ paypal: { experience_context } }`，**不需要 vault_id**；SDK 通过 `data-user-id-token` 自动识别回头买家身份
-    - `data-user-id-token` 由后端调 `POST /v1/oauth2/token?response_type=id_token&target_customer_id=<customerId>` 获取并注入 SDK script 标签
+> JSSDK v5 专属规则（14–19：Google Pay、Apple Pay、Vault Return）→ `src/routes/paypal/jssdk-v5/CLAUDE.md`
 
 ## EJS/JS 分离模式
 
@@ -343,23 +282,7 @@ EJS 文件职责：
 
 **静态 JS 文件位置与对应关系：**
 
-| JS 文件 | 使用的产品 EJS |
-|---------|--------------|
-| `public/js/paypal/jssdk-v5/spb.js` | spb-ecm, spb-ecs |
-| `public/js/paypal/jssdk-v5/vault-paypal-with-purchase.js` | vault-paypal-with-purchase（专属；capture 后显示 vaultId + customerId） |
-| `public/js/paypal/jssdk-v5/acdc.js` | acdc |
-| `public/js/paypal/jssdk-v5/vault-acdc-setup-only.js` | vault-acdc-setup-only（专属；`createVaultSetupToken` callback；onApprove 3DS 决策：`liabilityShift 'YES'|'POSSIBLE'` → 直接 confirm；否则 GET setup token → `token.status==='APPROVED' && verification_status==='VERIFIED'` → confirm；`doConfirm()` + `showVaultResult(paymentTokenId, customerId)`；console.group 分组打印三个字段；前缀 `[ACDC-Setup]`） |
-| `public/js/paypal/jssdk-v5/vault-acdc-with-purchase.js` | vault-acdc-with-purchase（专属；含 `getVaultChecked()` + `showVaultResult()`；`saveVault` 条件 vault attrs；capture 后展示 vault 面板） |
-| `public/js/paypal/jssdk-v5/buttons.js` | buttons（双 SDK：cnSdkUrl + usSdkUrl） |
-| `public/js/paypal/jssdk-v5/vault-paypal-setup-only.js` | vault-paypal-setup-only |
-| `public/js/paypal/jssdk-v5/vault-return.js` | vault-return |
-| `public/js/paypal/jssdk-v5/applepay-ecm.js` | applepay-ecm（已实现；完整 ApplePaySession 流程；`confirmOrder` 响应 `{ approveApplePayPayment }` 解包后检查 `.status === 'APPROVED'`；3DS 由 Apple Pay 协议内部处理；ECM 无 shippingFields） |
-| `public/js/paypal/jssdk-v5/applepay-ecs.js` | applepay-ecs（已实现；ECS 流程；`SHIPPING_METHODS` 数组；`onshippingmethodselected` + `onshippingcontactselected`；`normalizeContact()` 剥离非数字；createOrder 带 shippingContact + shippingAmount；`payment_source.apple_pay` 含 name/email/phone） |
-| `public/js/paypal/jssdk-v5/googlepay-ecm.js` | googlepay-ecm（已实现；Promise 模式；`emailRequired:true`；流程：sheet 先开→获取 email→createOrder（email + SANDBOX_PHONE 注入 payment_source）→processPayment；singleton paymentsClient/googlepayConfig、handle3DS、doCapture；custom button 绑定 hover/press/click） |
-| `public/js/paypal/jssdk-v5/googlepay-ecs.js` | googlepay-ecs（已实现；`shippingAddressRequired:true` + `emailRequired:true` + `phoneNumberRequired:true` + `shippingOptionRequired:true`；`SHIPPING_OPTIONS` 数组（Standard $5 / Express $10）；`chosenShipping` 模块状态；**Full Callback 模式**：`paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }`，`callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION', 'PAYMENT_AUTHORIZATION']`；`onPaymentAuthorized`：createOrder 在此回调内执行，返回 `Promise<{transactionState}>`；`onPaymentDataChanged`：INITIALIZE/SHIPPING_ADDRESS→`newTransactionInfo+newShippingOptionParameters`，SHIPPING_OPTION→仅 `newTransactionInfo`；`shippingOptions` 只含 `{id,label,description}`；`COUNTRY_DIAL` + `parsePhoneNumber()` 把 E.164 → `{ country_code, national_number }`；3DS 路径与 ECM 相同） |
-| `public/js/paypal/jssdk-v5/vault-applepay-with-purchase.js` | vault-applepay-with-purchase（专属；虚拟产品 Apple Pay 流程 + vault；硬编码 `TRIAL_AMOUNT="25.00"` / `REGULAR_AMOUNT="40.00"` / `CURRENCY="USD"`；`requiredShippingContactFields:['email']`（email only，无 shipping address）；`stored_credential` 含 `usage:FIRST`；paymentRequest 含 `recurringPaymentRequest`（trial 7天$25 + regular 每7天$40，`billingAgreement`/`managementURL`）+ `lineItems`（`paymentTiming:recurring`）+ `total`（含 recurring 字段，Apple Pay sheet 展示订阅信息）；`recurringPaymentIntervalUnit:"day"`（Apple Pay 无 "week"）；`ApplePaySession(4, paymentRequest)`；button type `"subscribe"`；`showVaultResult(vaultId, customerId, vaultStatus)`；console.log 前缀 `[Apple Pay Vault]`） |
-| `public/js/paypal/jssdk-v5/plm-div.js` | plm-div（`updateAllMessages()`：`querySelectorAll("[data-pp-message]")` → `setAttribute("data-pp-amount", val)`，SDK MutationObserver 自动重渲染；`COUNTRY_TO_CUR` 映射（US→USD / AU→AUD / DE/ES/FR/IT→EUR / GB→GBP / CA→CAD）；`#demo-country` change：带 `?country=XX&currency=YYY` 刷新；零小数位格式化） |
-| `public/js/paypal/jssdk-v5/plm-js.js` | plm-js（`renderMessages(amount)`：调 `paypalSDK.Messages({ amount, placement, buyerCountry, style, onRender, onClick, onApply }).render('#plm-js-container')`；金额变化重新调 `renderMessages()`（非 setAttribute）；`logEvent()` 写 `#plm-event-log`（最多 30 条，最新在顶）；`updateConfigDisplay()` 更新 `#plm-js-config`；Clear 按钮重置日志；同 plm-div 的国家切换逻辑） |
+完整文件对应表 → `docs/design/2026-05-18-design-be-jssdk-v5-file-map.md`
 
 **新增 JS 文件时的规范：**
 - 用 IIFE 包裹（`(function() { 'use strict'; ... })()`）
@@ -380,181 +303,9 @@ npm run dev:demo-hub
 
 nodemon 监听文件变更自动重启。修改路由/视图后终端会显示重启信息。
 
-## 新增支付产品 Demo 完整步骤
+## 新增支付产品 Demo
 
-### 1. 创建路由文件
-
-**`buildBody` 模式（推荐，所有 API 参数在一个文件）：**
-```js
-// src/routes/<provider>/<sdk>/<product>.js
-const { createStandardRoute } = require('./_factory')
-const C = require('../../../config/constants')  // 整个引入
-
-module.exports = createStandardRoute({
-  productKey: '<product>',
-  sdkParams:  'components=buttons',
-  view:       '<provider>/<sdk>/<product>',
-
-  buildBody: function (amount, currency) {
-    // 完整 body 在这里，amount + currency 由工厂动态注入
-    return {
-      intent: C.INTENT.CAPTURE,
-      purchase_units: [{
-        amount: { currency_code: currency, value: amount, breakdown: { item_total: { currency_code: currency, value: amount } } },
-        description: C.DEMO_DESCRIPTION,
-        items: [{ ...C.DEMO_ITEM, unit_amount: { currency_code: currency, value: amount } }],
-        shipping: C.SANDBOX_SHIPPING,
-        // 加任何产品专属字段
-      }]
-    }
-  },
-})
-```
-
-**所有工厂路由产品必须使用 `buildBody`，包括"简单"产品。** 这样所有 API 参数都在路由文件一处，方便调试和日志查看：
-```js
-// 即使是最简单的产品，也用 buildBody 而非省略
-module.exports = createStandardRoute({
-  productKey: 'spb-ecs',
-  sdkParams:  'components=buttons',
-  view:       'paypal/jssdk-v5/spb-ecs',
-  buildBody: function (amount, currency) {
-    return {
-      intent: demoParams.INTENT.CAPTURE,
-      purchase_units: [{ ... }]
-    }
-  }
-})
-```
-
-**Vault with-purchase（带购买的 Vault）：**
-
-`vault-paypal-with-purchase` 已改为**完整自定义路由**（不再用工厂）：GET 获取 id_token → 注入 `data-user-id-token`；create-order 的 `payment_source` 在**顶层**（含 vault 完整参数）；capture 返回 `vaultId` + `customerId`。
-
-其余 vault-with-purchase 产品仍可用工厂：
-```js
-const { createVaultWithPurchaseRoute } = require('./_factory')
-module.exports = createVaultWithPurchaseRoute({
-  productKey: 'vault-acdc-with-purchase',
-  sdkParams:  'components=card-fields&vault=true',
-  view:       'paypal/jssdk-v5/vault-acdc-with-purchase',
-  paymentSource: { card: { attributes: { vault: { store_in_vault: 'ON_SUCCESS' } } } }
-})
-```
-
-**自定义路由**（CardFields、双SDK、Google Pay、Vault Setup-only、Return Buyer）：参考 `acdc.js`、`buttons.js`、`googlepay-ecm.js`、`vault-paypal-setup-only.js`、`vault-return.js`。
-
-### 2. 创建（或复用）静态 JS 文件
-
-先看是否能复用已有 JS 文件（参考上方"EJS/JS 分离模式"对应关系表）。
-
-**如需新建 JS 文件**（`src/public/js/<provider>/<sdk>/<product>.js`）：
-```js
-;(function () {
-  'use strict'
-
-  function showResult(text, type) {
-    var el = document.getElementById('result')
-    if (!el) return
-    el.className = 'result-msg ' + type
-    el.textContent = text
-  }
-
-  window.addEventListener('load', function () {
-    if (typeof paypalSDK === 'undefined') {
-      showResult('✗ PayPal SDK failed to load', 'error'); return
-    }
-    var container = document.getElementById('paypal-button-container')
-    container.classList.remove('sdk-loading')
-    container.innerHTML = ''
-
-    var urls = window.DEMO && window.DEMO.urls
-
-    paypalSDK.Buttons({
-      createOrder: function () {
-        return fetch(urls.createOrder, { method: 'POST' })
-          .then(function (r) { return r.json() }).then(function (d) { return d.id })
-      },
-      onApprove: function (data) {
-        return fetch(urls.captureOrder, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ orderID: data.orderID })
-        }).then(function (r) { return r.json() }).then(function (o) {
-          showResult('✓ Captured: ' + o.id, 'success')
-        })
-      },
-      onError: function (e) { showResult('✗ ' + (e.message || String(e)), 'error') }
-    }).render('#paypal-button-container')
-  })
-})()
-```
-
-### 3. 创建 EJS 视图
-
-在 `src/views/<provider>/<sdk>/<product>.ejs` 创建（**只写 HTML + window.DEMO 注入**）：
-```ejs
-<%- include('../../partials/header', {
-  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
-  sidebarProducts, showSidebar, sdkUrl
-}) %>
-
-<div class="sandbox-page">
-  <div class="sandbox-header">
-    <span class="provider-badge badge-paypal">PayPal · JSSDK v5</span>
-    <h1><%= title %></h1>
-    <p>产品描述</p>
-  </div>
-  <div class="sandbox-card">
-    <div class="amount-display">
-      <div class="amount-label">Test Amount</div>
-      <div class="amount-value">$1.00</div>
-      <span class="sandbox-mode-badge">⚡ Sandbox Mode</span>
-    </div>
-    <div id="paypal-button-container" class="sdk-loading">
-      <div class="sdk-spinner"></div>
-      <span>Loading PayPal...</span>
-    </div>
-    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
-  </div>
-</div>
-
-<%# 注入 API 端点配置，然后引入静态 JS 文件 %>
-<script>
-  window.DEMO = {
-    urls: {
-      createOrder:  '/paypal/jssdk-v5/api/<product>/create-order',
-      captureOrder: '/paypal/jssdk-v5/api/<product>/capture-order',
-    }
-  }
-</script>
-<script src="/js/paypal/jssdk-v5/<product-or-shared>.js"></script>
-
-<%- include('../../partials/footer', { showSidebar }) %>
-```
-
-### 4. 挂载路由（`src/app.js`）
-
-```js
-// 在对应 SDK 块下加一行
-app.use(v5, require('./routes/paypal/jssdk-v5/<product>'))
-```
-
-### 5. 插入 Supabase 数据
-
-```sql
-INSERT INTO demohub.products
-  (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
-VALUES
-  ('paypal', 'jssdk-v5', '<product>', '显示名称', '一句话描述', true, <排序号>);
-```
-
-### 6. 重启并验证
-
-```bash
-npm run dev        # 或在已启动的 nodemon 中输入 rs
-```
-
-打开 `http://localhost:3000` → 首页自动出现新产品卡片 → 点击进入 demo 页验证。
+详细步骤见 `docs/guides/add-product.md`。
 
 ## 记忆恢复（Memory Compaction 后）
 
@@ -563,24 +314,14 @@ npm run dev        # 或在已启动的 nodemon 中输入 rs
 3. 读 `docs/progress.md`
 4. 读 `docs/debug-log.md`
 
-## JSSDK v5 文件速查（调试用）
-
-```
-修改 SDK 加载参数  → src/routes/paypal/jssdk-v5/<product>.js 的 sdkParams
-修改 PayPal API   → src/routes/paypal/jssdk-v5/_factory.js（工厂产品）
-                    或 src/routes/paypal/jssdk-v5/<product>.js（自定义产品）
-修改 SDK 行为     → src/public/js/paypal/jssdk-v5/<shared>.js
-修改页面 HTML     → src/views/paypal/jssdk-v5/<product>.ejs
-修改 UI 样式      → src/public/css/sandbox.css
-```
-
-完整文件映射（每个 demo 对应哪些文件）：
-→ `docs/design/2026-05-18-design-be-jssdk-v5-file-map.md`
 
 ## 参考文档
 
+- 通用新增 Demo 步骤：`docs/guides/add-product.md`
+- JSSDK v5 专属规则 + 文件速查：`src/routes/paypal/jssdk-v5/CLAUDE.md`
 - 需求：`docs/req/2026-05-15-req-demo-hub.md`
 - JSSDK v5 产品：`docs/req/2026-05-15-req-jssdk-v5.md`
 - 实现计划：`docs/plans/2026-05-15-plan-jssdk-v5-v1.md`
 - 路由设计：`docs/design/2026-05-15-design-be-routing.md`
+- v5 文件映射：`docs/design/2026-05-18-design-be-jssdk-v5-file-map.md`
 - 根项目指南：`../../CLAUDE.md`
