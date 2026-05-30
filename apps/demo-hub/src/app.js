@@ -36,6 +36,11 @@ app.use(v5, require("./routes/paypal/jssdk-v5/vault-return"));
 app.use(v5, require("./routes/paypal/jssdk-v5/plm-div"));
 app.use(v5, require("./routes/paypal/jssdk-v5/plm-js"));
 
+// ── PayPal JSSDK v6 ──────────────────────────────────────────────────────────
+const v6 = '/paypal/jssdk-v6'
+app.use(v6, require('./routes/paypal/jssdk-v6/paypal-ecm'))
+app.use(v6, require('./routes/paypal/jssdk-v6/paypal-ecs'))
+
 app.use((req, res) => res.status(404).send("Route not found"));
 
 // ── 导出供 gateway 复用 ──────────────────────────────────────────────

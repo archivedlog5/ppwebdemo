@@ -109,9 +109,55 @@
 
 ---
 
+## PayPal JSSDK v6（进行中）
+
+> 完整计划：`docs/superpowers/plans/2026-05-30-jssdk-v6.md`
+> 设计文档：`docs/superpowers/specs/2026-05-30-jssdk-v6-design.md`
+
+### 基础设施（Tasks 1–3）
+
+- [x] **Task 1** — v6 路由工厂（`src/routes/paypal/jssdk-v6/_factory.js`：`createStandardRoute`，buildBody 必填，返回 `orderId` 小写 d）
+- [x] **Task 2** — 共享 init.js（`src/public/js/paypal/jssdk-v6/init.js`：`getPPInstance()` 单例 + sessionStorage 缓存）
+- [x] **Task 3** — app.js 挂载 v6 路由（仅 paypal-ecm + paypal-ecs，其余增量添加）
+
+### Supabase（Task 4）
+
+- [x] **Task 4** — 20 条 v6 seed 数据（用户已在 Supabase SQL Editor 执行）
+
+### PayPal ECM / ECS（Tasks 5–7）
+
+- [x] **Task 5** — 路由文件：`paypal-ecm.js` + `paypal-ecs.js`（buildBody 含 SANDBOX_SHIPPING / GET_FROM_FILE 差异）
+- [x] **Task 6** — EJS 视图：`paypal-ecm.ejs` + `paypal-ecs.ejs`（window.DEMO 注入 clientId + components，defer SDK）
+- [x] **Task 7** — 前端 JS：`paypal.js`（paypal-ecm 和 paypal-ecs 共用；嵌套 .then 保证 instance 作用域；session.start 传 Promise 引用）
+- [x] **Task 22** — CLAUDE.md + 规则文档（`src/routes/paypal/jssdk-v6/CLAUDE.md`，7 条 v6 专属规则 V6-1 到 V6-7，含 3 个 symlinks）
+
+### E2E 验证（Task 11）
+
+- [ ] **Task 11** — E2E 浏览器测试：paypal-ecm / paypal-ecs 完整支付流程（**用户人手测试中**）
+
+### 待实现（Tasks 12–21，等各产品 markdown）
+
+- [ ] **Task 8** — PayLater ECM + ECS（`paylater-ecm.js/ejs`、`paylater-ecs.js/ejs`、`paylater.js`）
+- [ ] **Task 9** — Venmo ECM + ECS（`venmo-ecm.js/ejs`、`venmo-ecs.js/ejs`、`venmo.js`）
+- [ ] **Task 10** — BCDC ECM + ECS（`bcdc-ecm.js/ejs`、`bcdc-ecs.js/ejs`、`bcdc.js`）
+- [ ] **Task 12** — Standalone Buttons（`buttons.js/ejs`，多 funding source）
+- [ ] **Task 13** — ACDC（`acdc.js/ejs`，Card Fields v6 API）
+- [ ] **Task 14** — Apple Pay ECM（`applepay-ecm.js/ejs`）
+- [ ] **Task 15** — Apple Pay ECS（`applepay-ecs.js/ejs`）
+- [ ] **Task 16** — Google Pay ECM（`googlepay-ecm.js/ejs`，Promise 模式）
+- [ ] **Task 17** — Google Pay ECS（`googlepay-ecs.js/ejs`，Full Callback 模式）
+- [ ] **Task 18** — PayPal Vault w/ Purchase（`vault-paypal-with-purchase.js/ejs`）
+- [ ] **Task 19** — PayPal Vault Setup-only（`vault-paypal-setup-only.js/ejs`）
+- [ ] **Task 20** — ACDC Vault w/ Purchase（`vault-acdc-with-purchase.js/ejs`）
+- [ ] **Task 21** — ACDC Vault Setup-only（`vault-acdc-setup-only.js/ejs`）
+- [ ] **Task 23** — PLM HTML（`plm-html.js/ejs`）
+- [ ] **Task 24** — PLM JS（`plm-js.js/ejs`）
+
+---
+
 ## 待启动（后续讨论）
 
-- [ ] PayPal JSSDK v6 — 产品清单待讨论（与 v5 共用 `_factory.js` 模式）
+- [ ] PayPal JSSDK v6 — Tasks 12–21（等各产品 v6 markdown 到位）
 - [ ] Braintree Web SDK — Drop-in UI、Hosted Fields
 - [ ] Braintree GraphQL — 产品待定
 - [ ] Stripe stripe-js — 产品待定
