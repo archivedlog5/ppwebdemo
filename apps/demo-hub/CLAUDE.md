@@ -2,6 +2,22 @@
 
 > 派生自根目录 `CLAUDE.md`，聚焦 demo-hub app。根 CLAUDE.md 的所有通用规则在此同样适用。
 
+## 核心开发原则（Karpathy）
+
+**1. 先思考，再编码（Think Before Coding）**
+不做无声假设，不掩盖困惑。需求存在多种解读时，列出来让用户确认，而不是随机选一种就跑。
+
+**2. 简单优先（Simplicity First）**
+不写没人要求的抽象层，50 行能解决的问题不写 200 行。避免过度设计。
+
+**3. 精准修改（Surgical Changes）**
+只碰需要改的地方，每一行 diff 都要能追溯到用户的具体需求。不"顺手"优化不相关的代码，不重构没坏的东西，不动没被要求改的文件。
+
+**4. 目标驱动执行（Goal-Driven Execution）**
+开始写代码之前，先定义"完成"长什么样。要有可验证的成功标准，而不是模糊地开工。
+
+---
+
 ## App 定位
 
 demo-hub 是支付产品集成演示中心，以最简洁的方式展示各支付提供商（PayPal、Braintree、Stripe、Adyen）的不同产品如何集成。面向技术开发者（主）、业务决策者（辅）、内部销售同事（辅）。
@@ -172,6 +188,8 @@ createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody?, paymentS
 // vault-applepay-with-purchase.js — 完整自定义路由；虚拟产品（purchase_unit 无 shipping）；SDK URL 硬编码 `currency=USD&vault=true`；payment_source.apple_pay 含 experience_context（return/cancel_url）+ stored_credential（CUSTOMER/RECURRING/`usage:FIRST`）+ attributes.vault.store_in_vault:ON_SUCCESS；capture 提取 payment_source.apple_pay.attributes.vault：{id→vaultId, customer.id→customerId, status→vaultStatus}；返回 { ...data, vaultId, customerId, vaultStatus }；前端：硬编码 TRIAL_AMOUNT="25.00" / REGULAR_AMOUNT="40.00" / CURRENCY="USD"；requiredShippingContactFields:['email']；paymentRequest 含 recurringPaymentRequest（trial 7天$25 + regular 每7天$40，billingAgreement/managementURL）+ lineItems（paymentTiming:recurring）+ total（含 recurring 字段）；recurringPaymentIntervalUnit:"day"（Apple Pay 无 "week"）；ApplePaySession(4, paymentRequest)；button type "subscribe"
 // vault-paypal-setup-only.js — /v3/vault/setup-tokens API（PayPal 按钮方式）
 // vault-return.js       — 自定义；GET payment-tokens 按钮触发；PayPal → SDK Buttons（fundingSource:PAYPAL，payment_source.paypal.experience_context 无 vault_id，SDK 通过 data-user-id-token 识别回头买家）；card → Pay Now（vault_id）；apple_pay → 禁用（Apple 指南限制）；PayPal-Request-Id 头；shipping:SANDBOX_SHIPPING；**SDK URL 必须含 commit=true&buyer-country=US，否则弹出登录 popup**
+// plm-div.js            — 工厂路由；sdkParams:"components=messages"；EJS 国家选择器（US/AU/DE/ES/FR/IT/GB/CA）；服务端 COUNTRY_TO_CUR 映射；优先读 ?country param（保留 ES/FR/IT 选择）；`data-pp-buyercountry` 注入每个 message div；3 text + 2 flex 布局；无按钮；max-width:680px
+// plm-js.js             — 工厂路由；同 plm-div 国家选择；JS API 方式：`paypalSDK.Messages({amount, placement, buyerCountry, style, onRender, onClick, onApply}).render('#plm-js-container')`；金额变化重新调 Messages()；Event Log 面板；Current Config 展示
 ```
 
 ## Supabase 产品配置
@@ -226,6 +244,7 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 5. `product_key` 与路由 slug 完全对应（`/paypal/jssdk-v5/spb-ecm` → `product_key: 'spb-ecm'`）
 6. 新增产品：写路由代码 → 在 Supabase 插入行（含 sdk_version） → 重启 app
 7. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
+7a. 工厂 GET handler 透传 `country: req.query.country || ''` 给所有 EJS（非破坏性，普通产品忽略；PLM demo 用此区分同属 EUR 的 DE/ES/FR/IT）
 8. **API 常量引入方式**：路由文件用 `const C = require('../../../config/constants')` 整个引入，用 `C.INTENT`、`C.SANDBOX_SHIPPING` 等，不逐个解构
 9. **Order body 规范**：所有工厂路由产品（`createStandardRoute` / `createVaultWithPurchaseRoute`）**必须**提供 `buildBody(amount, currency)` 函数；自定义路由（buttons/acdc/googlepay-ecm/vault-setup-only/vault-return）直接在 POST handler 里控制 body
 10. **金额动态传递**：前端从 `#demo-amount` 读值 → fetch body `{ amount, currency }` → 后端 `req.body.amount` / `req.body.currency`
@@ -339,6 +358,8 @@ EJS 文件职责：
 | `public/js/paypal/jssdk-v5/googlepay-ecm.js` | googlepay-ecm（已实现；Promise 模式；`emailRequired:true`；流程：sheet 先开→获取 email→createOrder（email + SANDBOX_PHONE 注入 payment_source）→processPayment；singleton paymentsClient/googlepayConfig、handle3DS、doCapture；custom button 绑定 hover/press/click） |
 | `public/js/paypal/jssdk-v5/googlepay-ecs.js` | googlepay-ecs（已实现；`shippingAddressRequired:true` + `emailRequired:true` + `phoneNumberRequired:true` + `shippingOptionRequired:true`；`SHIPPING_OPTIONS` 数组（Standard $5 / Express $10）；`chosenShipping` 模块状态；**Full Callback 模式**：`paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }`，`callbackIntents: ['SHIPPING_ADDRESS', 'SHIPPING_OPTION', 'PAYMENT_AUTHORIZATION']`；`onPaymentAuthorized`：createOrder 在此回调内执行，返回 `Promise<{transactionState}>`；`onPaymentDataChanged`：INITIALIZE/SHIPPING_ADDRESS→`newTransactionInfo+newShippingOptionParameters`，SHIPPING_OPTION→仅 `newTransactionInfo`；`shippingOptions` 只含 `{id,label,description}`；`COUNTRY_DIAL` + `parsePhoneNumber()` 把 E.164 → `{ country_code, national_number }`；3DS 路径与 ECM 相同） |
 | `public/js/paypal/jssdk-v5/vault-applepay-with-purchase.js` | vault-applepay-with-purchase（专属；虚拟产品 Apple Pay 流程 + vault；硬编码 `TRIAL_AMOUNT="25.00"` / `REGULAR_AMOUNT="40.00"` / `CURRENCY="USD"`；`requiredShippingContactFields:['email']`（email only，无 shipping address）；`stored_credential` 含 `usage:FIRST`；paymentRequest 含 `recurringPaymentRequest`（trial 7天$25 + regular 每7天$40，`billingAgreement`/`managementURL`）+ `lineItems`（`paymentTiming:recurring`）+ `total`（含 recurring 字段，Apple Pay sheet 展示订阅信息）；`recurringPaymentIntervalUnit:"day"`（Apple Pay 无 "week"）；`ApplePaySession(4, paymentRequest)`；button type `"subscribe"`；`showVaultResult(vaultId, customerId, vaultStatus)`；console.log 前缀 `[Apple Pay Vault]`） |
+| `public/js/paypal/jssdk-v5/plm-div.js` | plm-div（`updateAllMessages()`：`querySelectorAll("[data-pp-message]")` → `setAttribute("data-pp-amount", val)`，SDK MutationObserver 自动重渲染；`COUNTRY_TO_CUR` 映射（US→USD / AU→AUD / DE/ES/FR/IT→EUR / GB→GBP / CA→CAD）；`#demo-country` change：带 `?country=XX&currency=YYY` 刷新；零小数位格式化） |
+| `public/js/paypal/jssdk-v5/plm-js.js` | plm-js（`renderMessages(amount)`：调 `paypalSDK.Messages({ amount, placement, buyerCountry, style, onRender, onClick, onApply }).render('#plm-js-container')`；金额变化重新调 `renderMessages()`（非 setAttribute）；`logEvent()` 写 `#plm-event-log`（最多 30 条，最新在顶）；`updateConfigDisplay()` 更新 `#plm-js-config`；Clear 按钮重置日志；同 plm-div 的国家切换逻辑） |
 
 **新增 JS 文件时的规范：**
 - 用 IIFE 包裹（`(function() { 'use strict'; ... })()`）

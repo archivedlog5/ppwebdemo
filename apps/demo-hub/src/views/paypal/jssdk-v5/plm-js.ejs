@@ -1,0 +1,89 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar, sdkUrl
+}) %>
+
+<%
+var COUNTRY_TO_CUR = { US: 'USD', AU: 'AUD', DE: 'EUR', ES: 'EUR', FR: 'EUR', IT: 'EUR', GB: 'GBP', CA: 'CAD' };
+var CUR_TO_COUNTRY = { USD: 'US', AUD: 'AU', EUR: 'DE', GBP: 'GB', CAD: 'CA' };
+var PLM_COUNTRIES = ['US','AU','DE','ES','FR','IT','GB','CA'];
+var _country = (country && PLM_COUNTRIES.indexOf(country) !== -1) ? country : (CUR_TO_COUNTRY[currency] || 'US');
+var _cur = COUNTRY_TO_CUR[_country] || 'USD';
+var buyerCountry = _country;
+%>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · PLM — JS</span>
+    <h1><%= title %></h1>
+    <p>Pay Later messaging via <code>paypalSDK.Messages({ amount, placement, buyerCountry, style, onRender, onClick, onApply }).render()</code>. Amount changes re-invoke <code>Messages()</code> with the new value. Event hooks are logged below.</p>
+  </div>
+
+  <div class="sandbox-card" style="max-width:680px">
+
+    <%# ── Amount + Currency ──────────────────────────────────────────────── %>
+    <div class="amount-row" style="margin-bottom:6px">
+      <div class="currency-group">
+        <label class="field-label" for="demo-country">Buyer Country</label>
+        <select id="demo-country" class="currency-select" aria-label="Select buyer country">
+          <% ['US','AU','DE','ES','FR','IT','GB','CA'].forEach(function(c) { %>
+            <option value="<%= c %>" <%= _country === c ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00" aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+    <div class="amount-error" id="amount-error" role="alert" style="margin-bottom:14px"></div>
+
+    <%# ── JS-configured message ───────────────────────────────────────────── %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:14px">JS-configured Message</div>
+
+    <div style="background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:20px;min-height:40px">
+      <div id="plm-js-container"></div>
+    </div>
+
+    <%# ── Current config ──────────────────────────────────────────────────── %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:10px">Current JS Config</div>
+    <pre id="plm-js-config"
+      style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:12px 14px;font-size:12px;font-family:var(--font-mono);color:var(--fg-muted);overflow-x:auto;margin-bottom:22px;line-height:1.6"
+    ></pre>
+
+    <%# ── Event log ───────────────────────────────────────────────────────── %>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle)">
+        Event Log &nbsp;<span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;color:var(--fg-muted)">onRender · onClick · onApply</span>
+      </div>
+      <button id="clear-log-btn" type="button"
+        style="padding:3px 10px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:5px;font-size:11px;color:var(--fg-muted);cursor:pointer">
+        Clear
+      </button>
+    </div>
+    <div id="plm-event-log"
+      style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:7px;padding:10px 14px;min-height:80px;max-height:220px;overflow-y:auto;margin-bottom:20px;font-size:12px">
+      <div style="color:var(--fg-subtle);font-size:12px">Events will appear here...</div>
+    </div>
+
+    <div class="test-hint">
+      Supported markets: <strong>US</strong> · <strong>AU</strong> · <strong>DE</strong> · <strong>ES</strong> · <strong>FR</strong> · <strong>IT</strong> · <strong>GB</strong> · <strong>CA</strong>.
+      <code>buyerCountry</code> is passed to <code>Messages()</code> based on the selected buyer country.
+    </div>
+
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    currency:      '<%= _cur %>',
+    defaultAmount: '<%= defaultAmount %>',
+    buyerCountry:  '<%= buyerCountry || "" %>',
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/plm-js.js"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

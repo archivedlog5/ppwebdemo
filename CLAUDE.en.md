@@ -2,6 +2,22 @@
 
 > This is the English version of `CLAUDE.md`. Both files must be kept in sync — any update to `CLAUDE.md` must be reflected here immediately.
 
+## Core Development Principles (Karpathy)
+
+**1. Think Before Coding**
+Don't make silent assumptions; don't hide confusion. When a requirement has multiple interpretations, list them for the user to confirm — don't just pick one and run with it.
+
+**2. Simplicity First**
+Don't write abstraction layers nobody asked for. Don't solve a 50-line problem with 200 lines. Avoid over-engineering.
+
+**3. Surgical Changes**
+Only touch what needs to change. Every line of diff must trace back to a specific user request. Don't "opportunistically" optimize unrelated code, don't refactor things that aren't broken, don't modify files that weren't asked about.
+
+**4. Goal-Driven Execution**
+Before writing any code, define what "done" looks like. Establish verifiable success criteria — don't start work on a vague mandate.
+
+---
+
 ## Project Overview
 
 **payment-playground** is a comprehensive payment demo and cross-border e-commerce monorepo, containing:

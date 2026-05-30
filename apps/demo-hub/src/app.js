@@ -33,6 +33,8 @@ app.use(v5, require("./routes/paypal/jssdk-v5/vault-acdc-with-purchase"));
 app.use(v5, require("./routes/paypal/jssdk-v5/vault-acdc-setup-only"));
 app.use(v5, require("./routes/paypal/jssdk-v5/vault-applepay-with-purchase"));
 app.use(v5, require("./routes/paypal/jssdk-v5/vault-return"));
+app.use(v5, require("./routes/paypal/jssdk-v5/plm-div"));
+app.use(v5, require("./routes/paypal/jssdk-v5/plm-js"));
 
 app.use((req, res) => res.status(404).send("Route not found"));
 

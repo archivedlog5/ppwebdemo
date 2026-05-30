@@ -1,0 +1,151 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar, sdkUrl
+}) %>
+
+<%
+var COUNTRY_TO_CUR = { US: 'USD', AU: 'AUD', DE: 'EUR', ES: 'EUR', FR: 'EUR', IT: 'EUR', GB: 'GBP', CA: 'CAD' };
+var CUR_TO_COUNTRY = { USD: 'US', AUD: 'AU', EUR: 'DE', GBP: 'GB', CAD: 'CA' };
+var PLM_COUNTRIES = ['US','AU','DE','ES','FR','IT','GB','CA'];
+var _country = (country && PLM_COUNTRIES.indexOf(country) !== -1) ? country : (CUR_TO_COUNTRY[currency] || 'US');
+var _cur = COUNTRY_TO_CUR[_country] || 'USD';
+var buyerCountry = _country;
+%>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · PLM — div</span>
+    <h1><%= title %></h1>
+    <p>Pay Later messaging via HTML <code>data-pp-*</code> attributes. Change the amount — all placements update automatically via the SDK's MutationObserver (no <code>render()</code> call). Non-domestic merchants use <code>data-pp-buyercountry</code> for cross-border messaging.</p>
+  </div>
+
+  <div class="sandbox-card" style="max-width:680px">
+
+    <%# ── Amount + Currency ──────────────────────────────────────────────── %>
+    <div class="amount-row" style="margin-bottom:6px">
+      <div class="currency-group">
+        <label class="field-label" for="demo-country">Buyer Country</label>
+        <select id="demo-country" class="currency-select" aria-label="Select buyer country">
+          <% ['US','AU','DE','ES','FR','IT','GB','CA'].forEach(function(c) { %>
+            <option value="<%= c %>" <%= _country === c ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00" aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+    <div class="amount-error" id="amount-error" role="alert" style="margin-bottom:14px"></div>
+
+    <%# ══ TEXT LAYOUT ═══════════════════════════════════════════════════════ %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:14px">Text Layout</div>
+
+    <%# — Product placement ─────────────────────────────────────────────── %>
+    <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+      Product Page &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">placement="product"</code>
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:18px;min-height:32px">
+      <div
+        data-pp-message
+        data-pp-style-layout="text"
+        data-pp-style-logo-type="inline"
+        data-pp-style-text-color="black"
+        data-pp-style-text-size="12"
+        data-pp-amount="<%= defaultAmount %>"
+        data-pp-placement="product"
+        <% if (buyerCountry) { %>data-pp-buyercountry="<%= buyerCountry %>"<% } %>>
+      </div>
+    </div>
+
+    <%# — Cart placement ────────────────────────────────────────────────── %>
+    <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+      Cart &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">placement="cart"</code>
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:18px;min-height:32px">
+      <div
+        data-pp-message
+        data-pp-style-layout="text"
+        data-pp-style-logo-type="primary"
+        data-pp-style-logo-position="right"
+        data-pp-style-text-color="black"
+        data-pp-style-text-size="13"
+        data-pp-amount="<%= defaultAmount %>"
+        data-pp-placement="cart"
+        <% if (buyerCountry) { %>data-pp-buyercountry="<%= buyerCountry %>"<% } %>>
+      </div>
+    </div>
+
+    <%# — Checkout/Payment placement ────────────────────────────────────── %>
+    <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+      Checkout &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">placement="payment"</code>
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:26px;min-height:32px">
+      <div
+        data-pp-message
+        data-pp-style-layout="text"
+        data-pp-style-logo-type="none"
+        data-pp-style-text-color="black"
+        data-pp-style-text-size="12"
+        data-pp-amount="<%= defaultAmount %>"
+        data-pp-placement="payment"
+        <% if (buyerCountry) { %>data-pp-buyercountry="<%= buyerCountry %>"<% } %>>
+      </div>
+    </div>
+
+    <%# ══ FLEX / BANNER LAYOUT ══════════════════════════════════════════════ %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:14px">Flex / Banner Layout</div>
+
+    <%# — Home banner (8x1) ─────────────────────────────────────────────── %>
+    <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+      Home &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">ratio="8x1" placement="home"</code>
+    </div>
+    <div style="border-radius:8px;overflow:hidden;margin-bottom:18px;min-height:40px">
+      <div
+        data-pp-message
+        data-pp-style-layout="flex"
+        data-pp-style-ratio="8x1"
+        data-pp-style-color="white-no-border"
+        data-pp-amount="<%= defaultAmount %>"
+        data-pp-placement="home"
+        <% if (buyerCountry) { %>data-pp-buyercountry="<%= buyerCountry %>"<% } %>>
+      </div>
+    </div>
+
+    <%# — Category banner (20x1) ────────────────────────────────────────── %>
+    <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+      Category &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">ratio="20x1" placement="category"</code>
+    </div>
+    <div style="border-radius:8px;overflow:hidden;margin-bottom:20px;min-height:40px">
+      <div
+        data-pp-message
+        data-pp-style-layout="flex"
+        data-pp-style-ratio="20x1"
+        data-pp-style-color="blue"
+        data-pp-amount="<%= defaultAmount %>"
+        data-pp-placement="category"
+        <% if (buyerCountry) { %>data-pp-buyercountry="<%= buyerCountry %>"<% } %>>
+      </div>
+    </div>
+
+    <div class="test-hint">
+      Supported markets: <strong>US</strong> · <strong>AU</strong> · <strong>DE</strong> · <strong>ES</strong> · <strong>FR</strong> · <strong>IT</strong> · <strong>GB</strong> · <strong>CA</strong>.
+      <code>data-pp-buyercountry</code> is set on each message div based on the selected buyer country.
+    </div>
+
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    currency:      '<%= _cur %>',
+    defaultAmount: '<%= defaultAmount %>',
+    buyerCountry:  '<%= buyerCountry || "" %>',
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/plm-div.js"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

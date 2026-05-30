@@ -901,6 +901,34 @@ onApprove({ liabilityShift, vaultSetupToken })
 
 ---
 
+## Pay Later Messages（工厂路由）
+
+### plm-div
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 | `src/routes/paypal/jssdk-v5/plm-div.js` | `createStandardRoute`；`sdkParams: "components=messages"`；`buildBody` 仅作预留（PLM demo 不走 create-order）；工厂 GET handler 读 `?country` + `?currency`，两者均传给 EJS |
+| EJS | `src/views/paypal/jssdk-v5/plm-div.ejs` | 服务端 `COUNTRY_TO_CUR`（US→USD / AU→AUD / DE/ES/FR/IT→EUR / GB→GBP / CA→CAD）+ `CUR_TO_COUNTRY` 映射；优先读 `?country` param（保留 ES/FR/IT 选择）；国家选择器（US/AU/DE/ES/FR/IT/GB/CA）；`buyerCountry = _country`（直接用国家码）；3 个 text layout（product/cart/payment）+ 2 个 flex/banner layout（home 8x1 / category 20x1）；每个 `[data-pp-message]` div 均含 `data-pp-buyercountry="<%= buyerCountry %>"`；`max-width:680px`；`window.DEMO.{currency, defaultAmount, buyerCountry}` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/plm-div.js` | `updateAllMessages()`：`querySelectorAll("[data-pp-message]")` → `setAttribute("data-pp-amount", val)`，SDK MutationObserver 自动重渲染；`COUNTRY_TO_CUR` 映射；`#demo-country` change：带 `?country=XX&currency=YYY` 刷新；零小数位货币格式化 |
+
+### plm-js
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 | `src/routes/paypal/jssdk-v5/plm-js.js` | 同 plm-div，`productKey: "plm-js"`，view `paypal/jssdk-v5/plm-js` |
+| EJS | `src/views/paypal/jssdk-v5/plm-js.ejs` | 同 plm-div 的国家/金额选择；容器 `#plm-js-container`（空 div，Messages() 渲染目标）；Current JS Config `<pre id="plm-js-config">`（实时展示 Messages() 入参）；Event Log `#plm-event-log` + Clear 按钮（显示 onRender/onClick/onApply 事件）；`window.DEMO.buyerCountry` 传给 JS |
+| SDK JS | `src/public/js/paypal/jssdk-v5/plm-js.js` | `renderMessages(amount)`：每次调用 `paypalSDK.Messages({ amount, placement:"product", buyerCountry, style:{layout:"text",logo:{type:"inline"}}, onRender, onClick, onApply }).render('#plm-js-container')`；金额/国家变化直接重新调 `renderMessages()`（非 setAttribute）；`logEvent()` 写 `#plm-event-log`（最多 30 条，最新在顶）；`updateConfigDisplay()` 同步更新 `#plm-js-config`；Clear 按钮重置日志计数 |
+
+### PLM 关键设计规则
+
+- **buyerCountry 直接用国家码**（US/AU/DE/ES/FR/IT/GB/CA），不再从币种反推
+- **ES/FR/IT 同属 EUR**：切换时同时传 `?country=ES&currency=EUR`，EJS 优先读 `?country` 保留选中项
+- **plm-div 用 setAttribute**：符合 HTML attribute 驱动方式，SDK MutationObserver 处理更新，无需 re-render
+- **plm-js 用 re-render**：JS API 方式应直接重新调 `Messages()`，不走 DOM attribute
+- **工厂 GET handler** 新增 `country: req.query.country || ''` 透传给所有 EJS（非破坏性，其他产品忽略此变量）
+
+---
+
 ## SDK 参数速查表
 
 每个产品的 SDK URL 格式：`https://www.paypal.com/sdk/js?client-id=<ID>&<sdkParams>&currency=<CURRENCY>`
@@ -922,6 +950,8 @@ onApprove({ liabilityShift, vaultSetupToken })
 | **vault-paypal-setup-only** | `buyer-country=US&components=buttons&currency=USD` | 自定义路由；GET 后端先获取 id_token，注入 `data-user-id-token`；**无 `vault=true`**；`currency=USD` 固定（非动态）；`NO_SHIPPING` 无运费 |
 | **vault-acdc-setup-only** | `components=card-fields&vault=true&currency=USD` | 自定义路由；`currency=USD` 固定（同上） |
 | **vault-return** | `buyer-country=US&commit=true&components=buttons&currency=${currency}` | GET 时后端获取 id_token 注入 `data-user-id-token`；**`commit=true` 是关键**：缺少此参数会导致 PayPal 弹出登录 popup 而非回头买家一键体验；`buyer-country=US`（沙盒必须）；apple_pay token 禁用（Apple 指南限制） |
+| **plm-div** | `components=messages` | 工厂路由；`buyerCountry` 通过 `data-pp-buyercountry` attribute 注入每个 message div；国家选择器 US/AU/DE/ES/FR/IT/GB/CA；ES/FR/IT 同属 EUR |
+| **plm-js** | `components=messages` | 工厂路由；`buyerCountry` 通过 `Messages()` JS config 传入；金额变化调 `paypalSDK.Messages({...}).render()` 重渲染 |
 
 ---
 

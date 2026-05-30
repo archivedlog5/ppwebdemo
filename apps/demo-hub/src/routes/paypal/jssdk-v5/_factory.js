@@ -59,6 +59,7 @@ function createStandardRoute({ productKey, sdkParams, view, buildBody, orderBody
       extraScripts,
       defaultAmount:     amount,
       currency,
+      country:           req.query.country || '',
     })
   })
 
@@ -136,6 +137,7 @@ function createVaultWithPurchaseRoute({ productKey, sdkParams, view, buildBody, 
       sdkUrl:            `https://www.paypal.com/sdk/js?client-id=${process.env.PAYPAL_CN_CLIENT_ID}&${baseParams}&currency=${currency}`,
       defaultAmount:     amount,
       currency,
+      country:           req.query.country || '',
     })
   })
 
