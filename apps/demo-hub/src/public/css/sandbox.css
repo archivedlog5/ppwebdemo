@@ -65,7 +65,7 @@
 
 /* v6 button web components — fill the container, no width cap */
 paypal-button,
-paylater-button,
+paypal-pay-later-button,
 venmo-button,
 paypal-credit-button {
   display: block;

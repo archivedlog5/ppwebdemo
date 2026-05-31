@@ -260,12 +260,12 @@ buildBody: function (amount, currency) {
 | 按钮 | 正确元素名 | JS 创建 |
 |------|-----------|---------|
 | PayPal 按钮 | `paypal-button` | `createElement('paypal-button')` |
-| Pay Later 按钮 | `paylater-button` | `createElement('paylater-button')` |
+| Pay Later 按钮 | `paypal-pay-later-button` | `createElement('paypal-pay-later-button')` |
 | Venmo 按钮 | `venmo-button` | `createElement('venmo-button')` |
 | PayPal Credit 按钮 | `paypal-credit-button` | `createElement('paypal-credit-button')` |
 
-**❌ 错误：** `createElement('paypal-pay-later-button')` — 不存在的元素名。
-**✅ 正确：** `createElement('paylater-button')`
+**❌ 错误：** `createElement('paylater-button')` — SDK 未注册此元素，创建后无内容不可见。
+**✅ 正确：** `createElement('paypal-pay-later-button')`
 
 ---
 
@@ -308,35 +308,26 @@ container.appendChild(btn)
 
 ---
 
-### `paylater-button` — productCode 与 countryCode
+### `paypal-pay-later-button` — productCode 与 countryCode
 
-属性需以 DOM property（非 HTML attribute）方式赋值：
+与 `paypal-button` 一致，动态创建后 append 到容器：
 
 ```js
-var btn = document.createElement('paylater-button')
-btn.productCode = paylaterDetails.productCode   // 从 eligibility.getDetails('paylater') 取
-btn.countryCode = paylaterDetails.countryCode
+var paylaterDetails = eligibility.getDetails('paylater')
+var btn = document.createElement('paypal-pay-later-button')
+btn.productCode = paylaterDetails.productCode   // DOM property（非 attribute）
+btn.countryCode = paylaterDetails.countryCode   // DOM property（非 attribute）
 container.appendChild(btn)
 ```
 
 ---
 
-### `venmo-button`
+### `paypal-credit-button` — countryCode
 
 ```js
-var btn = document.createElement('venmo-button')
-btn.setAttribute('type', 'pay')
-btn.setAttribute('class', 'venmo-blue')
-container.appendChild(btn)
-```
-
----
-
-### `paypal-credit-button`
-
-```js
+var creditDetails = eligibility.getDetails('credit')
 var btn = document.createElement('paypal-credit-button')
-btn.countryCode = 'US'   // DOM property
+btn.countryCode = creditDetails.countryCode   // DOM property
 container.appendChild(btn)
 ```
 
@@ -347,7 +338,7 @@ container.appendChild(btn)
 ```css
 /* sandbox.css 已包含此规则，无需重复 */
 paypal-button,
-paylater-button,
+paypal-pay-later-button,
 venmo-button,
 paypal-credit-button {
   display: block;

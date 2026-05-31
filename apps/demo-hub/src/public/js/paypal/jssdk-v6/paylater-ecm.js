@@ -118,11 +118,11 @@
     }
 
     var container = clearLoading()
-    var btn = document.createElement('paylater-button')
+    var btn = document.createElement('paypal-pay-later-button')
     btn.productCode = paylaterDetails.productCode
     btn.countryCode = paylaterDetails.countryCode
     container.appendChild(btn)
-    console.log('[PayLater-ECM] paylater-button appended, productCode=%s countryCode=%s', paylaterDetails.productCode, paylaterDetails.countryCode)
+    console.log('[PayLater-ECM] paypal-pay-later-button appended, productCode=%s countryCode=%s', paylaterDetails.productCode, paylaterDetails.countryCode)
 
     btn.addEventListener('click', async function () {
       console.log('[PayLater-ECM] paypal-button clicked')
@@ -176,11 +176,7 @@
       .then(function (instance) {
         console.log('[PayLater-ECM] getPPInstance() resolved, instance =', instance)
         console.log('[PayLater-ECM] calling findEligibleMethods()...')
-        return instance.findEligibleMethods({
-          countryCode: window.DEMO.testBuyerCountry || 'US',
-          currencyCode: 'USD',
-          amount: getAmount() || '100.00',
-        })
+        return instance.findEligibleMethods({ currencyCode: 'USD' })
           .then(function (eligibility) {
             console.log('[PayLater-ECM] findEligibleMethods() resolved')
             console.log('[PayLater-ECM] isEligible("paylater") =', eligibility.isEligible('paylater'))

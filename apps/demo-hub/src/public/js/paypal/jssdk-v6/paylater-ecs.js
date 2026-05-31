@@ -103,11 +103,7 @@
       .then(function (instance) {
         console.log('[PayLater-ECS] getPPInstance() resolved, instance =', instance)
         console.log('[PayLater-ECS] calling findEligibleMethods()...')
-        return instance.findEligibleMethods({
-          countryCode: window.DEMO.testBuyerCountry || 'US',
-          currencyCode: 'USD',
-          amount: getAmount() || '100.00',
-        })
+        return instance.findEligibleMethods({ currencyCode: 'USD' })
           .then(function (eligibility) {
             console.log('[PayLater-ECS] findEligibleMethods() resolved')
             console.log('[PayLater-ECS] isEligible("paylater") =', eligibility.isEligible('paylater'))
@@ -121,11 +117,11 @@
             console.log('[PayLater-ECS] paylater details =', paylaterDetails)
 
             var container = clearLoading()
-            var btn = document.createElement('paylater-button')
+            var btn = document.createElement('paypal-pay-later-button')
             btn.productCode = paylaterDetails.productCode
             btn.countryCode = paylaterDetails.countryCode
             container.appendChild(btn)
-            console.log('[PayLater-ECS] paylater-button appended, productCode=%s countryCode=%s', paylaterDetails.productCode, paylaterDetails.countryCode)
+            console.log('[PayLater-ECS] paypal-pay-later-button appended, productCode=%s countryCode=%s', paylaterDetails.productCode, paylaterDetails.countryCode)
 
             var session = instance.createPayLaterOneTimePaymentSession({
               onApprove: function (data) {
