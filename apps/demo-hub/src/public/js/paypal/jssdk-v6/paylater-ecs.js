@@ -3,6 +3,23 @@
 
   console.log('[PayLater-ECS] paylater-ecs.js loaded')
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  var COUNTRY_TO_CURRENCY = {
+    US: 'USD',
+    AU: 'AUD',
+    IT: 'EUR',
+    ES: 'EUR',
+    FR: 'EUR',
+    GB: 'GBP',
+    CA: 'CAD',
+  }
+
+  function getCurrency() {
+    var sel = document.getElementById('demo-country')
+    return COUNTRY_TO_CURRENCY[sel ? sel.value : 'US'] || 'USD'
+  }
+
   function getPresentationMode() {
     var sel = document.getElementById('demo-presentation-mode')
     return sel ? sel.value : 'auto'
@@ -71,6 +88,7 @@
         console.log('[PayLater-ECS] country changed to', this.value)
         var url = new URL(window.location.href)
         url.searchParams.set('country', this.value)
+        url.searchParams.set('currency', COUNTRY_TO_CURRENCY[this.value] || 'USD')
         var amt = document.getElementById('demo-amount')
         if (amt) url.searchParams.set('amount', amt.value.trim())
         window.location.replace(url.toString())
@@ -103,7 +121,7 @@
       .then(function (instance) {
         console.log('[PayLater-ECS] getPPInstance() resolved, instance =', instance)
         console.log('[PayLater-ECS] calling findEligibleMethods()...')
-        return instance.findEligibleMethods({ currencyCode: 'USD' })
+        return instance.findEligibleMethods({ currencyCode: getCurrency() })
           .then(function (eligibility) {
             console.log('[PayLater-ECS] findEligibleMethods() resolved')
             console.log('[PayLater-ECS] isEligible("paylater") =', eligibility.isEligible('paylater'))
@@ -172,8 +190,8 @@
               return
             }
 
-            btn.addEventListener('click', async function () {
-              console.log('[PayLater-ECS] paypal-button clicked')
+            async function handleClick() {
+              console.log('[PayLater-ECS] payment triggered')
               if (!validateAmount()) return
               console.log('[PayLater-ECS] amount valid, calling createOrder...')
               var modesToTry = getPresentationModesToTry()
@@ -182,7 +200,7 @@
               var orderPromise = fetch(urls.createOrder, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount: getAmount(), currency: 'USD' }),
+                body: JSON.stringify({ amount: getAmount(), currency: getCurrency() }),
               })
                 .then(function (r) {
                   console.log('[PayLater-ECS] createOrder response status =', r.status)
@@ -209,8 +227,19 @@
                   break
                 }
               }
-            })
-            console.log('[PayLater-ECS] click listener attached to paypal-button')
+            }
+
+            btn.addEventListener('click', handleClick)
+
+            var wrap = document.getElementById('custom-trigger-wrap')
+            var customBtn = document.getElementById('custom-trigger-btn')
+            if (wrap && customBtn) {
+              wrap.style.display = 'block'
+              customBtn.addEventListener('click', handleClick)
+              console.log('[PayLater-ECS] custom trigger button activated')
+            }
+
+            console.log('[PayLater-ECS] click listeners attached')
           })
       })
       .catch(function (err) {

@@ -129,8 +129,8 @@
     container.appendChild(btn)
     console.log('[PayPal-ECM] paypal-button appended to container')
 
-    btn.addEventListener('click', async function () {
-      console.log('[PayPal-ECM] paypal-button clicked')
+    async function handleClick() {
+      console.log('[PayPal-ECM] payment triggered')
       if (!validateAmount()) return
       console.log('[PayPal-ECM] amount valid, calling createOrder...')
       var urls = (window.DEMO || {}).urls
@@ -167,8 +167,19 @@
           break
         }
       }
-    })
-    console.log('[PayPal-ECM] click listener attached to paypal-button')
+    }
+
+    btn.addEventListener('click', handleClick)
+
+    var wrap = document.getElementById('custom-trigger-wrap')
+    var customBtn = document.getElementById('custom-trigger-btn')
+    if (wrap && customBtn) {
+      wrap.style.display = 'block'
+      customBtn.addEventListener('click', handleClick)
+      console.log('[PayPal-ECM] custom trigger button activated')
+    }
+
+    console.log('[PayPal-ECM] click listeners attached')
   }
 
   // ── SDK init ───────────────────────────────────────────────────────────────

@@ -174,8 +174,8 @@
               return
             }
 
-            btn.addEventListener('click', async function () {
-              console.log('[PayPal-ECS] paypal-button clicked')
+            async function handleClick() {
+              console.log('[PayPal-ECS] payment triggered')
               if (!validateAmount()) return
               console.log('[PayPal-ECS] amount valid, calling createOrder...')
               var modesToTry = getPresentationModesToTry()
@@ -211,8 +211,19 @@
                   break
                 }
               }
-            })
-            console.log('[PayPal-ECS] click listener attached to paypal-button')
+            }
+
+            btn.addEventListener('click', handleClick)
+
+            var wrap = document.getElementById('custom-trigger-wrap')
+            var customBtn = document.getElementById('custom-trigger-btn')
+            if (wrap && customBtn) {
+              wrap.style.display = 'block'
+              customBtn.addEventListener('click', handleClick)
+              console.log('[PayPal-ECS] custom trigger button activated')
+            }
+
+            console.log('[PayPal-ECS] click listeners attached')
           })
       })
       .catch(function (err) {

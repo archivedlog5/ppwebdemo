@@ -1,6 +1,6 @@
 # demo-hub — Todos
 
-最后更新：2026-05-30
+最后更新：2026-05-31
 
 ---
 
@@ -127,9 +127,9 @@
 ### PayPal ECM / ECS（Tasks 5–7）
 
 - [x] **Task 5** — 路由文件：`paypal-ecm.js` + `paypal-ecs.js`（buildBody 含 SANDBOX_SHIPPING / GET_FROM_FILE 差异）
-- [x] **Task 6** — EJS 视图：`paypal-ecm.ejs` + `paypal-ecs.ejs`（window.DEMO 注入 clientId + components，defer SDK）
-- [x] **Task 7** — 前端 JS：`paypal.js`（paypal-ecm 和 paypal-ecs 共用；嵌套 .then 保证 instance 作用域；session.start 传 Promise 引用）
-- [x] **Task 22** — CLAUDE.md + 规则文档（`src/routes/paypal/jssdk-v6/CLAUDE.md`，7 条 v6 专属规则 V6-1 到 V6-7，含 3 个 symlinks）
+- [x] **Task 6** — EJS 视图：`paypal-ecm.ejs` + `paypal-ecs.ejs`（window.DEMO 注入 clientId + components，defer SDK；**2026-05-31 新增** custom trigger button）
+- [x] **Task 7** — 前端 JS：`paypal-ecm.js` + `paypal-ecs.js`（各产品独立文件；嵌套 .then 保证 instance 作用域；session.start 传 Promise 引用；**2026-05-31 新增** handleClick 抽取 + custom button 绑定）
+- [x] **Task 22** — CLAUDE.md + 规则文档（`src/routes/paypal/jssdk-v6/CLAUDE.md`，V6-1 到 V6-10，含 3 个 symlinks）
 
 ### E2E 验证（Task 11）
 
@@ -137,7 +137,7 @@
 
 ### 待实现（Tasks 12–21，等各产品 markdown）
 
-- [ ] **Task 8** — PayLater ECM + ECS（`paylater-ecm.js/ejs`、`paylater-ecs.js/ejs`、`paylater.js`）
+- [x] **Task 8** — PayLater ECM + ECS（`paylater-ecm.js/ejs`、`paylater-ecs.js/ejs`；**2026-05-31 新增** custom trigger button；`paypal-pay-later-button` web component + `createPayLaterOneTimePaymentSession`）
 - [ ] **Task 9** — Venmo ECM + ECS（`venmo-ecm.js/ejs`、`venmo-ecs.js/ejs`、`venmo.js`）
 - [ ] **Task 10** — BCDC ECM + ECS（`bcdc-ecm.js/ejs`、`bcdc-ecs.js/ejs`、`bcdc.js`）
 - [ ] **Task 12** — Standalone Buttons（`buttons.js/ejs`，多 funding source）

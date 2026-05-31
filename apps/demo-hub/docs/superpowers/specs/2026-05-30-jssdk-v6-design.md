@@ -110,7 +110,8 @@ apps/demo-hub/src/
     ├── init.js                           # 共享：getPPInstance() 单例 + sessionStorage
     ├── paypal-ecm.js                     # paypal-ecm 独立（已拆分）
     ├── paypal-ecs.js                     # paypal-ecs 独立（已拆分）
-    ├── paylater.js                       # paylater-ecm 和 paylater-ecs 共用
+    ├── paylater-ecm.js                   # paylater-ecm 独立（已拆分）
+    ├── paylater-ecs.js                   # paylater-ecs 独立（已拆分）
     ├── venmo.js                          # venmo-ecm 和 venmo-ecs 共用
     ├── bcdc.js                           # bcdc-ecm 和 bcdc-ecs 共用
     ├── buttons.js
@@ -129,7 +130,8 @@ apps/demo-hub/src/
 
 **JS 文件共用说明：**
 - `paypal-ecm.js` 和 `paypal-ecs.js` 各自独立（已拆分，便于后续前端逻辑差异化）
-- `paylater.js`, `venmo.js`, `bcdc.js` 各自被对应的 ECM/ECS 两个 EJS 共用
+- `paylater-ecm.js` 和 `paylater-ecs.js` 各自独立（已拆分，含国家→币种联动逻辑）
+- `venmo.js`, `bcdc.js` 各自被对应的 ECM/ECS 两个 EJS 共用（待实现）
 - Apple Pay / Google Pay / Vault：ECM vs ECS 实现差异较大，各自独立
 
 ---
@@ -364,7 +366,7 @@ const r = await fetch(`${API}/v2/checkout/orders/${orderId}/capture`, {
 | product_key | components | 状态 |
 |---|---|---|
 | paypal-ecm, paypal-ecs | `['paypal-payments']` | 已确认（v6 文档） |
-| paylater-ecm, paylater-ecs | TBD | 等 markdown |
+| paylater-ecm, paylater-ecs | `['paypal-payments']` | ✅ 已实现（`isEligible('paylater')`，`findEligibleMethods({currencyCode: getCurrency()})`，`createPayLaterOneTimePaymentSession`，`paypal-pay-later-button`；国家→币种联动：US→USD / AU→AUD / IT|ES|FR→EUR / GB→GBP / CA→CAD） |
 | venmo-ecm, venmo-ecs | TBD | 等 markdown |
 | bcdc-ecm, bcdc-ecs, buttons | TBD | 等 markdown |
 | acdc | TBD | 等 markdown |

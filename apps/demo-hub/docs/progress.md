@@ -61,6 +61,63 @@
 
 ---
 
+## 2026-05-31 — JSSDK v6 四个 demo 新增 Custom Trigger Button
+
+**背景：** JSSDK v6 使用真实 HTML 元素（Web Component）而非 iframe，因此任何普通 DOM 元素都可通过 `.addEventListener('click', sameHandler)` 触发相同支付流程。在 paypal-ecm / paypal-ecs / paylater-ecm / paylater-ecs 四个 demo 中，在官方按钮下方加入一个视觉美观的自定义按钮，用于演示这一能力。
+
+**完成内容：**
+
+- **`src/public/css/sandbox.css`**：新增 custom trigger button 样式（`.custom-trigger-wrap`、`.custom-trigger-sep`、`.custom-trigger-sep-label`、`.custom-trigger-btn`）
+  - 虚线边框（dashed）+ monospace 字体，与沙盒 dev 风格一致
+  - 完整交互状态：hover / active（scale 0.99）/ focus-visible（accent outline）
+  - 初始 `display:none`，JS 在 SDK 就绪后显示
+
+- **4 个 EJS 视图**：在 `#paypal-button-container` 和 `#result` 之间插入 `#custom-trigger-wrap`
+  - paypal-ecm / paypal-ecs：按钮文字 "Trigger Payment Flow"
+  - paylater-ecm / paylater-ecs：按钮文字 "Trigger Pay Later Flow"
+  - 内联 SVG 播放三角图标（无 emoji）
+
+- **4 个前端 JS 文件**：将原匿名 click handler 抽取为命名 `handleClick` async function
+  - 保持 V6-2 规则不变：`orderPromise` 在 handler 内同步创建（不 await），然后传给 `session.start()`，确保弹窗在 transient activation 窗口内触发
+  - SDK 官方按钮和 custom button 共享同一 `handleClick` 引用
+  - SDK 就绪后 `wrap.style.display = 'block'` 显示 custom button 区域
+
+**改动文件：**
+- `src/public/css/sandbox.css`
+- `src/views/paypal/jssdk-v6/paypal-ecm.ejs`
+- `src/views/paypal/jssdk-v6/paypal-ecs.ejs`
+- `src/views/paypal/jssdk-v6/paylater-ecm.ejs`
+- `src/views/paypal/jssdk-v6/paylater-ecs.ejs`
+- `src/public/js/paypal/jssdk-v6/paypal-ecm.js`
+- `src/public/js/paypal/jssdk-v6/paypal-ecs.js`
+- `src/public/js/paypal/jssdk-v6/paylater-ecm.js`
+- `src/public/js/paypal/jssdk-v6/paylater-ecs.js`
+
+---
+
+## 2026-05-31 — JSSDK v6 PayLater ECM/ECS 国家→币种联动
+
+**背景：** paylater-ecm 和 paylater-ecs demo 中，切换国家选择器时，SDK 的 `findEligibleMethods()` 和 create-order 请求的 currency 参数需要随之变化（而非硬编码 USD）。工厂路由的 GET handler 已支持透传 `?currency=` 参数，只需在前端 JS 完成映射并在 URL reload 时带上 currency。
+
+**完成内容：**
+
+- **`paylater-ecm.js`**（3 处修改）：
+  1. `findEligibleMethods({ currencyCode: 'USD' })` → `findEligibleMethods({ currencyCode: getCurrency() })`
+  2. `createOrder` body `currency: 'USD'` → `currency: getCurrency()`
+  3. 国家切换 reload URL 新增 `url.searchParams.set('currency', COUNTRY_TO_CURRENCY[this.value] || 'USD')`
+
+- **`paylater-ecs.js`**（4 处修改）：
+  1. 新增 `COUNTRY_TO_CURRENCY` 映射表 + `getCurrency()` helper（与 ECM 相同）
+  2. 同上 1–3 三处修改
+
+**映射规则：** `US→USD | AU→AUD | IT/ES/FR→EUR | GB→GBP | CA→CAD`（其余 fallback USD）
+
+**改动文件：**
+- `src/public/js/paypal/jssdk-v6/paylater-ecm.js`
+- `src/public/js/paypal/jssdk-v6/paylater-ecs.js`
+
+---
+
 ## 2026-05-31 — JSSDK v6 paypal-ecm/ecs Bug 修复 + 代码重构
 
 **修复内容：**

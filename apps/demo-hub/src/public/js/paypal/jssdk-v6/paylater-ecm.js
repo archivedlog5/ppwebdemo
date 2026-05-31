@@ -5,6 +5,21 @@
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  var COUNTRY_TO_CURRENCY = {
+    US: 'USD',
+    AU: 'AUD',
+    IT: 'EUR',
+    ES: 'EUR',
+    FR: 'EUR',
+    GB: 'GBP',
+    CA: 'CAD',
+  }
+
+  function getCurrency() {
+    var sel = document.getElementById('demo-country')
+    return COUNTRY_TO_CURRENCY[sel ? sel.value : 'US'] || 'USD'
+  }
+
   function getPresentationMode() {
     var sel = document.getElementById('demo-presentation-mode')
     return sel ? sel.value : 'auto'
@@ -124,8 +139,8 @@
     container.appendChild(btn)
     console.log('[PayLater-ECM] paypal-pay-later-button appended, productCode=%s countryCode=%s', paylaterDetails.productCode, paylaterDetails.countryCode)
 
-    btn.addEventListener('click', async function () {
-      console.log('[PayLater-ECM] paypal-button clicked')
+    async function handleClick() {
+      console.log('[PayLater-ECM] payment triggered')
       if (!validateAmount()) return
       console.log('[PayLater-ECM] amount valid, calling createOrder...')
       var urls = (window.DEMO || {}).urls
@@ -135,7 +150,7 @@
       var orderPromise = fetch(urls.createOrder, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: getAmount(), currency: 'USD' }),
+        body: JSON.stringify({ amount: getAmount(), currency: getCurrency() }),
       })
         .then(function (r) {
           console.log('[PayLater-ECM] createOrder response status =', r.status)
@@ -162,8 +177,19 @@
           break
         }
       }
-    })
-    console.log('[PayLater-ECM] click listener attached to paypal-button')
+    }
+
+    btn.addEventListener('click', handleClick)
+
+    var wrap = document.getElementById('custom-trigger-wrap')
+    var customBtn = document.getElementById('custom-trigger-btn')
+    if (wrap && customBtn) {
+      wrap.style.display = 'block'
+      customBtn.addEventListener('click', handleClick)
+      console.log('[PayLater-ECM] custom trigger button activated')
+    }
+
+    console.log('[PayLater-ECM] click listeners attached')
   }
 
   // ── SDK init ───────────────────────────────────────────────────────────────
@@ -176,7 +202,7 @@
       .then(function (instance) {
         console.log('[PayLater-ECM] getPPInstance() resolved, instance =', instance)
         console.log('[PayLater-ECM] calling findEligibleMethods()...')
-        return instance.findEligibleMethods({ currencyCode: 'USD' })
+        return instance.findEligibleMethods({ currencyCode: getCurrency() })
           .then(function (eligibility) {
             console.log('[PayLater-ECM] findEligibleMethods() resolved')
             console.log('[PayLater-ECM] isEligible("paylater") =', eligibility.isEligible('paylater'))
@@ -206,6 +232,7 @@
         console.log('[PayLater-ECM] country changed to', this.value)
         var url = new URL(window.location.href)
         url.searchParams.set('country', this.value)
+        url.searchParams.set('currency', COUNTRY_TO_CURRENCY[this.value] || 'USD')
         var amt = document.getElementById('demo-amount')
         if (amt) url.searchParams.set('amount', amt.value.trim())
         window.location.replace(url.toString())
