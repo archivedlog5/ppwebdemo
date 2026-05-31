@@ -2,6 +2,61 @@
 
 ---
 
+## 2026-06-01 — JSSDK v6 Venmo ECM / ECS（Task 9）
+
+**背景：** 基于 PayPal JSSDK v6 文档，新增 Venmo ECM 和 ECS 两个 demo。Venmo 仅支持 US 买家 + USD，使用 US 沙盒账号凭证，前端 SDK 方法与 PayPal ECM/ECS 存在显著差异。
+
+**完成内容：**
+
+### 路由文件（各自独立，均使用 US 账号）
+
+- **`src/routes/paypal/jssdk-v6/venmo-ecm.js`**：自定义路由（非工厂）
+  - GET 注入 `clientId: process.env.PAYPAL_US_CLIENT_ID`
+  - create-order：`getUSToken()`；`payment_source.venmo.experience_context.shipping_preference: 'SET_PROVIDED_ADDRESS'`；`shipping: VENMO_SHIPPING`；货币硬编码 USD
+  - capture-order：`getUSToken()`
+
+- **`src/routes/paypal/jssdk-v6/venmo-ecs.js`**：自定义路由
+  - 与 ECM 相同，差异：`shipping_preference: 'GET_FROM_FILE'`；无 `shipping` 字段
+
+### EJS 视图
+
+- **`src/views/paypal/jssdk-v6/venmo-ecm.ejs`** / **`venmo-ecs.ejs`**：
+  - `window.DEMO.components: ['venmo-payments']`
+  - 无货币选择器（disabled select 显示 USD only）
+  - 无 presentation mode 选择器（Venmo 仅支持 `auto`）
+  - 保留 custom trigger wrap（与 paypal-ecm/ecs 一致）
+
+### 前端 JS
+
+- **`src/public/js/paypal/jssdk-v6/venmo-ecm.js`** / **`venmo-ecs.js`**：各自独立
+  - `createVenmoOneTimePaymentSession`（非 `createPayPalOneTimePaymentSession`）
+  - `findEligibleMethods({ currencyCode: 'USD' })`（显式传 currencyCode）
+  - `isEligible('venmo')`
+  - `document.createElement('venmo-button')` + `type="pay"`
+  - `session.start({ presentationMode: 'auto' }, orderPromise)`（仅 auto，无 fallback 循环）
+  - 无 `session.hasReturned()` / `session.resume()`（Venmo session 不支持）
+
+### Bug 修复（运行时）
+
+- 移除 `session.hasReturned()` 调用：Venmo session 无此方法，调用即 `TypeError`
+
+### 更新 app.js
+
+- 挂载 `venmo-ecm` + `venmo-ecs` 路由
+
+**改动文件（共 7 个）：**
+- `src/routes/paypal/jssdk-v6/venmo-ecm.js`（新建）
+- `src/routes/paypal/jssdk-v6/venmo-ecs.js`（新建）
+- `src/views/paypal/jssdk-v6/venmo-ecm.ejs`（新建）
+- `src/views/paypal/jssdk-v6/venmo-ecs.ejs`（新建）
+- `src/public/js/paypal/jssdk-v6/venmo-ecm.js`（新建）
+- `src/public/js/paypal/jssdk-v6/venmo-ecs.js`（新建）
+- `src/app.js`（修改 — 挂载两个新路由）
+
+**状态：** Task 9 ✅ 完成。Supabase 需插入两条产品记录后重启 demo-hub 生效。
+
+---
+
 ## 2026-05-30 — PayPal JSSDK v6 基础实施（Tasks 1–10 + Task 22）
 
 **背景：** 在已完成的 jssdk-v5 基础上，新增 `/paypal/jssdk-v6/` 路由前缀，首先实现 PayPal ECM / ECS 两个核心 demo，验证 v6 SDK 架构可行性。

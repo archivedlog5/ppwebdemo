@@ -112,7 +112,8 @@ apps/demo-hub/src/
     ├── paypal-ecs.js                     # paypal-ecs 独立（已拆分）
     ├── paylater-ecm.js                   # paylater-ecm 独立（已拆分）
     ├── paylater-ecs.js                   # paylater-ecs 独立（已拆分）
-    ├── venmo.js                          # venmo-ecm 和 venmo-ecs 共用
+    ├── venmo-ecm.js                      # venmo-ecm 独立（已实现）
+    ├── venmo-ecs.js                      # venmo-ecs 独立（已实现）
     ├── bcdc.js                           # bcdc-ecm 和 bcdc-ecs 共用
     ├── buttons.js
     ├── acdc.js
@@ -131,8 +132,17 @@ apps/demo-hub/src/
 **JS 文件共用说明：**
 - `paypal-ecm.js` 和 `paypal-ecs.js` 各自独立（已拆分，便于后续前端逻辑差异化）
 - `paylater-ecm.js` 和 `paylater-ecs.js` 各自独立（已拆分，含国家→币种联动逻辑）
-- `venmo.js`, `bcdc.js` 各自被对应的 ECM/ECS 两个 EJS 共用（待实现）
+- `venmo-ecm.js` 和 `venmo-ecs.js` 各自独立（已实现；仅 console log 前缀不同，后端 create-order body 差异在路由侧）
+- `bcdc.js`：bcdc-ecm 和 bcdc-ecs 共用（待实现）
 - Apple Pay / Google Pay / Vault：ECM vs ECS 实现差异较大，各自独立
+
+**Venmo 实现要点（2026-06-01 更新）：**
+- 路由使用 `getUSToken()` + `PAYPAL_US_CLIENT_ID`（Venmo 仅支持 US）
+- ECM：`payment_source.venmo.experience_context.shipping_preference: 'SET_PROVIDED_ADDRESS'` + `shipping: VENMO_SHIPPING`
+- ECS：`shipping_preference: 'GET_FROM_FILE'`，无 shipping 字段
+- 前端：`createVenmoOneTimePaymentSession`、`findEligibleMethods({ currencyCode: 'USD' })`、`isEligible('venmo')`、`venmo-button` 元素、仅 `auto` 模式
+- Venmo session 无 `hasReturned()` / `resume()`（仅 PayPal session 有，勿移植）
+- 货币固定 USD，EJS 显示 disabled select 而非完整货币选择器
 
 ---
 

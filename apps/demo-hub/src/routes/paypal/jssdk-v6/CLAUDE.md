@@ -354,10 +354,82 @@ paypal-credit-button {
 |---|---|---|
 | paypal-ecm, paypal-ecs | `['paypal-payments']` | ✅ 已实现 |
 | paylater-ecm, paylater-ecs | `['paypal-payments']` | ✅ 已实现 |
-| venmo-ecm, venmo-ecs | TBD | 等 markdown |
+| venmo-ecm, venmo-ecs | `['venmo-payments']` | ✅ 已实现 |
 | bcdc-ecm, bcdc-ecs, buttons | TBD | 等 markdown |
 | acdc | TBD | 等 markdown |
 | applepay-ecm, applepay-ecs | TBD | 等 markdown |
 | googlepay-ecm, googlepay-ecs | TBD | 等 markdown |
 | vault-* | TBD | 等 markdown |
 | plm-html, plm-js | TBD | 等 markdown |
+
+---
+
+## Venmo 专属规则
+
+### 规则 V6-VENMO-1 — 使用 US 账号凭证
+
+Venmo 仅支持 US 买家 + USD，路由文件必须使用 US 账号：
+
+```js
+// GET handler
+clientId: process.env.PAYPAL_US_CLIENT_ID
+
+// create-order / capture-order
+const token = await getUSToken()
+```
+
+**不能**使用工厂函数（`_factory.js` 硬编码 CN 账号），必须写自定义路由。
+
+### 规则 V6-VENMO-2 — session 方法名不同
+
+```js
+// ❌ 错误：PayPal session 方法，Venmo 没有
+var session = sdkInstance.createPayPalOneTimePaymentSession(opts)
+
+// ✅ 正确：Venmo 专属方法
+var session = sdkInstance.createVenmoOneTimePaymentSession(opts)
+```
+
+### 规则 V6-VENMO-3 — Venmo session 无 hasReturned() / resume()
+
+这两个方法是 PayPal session 为 redirect 模式提供的，Venmo session **不存在**：
+
+```js
+// ❌ 错误：直接抛 TypeError: session.hasReturned is not a function
+if (session.hasReturned()) { session.resume(); return }
+
+// ✅ 正确：Venmo 仅支持 auto 模式，无整页跳转，直接省略
+```
+
+### 规则 V6-VENMO-4 — findEligibleMethods 必须传 currencyCode
+
+```js
+// ✅ 正确：Venmo 文档要求显式传 currencyCode
+instance.findEligibleMethods({ currencyCode: 'USD' })
+
+// 资格检查
+eligibility.isEligible('venmo')
+```
+
+### 规则 V6-VENMO-5 — 按钮元素与 presentation mode
+
+```js
+// 按钮元素名
+var btn = document.createElement('venmo-button')
+btn.setAttribute('type', 'pay')
+
+// 唯一支持的 presentation mode
+session.start({ presentationMode: 'auto' }, orderPromise)
+// 无需 fallback loop（PayPal ECM 有 5 种模式，Venmo 只有 auto）
+```
+
+### 规则 V6-VENMO-6 — 货币硬编码 USD，create-order 无需传 currency
+
+```js
+// 后端：固定 USD，不从 req.body.currency 读取
+const val = parseFloat(amount).toFixed(2)
+// currency_code 硬编码 'USD'
+
+// 前端：createOrder fetch body 只传 amount，不传 currency
+body: JSON.stringify({ amount: getAmount() })
+```

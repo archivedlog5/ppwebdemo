@@ -1,0 +1,66 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · ECS</span>
+    <h1><%= title %></h1>
+    <p>Express Checkout Shortcut — buyer selects shipping address inside Venmo.</p>
+  </div>
+
+  <div class="sandbox-card">
+    <div class="amount-row">
+      <div class="currency-group">
+        <label class="field-label">Currency</label>
+        <select class="currency-select" disabled aria-label="Currency (USD only)">
+          <option value="USD" selected>USD</option>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
+            aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+
+    <div id="paypal-button-container" class="sdk-loading">
+      <div class="sdk-spinner"></div>
+      <span>Loading PayPal...</span>
+    </div>
+
+    <div id="custom-trigger-wrap" class="custom-trigger-wrap" style="display:none">
+      <div class="custom-trigger-sep">
+        <span class="custom-trigger-sep-label">or use custom button</span>
+      </div>
+      <button id="custom-trigger-btn" class="custom-trigger-btn" type="button" aria-label="Trigger payment flow">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><polygon points="3,2 9,6 3,10"/></svg>
+        Trigger Payment Flow
+      </button>
+    </div>
+
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:   '<%= clientId %>',
+    components: ['venmo-payments'],
+    pageType:   'checkout',
+    urls: {
+      createOrder:  '/paypal/jssdk-v6/api/venmo-ecs/create-order',
+      captureOrder: '/paypal/jssdk-v6/api/venmo-ecs/capture-order',
+    },
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/venmo-ecs.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

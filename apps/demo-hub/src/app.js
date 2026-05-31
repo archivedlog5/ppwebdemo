@@ -42,6 +42,8 @@ app.use(v6, require('./routes/paypal/jssdk-v6/paypal-ecm'));
 app.use(v6, require('./routes/paypal/jssdk-v6/paypal-ecs'));
 app.use(v6, require('./routes/paypal/jssdk-v6/paylater-ecm'));
 app.use(v6, require('./routes/paypal/jssdk-v6/paylater-ecs'));
+app.use(v6, require('./routes/paypal/jssdk-v6/venmo-ecm'));
+app.use(v6, require('./routes/paypal/jssdk-v6/venmo-ecs'));
 
 app.use((req, res) => res.status(404).send("Route not found"));
 
