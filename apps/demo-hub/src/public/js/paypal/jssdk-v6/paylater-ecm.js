@@ -1,14 +1,9 @@
 ;(function () {
   'use strict'
 
-  console.log('[PayPal-ECM] paypal-ecm.js loaded')
+  console.log('[PayLater-ECM] paylater-ecm.js loaded')
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-
-  function getCurrency() {
-    var sel = document.getElementById('demo-currency')
-    return sel ? sel.value : 'USD'
-  }
 
   function getPresentationMode() {
     var sel = document.getElementById('demo-presentation-mode')
@@ -37,7 +32,7 @@
   }
 
   function showResult(text, type) {
-    console.log('[PayPal-ECM] showResult() type=%s text=%s', type, text)
+    console.log('[PayLater-ECM] showResult() type=%s text=%s', type, text)
     var el = document.getElementById('result')
     if (!el) return
     el.className = 'result-msg ' + type
@@ -72,7 +67,7 @@
 
   var paymentSessionOptions = {
     onApprove: function (data) {
-      console.log('[PayPal-ECM] onApprove fired, orderId =', data.orderId)
+      console.log('[PayLater-ECM] onApprove fired, orderId =', data.orderId)
       var urls = (window.DEMO || {}).urls
       return fetch(urls.captureOrder, {
         method: 'POST',
@@ -80,11 +75,11 @@
         body: JSON.stringify({ orderId: data.orderId }),
       })
         .then(function (r) {
-          console.log('[PayPal-ECM] capture response status =', r.status)
+          console.log('[PayLater-ECM] capture response status =', r.status)
           return r.json()
         })
         .then(function (order) {
-          console.log('[PayPal-ECM] capture response body =', order)
+          console.log('[PayLater-ECM] capture response body =', order)
           if (order.error) { showResult('✗ ' + order.error, 'error'); return }
           var capture =
             order.purchase_units &&
@@ -92,7 +87,7 @@
             order.purchase_units[0].payments &&
             order.purchase_units[0].payments.captures &&
             order.purchase_units[0].payments.captures[0]
-          console.log('[PayPal-ECM] capture object =', capture)
+          console.log('[PayLater-ECM] capture object =', capture)
           if (!capture || capture.status !== 'COMPLETED') {
             showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
             return
@@ -101,66 +96,66 @@
         })
     },
     onCancel: function () {
-      console.log('[PayPal-ECM] onCancel fired')
+      console.log('[PayLater-ECM] onCancel fired')
       showResult('Payment cancelled.', 'error')
     },
     onError: function (err) {
-      console.error('[PayPal-ECM] onError fired, err =', err)
+      console.error('[PayLater-ECM] onError fired, err =', err)
       showResult('✗ ' + (err.message || String(err)), 'error')
     },
   }
 
   // ── Button setup ───────────────────────────────────────────────────────────
 
-  function configurePayPalButton(sdkInstance) {
-    var session = sdkInstance.createPayPalOneTimePaymentSession(paymentSessionOptions)
-    console.log('[PayPal-ECM] session created =', session)
+  function configurePayLaterButton(sdkInstance, paylaterDetails) {
+    var session = sdkInstance.createPayLaterOneTimePaymentSession(paymentSessionOptions)
+    console.log('[PayLater-ECM] session created =', session)
 
     if (session.hasReturned()) {
-      console.log('[PayPal-ECM] redirect returned, resuming session...')
+      console.log('[PayLater-ECM] redirect returned, resuming session...')
       session.resume()
       return
     }
 
     var container = clearLoading()
-    var btn = document.createElement('paypal-button')
-    btn.setAttribute('type', 'pay')
-    btn.setAttribute('class', 'paypal-gold')
+    var btn = document.createElement('paylater-button')
+    btn.productCode = paylaterDetails.productCode
+    btn.countryCode = paylaterDetails.countryCode
     container.appendChild(btn)
-    console.log('[PayPal-ECM] paypal-button appended to container')
+    console.log('[PayLater-ECM] paylater-button appended, productCode=%s countryCode=%s', paylaterDetails.productCode, paylaterDetails.countryCode)
 
     btn.addEventListener('click', async function () {
-      console.log('[PayPal-ECM] paypal-button clicked')
+      console.log('[PayLater-ECM] paypal-button clicked')
       if (!validateAmount()) return
-      console.log('[PayPal-ECM] amount valid, calling createOrder...')
+      console.log('[PayLater-ECM] amount valid, calling createOrder...')
       var urls = (window.DEMO || {}).urls
       var modesToTry = getPresentationModesToTry()
-      console.log('[PayPal-ECM] presentationModesToTry =', modesToTry)
+      console.log('[PayLater-ECM] presentationModesToTry =', modesToTry)
       // V6-2: get the promise reference without awaiting — must not await before session.start()
       var orderPromise = fetch(urls.createOrder, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: getAmount(), currency: getCurrency() }),
+        body: JSON.stringify({ amount: getAmount(), currency: 'USD' }),
       })
         .then(function (r) {
-          console.log('[PayPal-ECM] createOrder response status =', r.status)
+          console.log('[PayLater-ECM] createOrder response status =', r.status)
           return r.json()
         })
         .then(function (d) {
-          console.log('[PayPal-ECM] createOrder response body =', d)
+          console.log('[PayLater-ECM] createOrder response body =', d)
           if (d.error) throw new Error(d.error)
           return { orderId: d.orderId }
         })
       for (var _i = 0; _i < modesToTry.length; _i++) {
         var presentationMode = modesToTry[_i]
-        console.log('[PayPal-ECM] trying presentationMode =', presentationMode)
+        console.log('[PayLater-ECM] trying presentationMode =', presentationMode)
         try {
           await session.start({ presentationMode: presentationMode }, orderPromise)
           break
         } catch (error) {
-          console.log('[PayPal-ECM] session.start() error with mode "' + presentationMode + '":', error)
+          console.log('[PayLater-ECM] session.start() error with mode "' + presentationMode + '":', error)
           if (error.isRecoverable) {
-            console.log('[PayPal-ECM] error is recoverable, trying next mode...')
+            console.log('[PayLater-ECM] error is recoverable, trying next mode...')
             continue
           }
           showResult('✗ ' + (error.message || String(error)), 'error')
@@ -168,33 +163,39 @@
         }
       }
     })
-    console.log('[PayPal-ECM] click listener attached to paypal-button')
+    console.log('[PayLater-ECM] click listener attached to paypal-button')
   }
 
   // ── SDK init ───────────────────────────────────────────────────────────────
 
   function onPayPalWebSdkLoaded() {
-    console.log('[PayPal-ECM] onPayPalWebSdkLoaded() called')
-    console.log('[PayPal-ECM] window.DEMO =', window.DEMO)
+    console.log('[PayLater-ECM] onPayPalWebSdkLoaded() called')
+    console.log('[PayLater-ECM] window.DEMO =', window.DEMO)
 
     getPPInstance()
       .then(function (instance) {
-        console.log('[PayPal-ECM] getPPInstance() resolved, instance =', instance)
-        console.log('[PayPal-ECM] calling findEligibleMethods()...')
-        return instance.findEligibleMethods()
+        console.log('[PayLater-ECM] getPPInstance() resolved, instance =', instance)
+        console.log('[PayLater-ECM] calling findEligibleMethods()...')
+        return instance.findEligibleMethods({
+          countryCode: window.DEMO.testBuyerCountry || 'US',
+          currencyCode: 'USD',
+          amount: getAmount() || '100.00',
+        })
           .then(function (eligibility) {
-            console.log('[PayPal-ECM] findEligibleMethods() resolved')
-            console.log('[PayPal-ECM] isEligible("paypal") =', eligibility.isEligible('paypal'))
+            console.log('[PayLater-ECM] findEligibleMethods() resolved')
+            console.log('[PayLater-ECM] isEligible("paylater") =', eligibility.isEligible('paylater'))
 
-            if (eligibility.isEligible('paypal')) {
-              configurePayPalButton(instance)
+            if (eligibility.isEligible('paylater')) {
+              var paylaterDetails = eligibility.getDetails('paylater')
+              console.log('[PayLater-ECM] paylater details =', paylaterDetails)
+              configurePayLaterButton(instance, paylaterDetails)
             } else {
-              showResult('PayPal not eligible in this region', 'error')
+              showResult('Pay Later not eligible in this region', 'error')
             }
           })
       })
       .catch(function (err) {
-        console.error('[PayPal-ECM] top-level error =', err)
+        console.error('[PayLater-ECM] top-level error =', err)
         showResult('✗ ' + (err.message || String(err)), 'error')
       })
   }
@@ -202,13 +203,13 @@
   // ── Currency selector ──────────────────────────────────────────────────────
 
   document.addEventListener('DOMContentLoaded', function () {
-    console.log('[PayPal-ECM] DOMContentLoaded fired')
-    var currSel = document.getElementById('demo-currency')
-    if (currSel) {
-      currSel.addEventListener('change', function () {
-        console.log('[PayPal-ECM] currency changed to', this.value)
+    console.log('[PayLater-ECM] DOMContentLoaded fired')
+    var countrySel = document.getElementById('demo-country')
+    if (countrySel) {
+      countrySel.addEventListener('change', function () {
+        console.log('[PayLater-ECM] country changed to', this.value)
         var url = new URL(window.location.href)
-        url.searchParams.set('currency', this.value)
+        url.searchParams.set('country', this.value)
         var amt = document.getElementById('demo-amount')
         if (amt) url.searchParams.set('amount', amt.value.trim())
         window.location.replace(url.toString())
@@ -222,14 +223,14 @@
   })
 
   window.addEventListener('load', function () {
-    console.log('[PayPal-ECM] window.load fired, typeof paypal =', typeof paypal)
+    console.log('[PayLater-ECM] window.load fired, typeof paypal =', typeof paypal)
     if (typeof paypal === 'undefined') {
-      console.error('[PayPal-ECM] PayPal SDK not loaded!')
+      console.error('[PayLater-ECM] PayPal SDK not loaded!')
       showResult('✗ PayPal SDK failed to load', 'error')
       return
     }
     if (typeof window.isBrowserSupportedByPayPal === 'function' && !window.isBrowserSupportedByPayPal()) {
-      console.warn('[PayPal-ECM] browser not supported by PayPal')
+      console.warn('[PayLater-ECM] browser not supported by PayPal')
       showResult('✗ Your browser is not supported by PayPal.', 'error')
       return
     }

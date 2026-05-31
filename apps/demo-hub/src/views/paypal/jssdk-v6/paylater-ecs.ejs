@@ -7,16 +7,24 @@
   <div class="sandbox-header">
     <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · ECS</span>
     <h1><%= title %></h1>
-    <p>Express Checkout Shortcut — buyer selects shipping address inside PayPal sheet.</p>
+    <p>Pay Later Express Checkout Shortcut — buyer selects shipping address inside PayPal sheet.</p>
   </div>
 
   <div class="sandbox-card">
     <div class="amount-row">
       <div class="currency-group">
-        <label class="field-label" for="demo-currency">Currency</label>
-        <select id="demo-currency" class="currency-select" aria-label="Select currency">
-          <% supportedCurrencies.forEach(function(c) { %>
-            <option value="<%= c %>" <%= c === currency ? 'selected' : '' %>><%= c %></option>
+        <label class="field-label" for="demo-country">Buyer Country</label>
+        <select id="demo-country" class="currency-select" aria-label="Select buyer country">
+          <% [
+            { value: 'US', label: 'US' },
+            { value: 'AU', label: 'AU' },
+            { value: 'FR', label: 'FR' },
+            { value: 'IT', label: 'IT' },
+            { value: 'ES', label: 'ES' },
+            { value: 'GB', label: 'UK' },
+            { value: 'CA', label: 'CA' },
+          ].forEach(function(c) { %>
+            <option value="<%= c.value %>" <%= c.value === (country || 'US') ? 'selected' : '' %>><%= c.label %></option>
           <% }) %>
         </select>
       </div>
@@ -54,17 +62,18 @@
 
 <script>
   window.DEMO = {
-    clientId:   '<%= clientId %>',
-    components: ['paypal-payments'],
-    pageType:   'checkout',
+    clientId:         '<%= clientId %>',
+    components:       ['paypal-payments'],
+    pageType:         'checkout',
+    testBuyerCountry: '<%= country || "US" %>',
     urls: {
-      createOrder:  '/paypal/jssdk-v6/api/paypal-ecs/create-order',
-      captureOrder: '/paypal/jssdk-v6/api/paypal-ecs/capture-order',
+      createOrder:  '/paypal/jssdk-v6/api/paylater-ecs/create-order',
+      captureOrder: '/paypal/jssdk-v6/api/paylater-ecs/capture-order',
     },
   }
 </script>
 <script src="/js/paypal/jssdk-v6/init.js"></script>
-<script src="/js/paypal/jssdk-v6/paypal-ecs.js"></script>
+<script src="/js/paypal/jssdk-v6/paylater-ecs.js"></script>
 <script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
 
 <%- include('../../partials/footer', { showSidebar }) %>

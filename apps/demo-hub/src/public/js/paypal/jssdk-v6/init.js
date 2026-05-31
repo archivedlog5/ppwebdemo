@@ -1,20 +1,22 @@
-;(function () {
-  'use strict'
-  var _promise = null
+(function () {
+  "use strict";
+  var _promise = null;
 
   window.getPPInstance = function () {
-    if (_promise) return _promise
+    if (_promise) return _promise;
     _promise = window.paypal
       .createInstance({
         clientId: window.DEMO.clientId,
-        components: window.DEMO.components || ['paypal-payments'],
+        components: window.DEMO.components || ["paypal-payments"],
+        checkoutPageType: window.DEMO.checkoutPageType || "checkout",
+        testBuyerCountry: window.DEMO.testBuyerCountry || "US",
       })
       .then(function (inst) {
         try {
-          sessionStorage.setItem('pp_v6_clientId', window.DEMO.clientId)
+          sessionStorage.setItem("pp_v6_clientId", window.DEMO.clientId);
         } catch (e) {}
-        return inst
-      })
-    return _promise
-  }
-})()
+        return inst;
+      });
+    return _promise;
+  };
+})();

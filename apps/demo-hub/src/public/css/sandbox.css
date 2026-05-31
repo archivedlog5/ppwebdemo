@@ -58,9 +58,18 @@
   border-radius: var(--r-lg);
   padding: var(--sp-8);
   width: 100%;
-  max-width: 420px;
+  max-width: 500px;
   /* Subtle inner glow */
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* v6 button web components — fill the container, no width cap */
+paypal-button,
+paylater-button,
+venmo-button,
+paypal-credit-button {
+  display: block;
+  width: 100%;
 }
 
 /* Wider card for multi-field forms (ACDC, vault-acdc) */

@@ -255,12 +255,114 @@ buildBody: function (amount, currency) {
 
 ---
 
+## v6 Web Component 元素名（必须准确）
+
+| 按钮 | 正确元素名 | JS 创建 |
+|------|-----------|---------|
+| PayPal 按钮 | `paypal-button` | `createElement('paypal-button')` |
+| Pay Later 按钮 | `paylater-button` | `createElement('paylater-button')` |
+| Venmo 按钮 | `venmo-button` | `createElement('venmo-button')` |
+| PayPal Credit 按钮 | `paypal-credit-button` | `createElement('paypal-credit-button')` |
+
+**❌ 错误：** `createElement('paypal-pay-later-button')` — 不存在的元素名。
+**✅ 正确：** `createElement('paylater-button')`
+
+---
+
+### `paypal-button` — type 与 class
+
+**`type` 属性**（控制按钮文字，必须设置，否则无文字）：
+
+| type 值 | 显示文字 |
+|---------|---------|
+| `pay` | Pay with PayPal（**推荐，结账场景**） |
+| `checkout` | PayPal Checkout |
+| `buynow` | PayPal Buy Now |
+| `subscribe` | PayPal Subscribe |
+
+**`class` 属性**（控制按钮颜色）：
+
+| class 值 | 颜色 | 说明 |
+|---------|------|------|
+| `paypal-gold` | 金色 | **推荐**，PayPal 品牌标准色 |
+| `paypal-blue` | 蓝色 | 深蓝 |
+| `paypal-white` | 白色 | 白色，适合深色背景 |
+
+**CSS 自定义属性**（可选，控制圆角）：
+
+```css
+paypal-button {
+  --paypal-button-border-radius: 4px;   /* 按钮整体圆角 */
+  --paypal-mark-border-radius: 4px;     /* PayPal 标志圆角 */
+}
+```
+
+**完整创建示例：**
+
+```js
+var btn = document.createElement('paypal-button')
+btn.setAttribute('type', 'pay')        // "Pay with PayPal"
+btn.setAttribute('class', 'paypal-gold')  // 金色（推荐）
+container.appendChild(btn)
+```
+
+---
+
+### `paylater-button` — productCode 与 countryCode
+
+属性需以 DOM property（非 HTML attribute）方式赋值：
+
+```js
+var btn = document.createElement('paylater-button')
+btn.productCode = paylaterDetails.productCode   // 从 eligibility.getDetails('paylater') 取
+btn.countryCode = paylaterDetails.countryCode
+container.appendChild(btn)
+```
+
+---
+
+### `venmo-button`
+
+```js
+var btn = document.createElement('venmo-button')
+btn.setAttribute('type', 'pay')
+btn.setAttribute('class', 'venmo-blue')
+container.appendChild(btn)
+```
+
+---
+
+### `paypal-credit-button`
+
+```js
+var btn = document.createElement('paypal-credit-button')
+btn.countryCode = 'US'   // DOM property
+container.appendChild(btn)
+```
+
+---
+
+### CSS — 让 web component 铺满容器
+
+```css
+/* sandbox.css 已包含此规则，无需重复 */
+paypal-button,
+paylater-button,
+venmo-button,
+paypal-credit-button {
+  display: block;
+  width: 100%;
+}
+```
+
+---
+
 ## 各产品 components 数组（已确认）
 
 | product_key | components | 状态 |
 |---|---|---|
 | paypal-ecm, paypal-ecs | `['paypal-payments']` | ✅ 已实现 |
-| paylater-ecm, paylater-ecs | TBD | 等 markdown |
+| paylater-ecm, paylater-ecs | `['paypal-payments']` | ✅ 已实现 |
 | venmo-ecm, venmo-ecs | TBD | 等 markdown |
 | bcdc-ecm, bcdc-ecs, buttons | TBD | 等 markdown |
 | acdc | TBD | 等 markdown |
