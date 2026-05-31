@@ -355,12 +355,66 @@ paypal-credit-button {
 | paypal-ecm, paypal-ecs | `['paypal-payments']` | ✅ 已实现 |
 | paylater-ecm, paylater-ecs | `['paypal-payments']` | ✅ 已实现 |
 | venmo-ecm, venmo-ecs | `['venmo-payments']` | ✅ 已实现 |
-| bcdc-ecm, bcdc-ecs, buttons | TBD | 等 markdown |
+| bcdc-ecm, bcdc-ecs | `['paypal-guest-payments']` | ✅ 已实现 |
 | acdc | TBD | 等 markdown |
 | applepay-ecm, applepay-ecs | TBD | 等 markdown |
 | googlepay-ecm, googlepay-ecs | TBD | 等 markdown |
 | vault-* | TBD | 等 markdown |
 | plm-html, plm-js | TBD | 等 markdown |
+
+---
+
+## BCDC 专属规则
+
+### 规则 V6-BCDC-1 — session 方法名不同，且是异步的
+
+```js
+// ❌ 错误：PayPal session 方法
+var session = sdkInstance.createPayPalOneTimePaymentSession(opts)
+
+// ✅ 正确：BCDC 专属方法，且必须 await（异步，不同于 PayPal 的同步）
+var session = await sdkInstance.createPayPalGuestOneTimePaymentSession(opts)
+```
+
+### 规则 V6-BCDC-2 — 无 hasReturned() / resume()
+
+与 Venmo 一样，`createPayPalGuestOneTimePaymentSession` 返回的 session **没有** `hasReturned()` 和 `resume()` 方法。直接省略，否则报 `TypeError: session.hasReturned is not a function`。
+
+### 规则 V6-BCDC-3 — eligibility key 为 `basic_cards`（下划线复数）
+
+```js
+instance.findEligibleMethods({ currencyCode: getCurrency() })
+  .then(function (eligibility) {
+    eligibility.isEligible('basic_cards')  // ✅ 下划线 + 复数
+    // eligibility.isEligible('basic-card')  // ❌ 连字符 + 单数
+  })
+```
+
+### 规则 V6-BCDC-4 — 按钮元素与容器
+
+```js
+var cardContainer = document.createElement('paypal-basic-card-container')
+var btn = document.createElement('paypal-basic-card-button')
+cardContainer.appendChild(btn)
+container.appendChild(cardContainer)
+```
+
+### 规则 V6-BCDC-5 — 额外回调：onComplete 和 onWarn
+
+```js
+await sdkInstance.createPayPalGuestOneTimePaymentSession({
+  onApprove,
+  onCancel,
+  onComplete: function (data) { /* 支付流程完成 */ },
+  onError,
+  onWarn: function (data) { /* 表单提交失败（卡号错误、地址错误等），可恢复 */ },
+})
+```
+
+### 规则 V6-BCDC-6 — presentation mode 不支持 payment-handler
+
+BCDC 支持：`auto`, `modal`, `popup`, `redirect`。**不支持** `payment-handler`。
+`DEFAULT_MODES = ['auto', 'modal', 'popup', 'redirect']`
 
 ---
 

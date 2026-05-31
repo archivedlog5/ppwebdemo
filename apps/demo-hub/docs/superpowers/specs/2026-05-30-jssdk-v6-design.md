@@ -377,8 +377,9 @@ const r = await fetch(`${API}/v2/checkout/orders/${orderId}/capture`, {
 |---|---|---|
 | paypal-ecm, paypal-ecs | `['paypal-payments']` | 已确认（v6 文档） |
 | paylater-ecm, paylater-ecs | `['paypal-payments']` | ✅ 已实现（`isEligible('paylater')`，`findEligibleMethods({currencyCode: getCurrency()})`，`createPayLaterOneTimePaymentSession`，`paypal-pay-later-button`；国家→币种联动：US→USD / AU→AUD / IT|ES|FR→EUR / GB→GBP / CA→CAD） |
-| venmo-ecm, venmo-ecs | TBD | 等 markdown |
-| bcdc-ecm, bcdc-ecs, buttons | TBD | 等 markdown |
+| venmo-ecm, venmo-ecs | `['venmo-payments']` | ✅ 已实现（`isEligible('venmo')`，`findEligibleMethods({currencyCode:'USD'})`，`createVenmoOneTimePaymentSession`，`venmo-button`；US账号；固定USD；无hasReturned/resume；仅auto模式） |
+| bcdc-ecm, bcdc-ecs | `['paypal-guest-payments']` | ✅ 已实现（`isEligible('basic_cards')`，`findEligibleMethods({currencyCode:getCurrency()})`，`createPayPalGuestOneTimePaymentSession`（**async**），`paypal-basic-card-container`+`paypal-basic-card-button`；CN账号；无hasReturned/resume；固定auto；onComplete+onWarn额外回调） |
+| buttons | TBD | 等 markdown |
 | acdc | TBD | 等 markdown |
 | applepay-ecm, applepay-ecs | TBD | 等 markdown |
 | googlepay-ecm, googlepay-ecs | TBD | 等 markdown |
@@ -474,7 +475,10 @@ btn.addEventListener('click', function () {
 
 ## 13. 开放问题（各产品 markdown 到位后补全）
 
-- [ ] paylater / venmo / bcdc / buttons 的 `components` 数组和 eligibility key
+- [x] paylater 的 `components` 数组和 eligibility key（`['paypal-payments']` / `'paylater'`）
+- [x] venmo 的 `components` 数组和 eligibility key（`['venmo-payments']` / `'venmo'`）
+- [x] bcdc 的 `components` 数组和 eligibility key（`['paypal-guest-payments']` / `'basic_cards'`）
+- [ ] buttons 的 `components` 数组和 eligibility key
 - [ ] `acdc` 的 Card Fields v6 API（`createCardFieldsSession` 或类似）
 - [ ] `applepay-ecm/ecs` 的 v6 Apple Pay API
 - [ ] `googlepay-ecm/ecs` 的 v6 Google Pay API（ECM Promise 模式 vs ECS Full Callback 模式是否保持不变）

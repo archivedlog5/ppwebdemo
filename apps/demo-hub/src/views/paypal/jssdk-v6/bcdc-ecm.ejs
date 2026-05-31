@@ -1,0 +1,58 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · BCDC ECM</span>
+    <h1><%= title %></h1>
+    <p>Basic Card &amp; Debit Card — Express Checkout Mark. Merchant-prefilled shipping, buyer confirms in checkout sheet.</p>
+  </div>
+
+  <div class="sandbox-card">
+    <div class="amount-row">
+      <div class="currency-group">
+        <label class="field-label" for="demo-currency">Currency</label>
+        <select id="demo-currency" class="currency-select" aria-label="Select currency">
+          <% supportedCurrencies.forEach(function(c) { %>
+            <option value="<%= c %>" <%= c === currency ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
+            aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+
+    <div id="paypal-button-container" class="sdk-loading">
+      <div class="sdk-spinner"></div>
+      <span>Loading PayPal...</span>
+    </div>
+
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:   '<%= clientId %>',
+    components: ['paypal-guest-payments'],
+    pageType:   'checkout',
+    urls: {
+      createOrder:  '/paypal/jssdk-v6/api/bcdc-ecm/create-order',
+      captureOrder: '/paypal/jssdk-v6/api/bcdc-ecm/capture-order',
+    },
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/bcdc-ecm.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

@@ -139,7 +139,7 @@
 
 - [x] **Task 8** — PayLater ECM + ECS（`paylater-ecm.js/ejs`、`paylater-ecs.js/ejs`；**2026-05-31 新增** custom trigger button；`paypal-pay-later-button` web component + `createPayLaterOneTimePaymentSession`）
 - [x] **Task 9** — Venmo ECM + ECS（`venmo-ecm.js/ejs`、`venmo-ecs.js/ejs` 路由+视图+前端 JS；使用 US 账号；`createVenmoOneTimePaymentSession`；仅 `auto` 模式；`findEligibleMethods({ currencyCode: 'USD' })`；**2026-06-01 完成**）
-- [ ] **Task 10** — BCDC ECM + ECS（`bcdc-ecm.js/ejs`、`bcdc-ecs.js/ejs`、`bcdc.js`）
+- [x] **Task 10** — BCDC ECM + ECS（`bcdc-ecm.js/ejs`、`bcdc-ecs.js/ejs`；`createPayPalGuestOneTimePaymentSession`（async）；eligibility key `basic_cards`；`paypal-basic-card-container` + `paypal-basic-card-button`；components `['paypal-guest-payments']`；无 custom trigger；固定 `presentationMode: 'auto'`；**2026-06-01 完成**）
 - [ ] **Task 12** — Standalone Buttons（`buttons.js/ejs`，多 funding source）
 - [ ] **Task 13** — ACDC（`acdc.js/ejs`，Card Fields v6 API）
 - [ ] **Task 14** — Apple Pay ECM（`applepay-ecm.js/ejs`）

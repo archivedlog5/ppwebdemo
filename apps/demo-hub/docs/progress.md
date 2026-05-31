@@ -2,6 +2,67 @@
 
 ---
 
+## 2026-06-01 — JSSDK v6 BCDC ECM / ECS（Task 10）
+
+**背景：** 基于 PayPal JSSDK v6 BCDC 文档，新增 bcdc-ecm 和 bcdc-ecs 两个 demo。BCDC（Basic Card & Debit Card）使用 `createPayPalGuestOneTimePaymentSession`（异步）和 `paypal-basic-card-button` web component，与 PayPal ECM/ECS 的 `createPayPalOneTimePaymentSession`（同步）存在关键差异。
+
+**完成内容：**
+
+### 路由文件（工厂路由，CN 账号）
+
+- **`src/routes/paypal/jssdk-v6/bcdc-ecm.js`**：`createStandardRoute`，buildBody 与 paypal-ecm 完全相同（含 `SANDBOX_BUYER`、`EXPERIENCE_CONTEXT`、`SANDBOX_SHIPPING`）
+- **`src/routes/paypal/jssdk-v6/bcdc-ecs.js`**：`createStandardRoute`，buildBody 与 paypal-ecs 完全相同（`shipping_preference: 'GET_FROM_FILE'`，无 shipping 字段）
+
+### EJS 视图
+
+- **`src/views/paypal/jssdk-v6/bcdc-ecm.ejs`** / **`bcdc-ecs.ejs`**：
+  - `window.DEMO.components: ['paypal-guest-payments']`
+  - 有货币选择器
+  - 无 presentation mode 下拉（BCDC 固定 `auto`）
+  - 无 custom trigger button（BCDC 仅官方按钮）
+
+### 前端 JS
+
+- **`src/public/js/paypal/jssdk-v6/bcdc-ecm.js`** / **`bcdc-ecs.js`**：各自独立文件
+  - `createPayPalGuestOneTimePaymentSession`（**async**，需 await；与 PayPal session 的同步调用不同）
+  - `findEligibleMethods({ currencyCode: getCurrency() })`（显式传 currencyCode）
+  - `isEligible('basic_cards')`（下划线 + 复数）
+  - `paypal-basic-card-container` + `paypal-basic-card-button` 动态创建
+  - `session.start({ presentationMode: 'auto' }, orderPromise)`（固定 auto，无 fallback 循环）
+  - 无 `session.hasReturned()` / `session.resume()`（guest session 不支持）
+  - 额外回调：`onComplete`（完成通知）、`onWarn`（表单错误，可恢复）
+
+### Bug 修复（运行时）
+
+- 移除 `session.hasReturned()` 调用：guest session 无此方法，调用即 `TypeError`
+
+### 样式更新
+
+- `src/public/css/sandbox.css`：将 `paypal-basic-card-button` 和 `paypal-basic-card-container` 加入 web component block（`display: block; width: 100%`）
+
+### 规则文档
+
+- `src/routes/paypal/jssdk-v6/CLAUDE.md`：新增 V6-BCDC-1 至 V6-BCDC-6 六条 BCDC 专属规则
+
+### 更新 app.js
+
+- 挂载 `bcdc-ecm` + `bcdc-ecs` 路由
+
+**改动文件（共 9 个）：**
+- `src/routes/paypal/jssdk-v6/bcdc-ecm.js`（新建）
+- `src/routes/paypal/jssdk-v6/bcdc-ecs.js`（新建）
+- `src/views/paypal/jssdk-v6/bcdc-ecm.ejs`（新建）
+- `src/views/paypal/jssdk-v6/bcdc-ecs.ejs`（新建）
+- `src/public/js/paypal/jssdk-v6/bcdc-ecm.js`（新建）
+- `src/public/js/paypal/jssdk-v6/bcdc-ecs.js`（新建）
+- `src/app.js`（修改 — 挂载两个新路由）
+- `src/public/css/sandbox.css`（修改 — bcdc web component 样式）
+- `src/routes/paypal/jssdk-v6/CLAUDE.md`（修改 — 新增 BCDC 专属规则）
+
+**状态：** Task 10 ✅ 完成。Supabase 需插入两条产品记录后重启 demo-hub 生效。
+
+---
+
 ## 2026-06-01 — JSSDK v6 Venmo ECM / ECS（Task 9）
 
 **背景：** 基于 PayPal JSSDK v6 文档，新增 Venmo ECM 和 ECS 两个 demo。Venmo 仅支持 US 买家 + USD，使用 US 沙盒账号凭证，前端 SDK 方法与 PayPal ECM/ECS 存在显著差异。

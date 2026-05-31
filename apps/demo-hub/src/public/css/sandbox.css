@@ -67,7 +67,9 @@
 paypal-button,
 paypal-pay-later-button,
 venmo-button,
-paypal-credit-button {
+paypal-credit-button,
+paypal-basic-card-button,
+paypal-basic-card-container {
   display: block;
   width: 100%;
 }
