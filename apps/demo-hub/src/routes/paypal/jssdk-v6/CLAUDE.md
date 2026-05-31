@@ -63,6 +63,17 @@ btn.addEventListener('click', function () {
 })
 ```
 
+### 规则 V6-8 — createPayPalOneTimePaymentSession() 同步返回，不是 Promise
+
+```js
+// ❌ 错误：.then() 不存在，直接报 TypeError: ...().then is not a function
+instance.createPayPalOneTimePaymentSession({...}).then(function (session) { ... })
+
+// ✅ 正确：同步拿到 session，直接用
+var session = instance.createPayPalOneTimePaymentSession({...})
+btn.addEventListener('click', function () { session.start(...) })
+```
+
 ### 规则 V6-3 — instance 变量作用域：必须嵌套 .then()
 
 ```js
@@ -109,6 +120,105 @@ window.DEMO = {
     createOrder:  '/paypal/jssdk-v6/api/<product>/create-order',
     captureOrder: '/paypal/jssdk-v6/api/<product>/capture-order',
   },
+}
+```
+
+### 规则 V6-9 — 产品 JS 函数结构（标准模式）
+
+参考 PayPal 参考代码，所有 v6 产品 JS 文件统一使用以下三层分解：
+
+```js
+;(function () {
+  'use strict'
+
+  // ── 1. 顶层 paymentSessionOptions 对象（回调集中定义）
+  var paymentSessionOptions = {
+    onApprove: function (data) {
+      var urls = (window.DEMO || {}).urls
+      return fetch(urls.captureOrder, { ... body: JSON.stringify({ orderId: data.orderId }) ... })
+        .then(function (r) { return r.json() })
+        .then(function (order) {
+          // 检查 capture.status === 'COMPLETED'
+        })
+    },
+    onCancel: function () {
+      showResult('Payment cancelled.', 'error')   // 'error' = 红色（与失败一致）
+    },
+    onError: function (err) {
+      showResult('✗ ' + (err.message || String(err)), 'error')
+    },
+  }
+
+  // ── 2. configurePayPalButton(sdkInstance)：创建 session + button + click 监听
+  function configurePayPalButton(sdkInstance) {
+    // V6-8: 同步返回，不能 .then()
+    var session = sdkInstance.createPayPalOneTimePaymentSession(paymentSessionOptions)
+    var container = clearLoading()
+    var btn = document.createElement('paypal-button')
+    container.appendChild(btn)
+    btn.addEventListener('click', function () {
+      if (!validateAmount()) return
+      var urls = (window.DEMO || {}).urls
+      // V6-2: 传 Promise 引用，不能 await
+      var orderPromise = fetch(urls.createOrder, { ... })
+        .then(function (r) { return r.json() })
+        .then(function (d) {
+          if (d.error) throw new Error(d.error)
+          return { orderId: d.orderId }
+        })
+      session.start({ presentationMode: 'auto' }, orderPromise)
+    })
+  }
+
+  // ── 3. onPayPalWebSdkLoaded()：SDK 入口，getPPInstance + 资格检查
+  function onPayPalWebSdkLoaded() {
+    getPPInstance()
+      .then(function (instance) {
+        // V6-3: 必须嵌套在 instance 回调内
+        return instance.findEligibleMethods()
+          .then(function (eligibility) {
+            if (eligibility.isEligible('paypal')) {
+              configurePayPalButton(instance)
+            } else {
+              showResult('PayPal not eligible in this region', 'error')
+            }
+          })
+      })
+      .catch(function (err) {
+        showResult('✗ ' + (err.message || String(err)), 'error')
+      })
+  }
+
+  // ── Currency selector + window.load 触发入口
+  document.addEventListener('DOMContentLoaded', function () { /* currency change → reload */ })
+  window.addEventListener('load', function () {
+    if (typeof paypal === 'undefined') { showResult('✗ PayPal SDK failed to load', 'error'); return }
+    onPayPalWebSdkLoaded()
+  })
+})()
+```
+
+### 规则 V6-10 — showResult CSS class 命名（不加 result- 前缀）
+
+```js
+// ❌ 错误：CSS 没有 .result-success / .result-error，样式不生效
+el.className = 'result-msg result-success'
+el.className = 'result-msg result-error'
+el.style.display = 'block'  // 不要手动设 display，CSS 控制
+
+// ✅ 正确：class 直接用 'success' 或 'error'
+el.className = 'result-msg ' + type   // type = 'success' | 'error'
+el.textContent = text
+// .result-msg.success { display:block; color: green }
+// .result-msg.error   { display:block; color: red   }
+```
+
+**onCancel 统一用 `'error'` 类型（红色）**，与支付失败保持一致：
+
+```js
+onCancel: function () {
+  showResult('Payment cancelled.', 'error')   // ✅ 红色
+  // showResult('Payment cancelled.', 'info') // ❌ 无对应 CSS，样式不生效
 }
 ```
 

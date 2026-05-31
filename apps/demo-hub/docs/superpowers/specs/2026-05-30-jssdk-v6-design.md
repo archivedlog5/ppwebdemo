@@ -108,7 +108,8 @@ apps/demo-hub/src/
 │   └── plm-js.ejs
 └── public/js/paypal/jssdk-v6/
     ├── init.js                           # 共享：getPPInstance() 单例 + sessionStorage
-    ├── paypal.js                         # paypal-ecm 和 paypal-ecs 共用
+    ├── paypal-ecm.js                     # paypal-ecm 独立（已拆分）
+    ├── paypal-ecs.js                     # paypal-ecs 独立（已拆分）
     ├── paylater.js                       # paylater-ecm 和 paylater-ecs 共用
     ├── venmo.js                          # venmo-ecm 和 venmo-ecs 共用
     ├── bcdc.js                           # bcdc-ecm 和 bcdc-ecs 共用
@@ -127,8 +128,8 @@ apps/demo-hub/src/
 ```
 
 **JS 文件共用说明：**
-- `paypal.js` 被 `paypal-ecm.ejs` 和 `paypal-ecs.ejs` 共用（SDK 调用相同，order body 差异由后端路由区分）
-- 同理：`paylater.js`, `venmo.js`, `bcdc.js` 各自被对应的 ECM/ECS 两个 EJS 共用
+- `paypal-ecm.js` 和 `paypal-ecs.js` 各自独立（已拆分，便于后续前端逻辑差异化）
+- `paylater.js`, `venmo.js`, `bcdc.js` 各自被对应的 ECM/ECS 两个 EJS 共用
 - Apple Pay / Google Pay / Vault：ECM vs ECS 实现差异较大，各自独立
 
 ---
@@ -197,18 +198,112 @@ apps/demo-hub/src/
 
 ## 7. 各产品 JS 标准模式（以 paypal-ecm/ecs 为例）
 
+**三个关键修正（运行时验证）：**
+1. `createPayPalOneTimePaymentSession()` **同步返回** session 对象，不是 Promise（V6-8）
+2. `findEligibleMethods()` 必须在接收 `instance` 的回调内部嵌套调用，否则 `instance` 作用域丢失（V6-3）
+3. `showResult` class 命名：`'result-msg success'` / `'result-msg error'`，不加 `result-` 前缀（V6-10）
+
+**函数三层分解结构（参考 PayPal 参考代码）：**
+
 ```js
 ;(function () {
   'use strict'
 
-  // 公共辅助函数（与 v5 相同）
+  // ── 公共辅助函数 ────────────────────────────────────────────────────────────
   function getCurrency() { ... }
-  function getAmount()   { ... }
+  function getAmount() { ... }
   function validateAmount() { ... }
-  function clearLoading(id) { ... }
-  function showResult(text, type) { ... }
+  function clearLoading() { ... }
 
-  // 币种切换 → reload（与 v5 相同）
+  function showResult(text, type) {
+    var el = document.getElementById('result')
+    if (!el) return
+    el.className = 'result-msg ' + type   // ✅ V6-10: 'success' or 'error'，不加 result- 前缀
+    el.textContent = text
+    // el.style.display = 'block'  ← ❌ 不要，CSS 通过 .success/.error 控制 display
+  }
+
+  // ── 1. 顶层 paymentSessionOptions 对象（回调集中定义）────────────────────
+  var paymentSessionOptions = {
+    onApprove: function (data) {
+      // ✅ V6-1: data.orderId 小写 d
+      var urls = (window.DEMO || {}).urls
+      return fetch(urls.captureOrder, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: data.orderId }),
+      })
+        .then(function (r) { return r.json() })
+        .then(function (order) {
+          if (order.error) { showResult('✗ ' + order.error, 'error'); return }
+          var capture =
+            order.purchase_units &&
+            order.purchase_units[0] &&
+            order.purchase_units[0].payments &&
+            order.purchase_units[0].payments.captures &&
+            order.purchase_units[0].payments.captures[0]
+          if (!capture || capture.status !== 'COMPLETED') {
+            showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
+            return
+          }
+          showResult('✓ Payment captured · Order: ' + order.id, 'success')
+        })
+    },
+    onCancel: function () {
+      showResult('Payment cancelled.', 'error')   // ✅ 'error' = 红色，与失败一致；'info' 无 CSS
+    },
+    onError: function (err) {
+      showResult('✗ ' + (err.message || String(err)), 'error')
+    },
+  }
+
+  // ── 2. configurePayPalButton(sdkInstance)：创建 session + button + click 监听 ──
+  function configurePayPalButton(sdkInstance) {
+    // ✅ V6-8: createPayPalOneTimePaymentSession() 同步返回 session，不能 .then()
+    var session = sdkInstance.createPayPalOneTimePaymentSession(paymentSessionOptions)
+
+    var container = clearLoading()
+    var btn = document.createElement('paypal-button')
+    container.appendChild(btn)
+
+    btn.addEventListener('click', function () {
+      if (!validateAmount()) return
+      var urls = (window.DEMO || {}).urls
+      // ✅ V6-2: 传 Promise 引用，不能 await
+      var orderPromise = fetch(urls.createOrder, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: getAmount(), currency: getCurrency() }),
+      })
+        .then(function (r) { return r.json() })
+        .then(function (d) {
+          if (d.error) throw new Error(d.error)
+          return { orderId: d.orderId }
+        })
+      session.start({ presentationMode: 'auto' }, orderPromise)
+    })
+  }
+
+  // ── 3. onPayPalWebSdkLoaded()：SDK 入口，getPPInstance + 资格检查 ──────────
+  function onPayPalWebSdkLoaded() {
+    getPPInstance()
+      .then(function (instance) {
+        // ✅ V6-3: findEligibleMethods() 嵌套在 instance 回调内，保证 instance 作用域
+        return instance.findEligibleMethods()
+          .then(function (eligibility) {
+            if (eligibility.isEligible('paypal')) {
+              configurePayPalButton(instance)
+            } else {
+              showResult('PayPal not eligible in this region', 'error')
+            }
+          })
+      })
+      .catch(function (err) {
+        showResult('✗ ' + (err.message || String(err)), 'error')
+      })
+  }
+
+  // ── 币种切换 → reload ────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     var sel = document.getElementById('demo-currency')
     if (!sel) return
@@ -221,72 +316,13 @@ apps/demo-hub/src/
     })
   })
 
+  // ── 入口：window.load 后启动 ─────────────────────────────────────────────
   window.addEventListener('load', function () {
     if (typeof paypal === 'undefined') {
       showResult('✗ PayPal SDK failed to load', 'error')
       return
     }
-
-    var urls = window.DEMO.urls
-
-    getPPInstance()
-      .then(function (instance) { return instance.findEligibleMethods() })
-      .then(function (eligibility) {
-        if (!eligibility.isEligible('paypal')) {
-          showResult('PayPal not eligible in this region', 'error')
-          return
-        }
-
-        var container = clearLoading()
-        var btn = document.createElement('paypal-button')
-        container.appendChild(btn)
-
-        return instance.createPayPalOneTimePaymentSession({
-          onApprove: function (data) {
-            return fetch(urls.captureOrder, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ orderId: data.orderId }),
-            })
-              .then(function (r) { return r.json() })
-              .then(function (order) {
-                // capture 成功判断：与 v5 规则完全一致
-                var capture = order.purchase_units &&
-                  order.purchase_units[0] &&
-                  order.purchase_units[0].payments &&
-                  order.purchase_units[0].payments.captures &&
-                  order.purchase_units[0].payments.captures[0]
-                if (!capture || capture.status !== 'COMPLETED') {
-                  showResult('✗ Capture failed · status: ' + (capture ? capture.status : 'unknown'), 'error')
-                  return
-                }
-                showResult('✓ Payment captured · Order: ' + order.id, 'success')
-              })
-          },
-          onCancel: function () { showResult('Payment cancelled.', 'error') },
-          onError:  function (err) { showResult('✗ ' + (err.message || String(err)), 'error') },
-        })
-        .then(function (session) {
-          btn.addEventListener('click', function () {
-            if (!validateAmount()) return
-            // 关键：不能 await createOrder，要传 Promise 引用给 session.start()
-            var orderPromise = fetch(urls.createOrder, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ amount: getAmount(), currency: getCurrency() }),
-            })
-              .then(function (r) { return r.json() })
-              .then(function (d) {
-                if (d.error) throw new Error(d.error)
-                return { orderId: d.orderId }
-              })
-            session.start({ presentationMode: 'auto' }, orderPromise)
-          })
-        })
-      })
-      .catch(function (err) {
-        showResult('✗ ' + err.message, 'error')
-      })
+    onPayPalWebSdkLoaded()
   })
 })()
 ```

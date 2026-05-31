@@ -61,6 +61,47 @@
 
 ---
 
+## 2026-05-31 — JSSDK v6 paypal-ecm/ecs Bug 修复 + 代码重构
+
+**修复内容：**
+
+1. **`createPayPalOneTimePaymentSession()` 同步返回（V6-8 新规则）**
+   - 原错误：`.then(function(session) {...})` → `TypeError: ...().then is not a function`
+   - 修复：改为 `var session = instance.createPayPalOneTimePaymentSession({...})`，直接同步使用
+   - 更新 `CLAUDE.md` 新增规则 V6-8；更新 design spec section 7 代码示例
+
+2. **`paypal.js` 拆分为 `paypal-ecm.js` + `paypal-ecs.js`**
+   - 原因：每产品独立文件，便于后续差异化实现
+   - `paypal-ecm.ejs` → 引用 `/js/paypal/jssdk-v6/paypal-ecm.js`
+   - `paypal-ecs.ejs` → 引用 `/js/paypal/jssdk-v6/paypal-ecs.js`
+   - `paypal.js` 已删除
+
+3. **buildBody 完全对齐 v5 spb-ecm / spb-ecs**
+   - **paypal-ecm**：补充 `SANDBOX_BUYER`、`reference_id`、`description`、`invoice_id`、`custom_id`、`soft_descriptor`、完整 `DEMO_ITEM`（含 sku/description/url 等字段）；`EXPERIENCE_CONTEXT` 直接使用（不手动加 `shipping_preference`，由常量控制）
+   - **paypal-ecs**：同上字段，`experience_context` 额外加 `shipping_preference: 'GET_FROM_FILE'` + `user_action: 'CONTINUE'`；无 shipping 字段
+
+4. **`paypal-ecm.js` 三层函数重构（参考 PayPal 参考代码，V6-9 新规则）**
+   - `paymentSessionOptions` 对象提取到 IIFE 顶层（回调集中管理，不再内联）
+   - `configurePayPalButton(sdkInstance)` 函数：创建 session + button + click 监听
+   - `onPayPalWebSdkLoaded()` 函数：SDK 入口，getPPInstance + findEligibleMethods + 路由到 configurePayPalButton
+   - `window.addEventListener('load', ...)` 只调用 `onPayPalWebSdkLoaded()`，不含任何业务逻辑
+   - 保留 `[ECM]` console.log 调试日志（用于 Task 11 验证）
+
+5. **showResult CSS class 修复（V6-10 新规则）**
+   - 原错误：`el.className = 'result-msg result-success'`（无对应 CSS selector，样式不生效）
+   - 修复：`el.className = 'result-msg ' + type`（type = 'success' | 'error'）
+   - 移除 `el.style.display = 'block'`（CSS 通过 `.result-msg.success/.error` 控制 display）
+   - `onCancel` 改为 `showResult('Payment cancelled.', 'error')`（红色，与失败一致；`'info'` 无对应 CSS）
+   - 同时修复 `paypal-ecs.js` 的相同问题
+
+**更新的 markdown 文件：**
+- `src/routes/paypal/jssdk-v6/CLAUDE.md`：新增规则 V6-9（函数结构）、V6-10（showResult CSS）
+- `docs/superpowers/specs/2026-05-30-jssdk-v6-design.md`：Section 7 完整重写为三层函数结构
+
+**状态：** Task 11 E2E 测试进行中（用户人手测试）
+
+---
+
 ## 2026-05-28 — Google Pay ECS Full Callback 模式
 
 - 修复 `googlepay-ecs.js`：改为 Full Callback 模式（`paymentDataCallbacks: { onPaymentAuthorized, onPaymentDataChanged }`）
