@@ -2,6 +2,51 @@
 
 ---
 
+## 2026-06-01 — JSSDK v6 Standalone Buttons（Task 12）
+
+**背景：** 在同一页面渲染四个按钮（PayPal / PayLater / BCDC / Venmo），CN 账号用于前三者，US 账号用于 Venmo。v6 SDK `createInstance` 多次调用同一 `paypal` 全局且加载同一 SDK 脚本，无法通过 `data-namespace` 方案隔离（v6 Web Component 注册是全局单例，两次加载触发 `NotSupportedError: already been used with this registry`）。最终方案：单 SDK 加载，CN 用 `clientId`（via `getPPInstance()`），US 用 `clientToken`（从后端 `GET /api/buttons/us-client-token` 获取，调用 `/v1/oauth2/token` 带 `response_type=client_token&domains[]=...`）。
+
+**关键技术决策：**
+- **双实例不能并发** `createInstance`：必须 CN await 后再建 US（否则 Venmo `isEligible` 返回 false，原因可能是 SDK 内部 auth 上下文竞态）
+- **`clientToken` vs `clientId`**：第二次 `createInstance` 用 `clientToken` 才能携带独立的 US 账号凭证，`clientId` 在第二次调用时 Venmo 不 eligible
+- **货币固定 USD**：Venmo 只支持 USD，页面 currency selector disabled
+
+**新增函数：`getUSClientToken()`**（`config/paypal.js`）
+- 调 `/v1/oauth2/token`，body: `grant_type=client_credentials&response_type=client_token&domains[]=PAYPAL_US_MERCHANT_DOMAINS`
+- 返回 `data.access_token`（PayPal 把 client_token 放在 access_token 字段）
+
+**改动文件（共 5 个）：**
+- `src/routes/paypal/jssdk-v6/buttons.js`（新建：4 个 API 端点 + GET us-client-token）
+- `src/views/paypal/jssdk-v6/buttons.ejs`（新建：4 btn-slot，USD only，usClientToken URL）
+- `src/public/js/paypal/jssdk-v6/buttons.js`（新建：sequential createInstance，clientToken for US）
+- `src/config/paypal.js`（修改：新增 `getUSClientToken()`）
+- `src/app.js`（修改：挂载 buttons 路由）
+
+**状态：** Task 12 ✅ 完成。
+
+---
+
+## 2026-06-01 — Collapsible Sections（UI 改进）
+
+**背景：** List 页面 provider / SDK 分组内容太长，需要可折叠。Demo 详情页侧边栏同样需要两级折叠。
+
+**实现方案：** 共享 `collapse.js`（vanilla JS IIFE），读 `data-collapse-provider` / `data-collapse-sdk` 属性定位触发元素，`aria-controls` 关联 `.collapsible-body` 容器，CSS `max-height` + `opacity` 过渡实现动画，localStorage 持久化展开/折叠状态。
+
+**无障碍（ui-ux-pro-max 审查）：** `role="button"` + `tabindex="0"` + `aria-expanded` + `aria-controls` + `keydown Enter/Space` + `:focus-visible` 焦点环 + `@media (prefers-reduced-motion: reduce)`。
+
+**Coming-soon provider 处理：** CSS 触发样式改为属性选择器 `[data-collapse-provider]`，无此属性的 Stripe/Adyen header 保持 `cursor: auto`，不进入折叠逻辑。
+
+**改动文件（共 5 个）：**
+- `src/public/js/collapse.js`（新建：toggle + localStorage + ARIA + keyboard）
+- `src/public/css/layout.css`（修改：`.collapsible-body` transition + focus-visible + reduced-motion）
+- `src/views/index.ejs`（修改：provider/SDK wrapper + icons + ARIA attrs + script include）
+- `src/views/partials/header.ejs`（修改：sidebar provider/SDK wrapper）
+- `src/views/partials/footer.ejs`（修改：collapse.js script include）
+
+**状态：** ✅ 完成。经浏览器验证：折叠/展开、localStorage 持久化、键盘导航、焦点环、mobile tabs 不受影响均正常。
+
+---
+
 ## 2026-06-01 — JSSDK v6 BCDC ECM / ECS（Task 10）
 
 **背景：** 基于 PayPal JSSDK v6 BCDC 文档，新增 bcdc-ecm 和 bcdc-ecs 两个 demo。BCDC（Basic Card & Debit Card）使用 `createPayPalGuestOneTimePaymentSession`（异步）和 `paypal-basic-card-button` web component，与 PayPal ECM/ECS 的 `createPayPalOneTimePaymentSession`（同步）存在关键差异。

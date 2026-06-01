@@ -487,3 +487,58 @@ const val = parseFloat(amount).toFixed(2)
 // 前端：createOrder fetch body 只传 amount，不传 currency
 body: JSON.stringify({ amount: getAmount() })
 ```
+
+---
+
+## Standalone Buttons 专属规则
+
+### 规则 V6-BUTTONS-1 — 同页面双账号必须顺序创建 + US 用 clientToken
+
+同页面同时渲染 CN（PayPal/PayLater/BCDC）和 US（Venmo）按钮时：
+
+```
+❌ 错误：两次 createInstance 用 clientId，并发调用
+  → CN 先起，US clientId 的 Venmo isEligible 返回 false（SDK 内部 auth 竞态）
+
+❌ 错误：data-namespace 加载两次 SDK
+  → v6 Web Component（paypal-button 等）注册是全局单例，第二次注册报
+     NotSupportedError: already been used with this registry
+
+✅ 正确：单 SDK 加载，顺序 await，US 用 clientToken（不是 clientId）
+```
+
+```js
+// onPayPalWebSdkLoaded — async function
+var cnPromise  = getPPInstance()          // CN：clientId via window.DEMO.clientId
+var usTokenPromise = fetch(urls.usClientToken).then(r => r.json()).then(d => d.clientToken)
+
+// Step 1: CN 完全就绪后再建 US
+var cnInstance = await cnPromise
+// ... 设置 PayPal / PayLater / BCDC 按钮 ...
+
+// Step 2: 用 clientToken 创建 US 实例
+var usClientToken = await usTokenPromise
+var usInstance = await paypal.createInstance({
+  clientToken: usClientToken,   // ← clientToken 不是 clientId
+  components: ['venmo-payments'],
+  pageType: 'checkout',
+  testBuyerCountry: 'US',
+})
+// ... 设置 Venmo 按钮 ...
+```
+
+### 规则 V6-BUTTONS-2 — getUSClientToken() 调用方式
+
+```js
+// config/paypal.js
+async function getUSClientToken() {
+  // 调 /v1/oauth2/token，加 response_type=client_token + domains[]
+  // 返回 data.access_token（PayPal 把 client_token 放在 access_token 字段）
+}
+```
+
+路由后端暴露端点：`GET /api/buttons/us-client-token`，前端并行 fetch（与 CN instance 创建同时发起，await CN 完成后再 await token）。
+
+### 规则 V6-BUTTONS-3 — 货币固定 USD
+
+Standalone Buttons 页面有 Venmo（只支持 USD），currency selector disabled，`getCurrency()` 直接返回 `'USD'`。

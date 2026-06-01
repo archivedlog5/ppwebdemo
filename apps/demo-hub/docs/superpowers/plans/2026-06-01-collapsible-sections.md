@@ -1,6 +1,6 @@
 # Collapsible Sections Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add two-level collapsible UI (provider + SDK) to the demo-hub list page and demo detail sidebar, with localStorage persistence and full keyboard/ARIA accessibility.
 
@@ -27,7 +27,7 @@
 **Files:**
 - Modify: `src/public/css/layout.css`
 
-- [ ] **Step 1: Append collapse rules to the end of layout.css**
+- [x] **Step 1: Append collapse rules to the end of layout.css**
 
 ```css
 /* ── Collapsible Sections ── */
@@ -107,7 +107,7 @@
 }
 ```
 
-- [ ] **Step 2: Verify file reads without error**
+- [x] **Step 2: Verify file reads without error**
 
 ```bash
 node -e "require('fs').readFileSync('apps/demo-hub/src/public/css/layout.css','utf8'); console.log('OK')"
@@ -115,7 +115,7 @@ node -e "require('fs').readFileSync('apps/demo-hub/src/public/css/layout.css','u
 
 Expected output: `OK`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/demo-hub/src/public/css/layout.css
@@ -129,7 +129,7 @@ git commit -m "style(demo-hub): add collapsible section CSS — transition, focu
 **Files:**
 - Create: `src/public/js/collapse.js`
 
-- [ ] **Step 1: Create the file with full implementation**
+- [x] **Step 1: Create the file with full implementation**
 
 ```js
 ;(function () {
@@ -201,7 +201,7 @@ git commit -m "style(demo-hub): add collapsible section CSS — transition, focu
 })()
 ```
 
-- [ ] **Step 2: Check syntax**
+- [x] **Step 2: Check syntax**
 
 ```bash
 node -c apps/demo-hub/src/public/js/collapse.js && echo "Syntax OK"
@@ -209,7 +209,7 @@ node -c apps/demo-hub/src/public/js/collapse.js && echo "Syntax OK"
 
 Expected output: `Syntax OK`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add apps/demo-hub/src/public/js/collapse.js
@@ -225,7 +225,7 @@ git commit -m "feat(demo-hub): collapse.js — toggle, localStorage, keyboard na
 
 Two changes: (a) restructure the provider+SDK loop to add collapsible wrappers and ARIA attributes, (b) add the script include.
 
-- [ ] **Step 1: Replace the provider forEach block (lines 61–100)**
+- [x] **Step 1: Replace the provider forEach block (lines 61–100)**
 
 Find this block in `index.ejs` (starts at the `<% Object.entries(grouped)` line inside `.home-body`):
 
@@ -337,7 +337,7 @@ Replace with:
 
 Note: `&#9658;` is `▶` (U+25BA). The icon starts with class `expanded` because the initial state is fully expanded; `collapse.js` will remove it if localStorage says collapsed.
 
-- [ ] **Step 2: Add script include before `</body>` in index.ejs**
+- [x] **Step 2: Add script include before `</body>` in index.ejs**
 
 Find the closing tags at the bottom of `index.ejs`:
 ```html
@@ -352,7 +352,7 @@ Replace with:
 </html>
 ```
 
-- [ ] **Step 3: Start dev server and verify list page**
+- [x] **Step 3: Start dev server and verify list page**
 
 ```bash
 npm run dev:demo-hub
@@ -364,7 +364,7 @@ Open http://localhost:3000. Verify:
 - Clicking again expands
 - Clicking an SDK label collapses only that SDK's product grid, not the others
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/demo-hub/src/views/index.ejs
@@ -379,7 +379,7 @@ git commit -m "feat(demo-hub): collapsible provider/sdk sections on list page"
 - Modify: `src/views/partials/header.ejs`
 - Modify: `src/views/partials/footer.ejs`
 
-- [ ] **Step 1: Replace the desktop sidebar block in header.ejs**
+- [x] **Step 1: Replace the desktop sidebar block in header.ejs**
 
 Find the desktop sidebar block (look for the comment `<%# Desktop sidebar %>`):
 
@@ -443,7 +443,7 @@ Replace with:
   </aside>
 ```
 
-- [ ] **Step 2: Add script include to footer.ejs**
+- [x] **Step 2: Add script include to footer.ejs**
 
 Current `footer.ejs`:
 ```html
@@ -470,7 +470,7 @@ Replace with:
 </html>
 ```
 
-- [ ] **Step 3: Verify sidebar on a demo page**
+- [x] **Step 3: Verify sidebar on a demo page**
 
 Dev server should still be running. Open any demo page (e.g., http://localhost:3000/paypal/jssdk-v6/paypal-ecm).
 
@@ -480,7 +480,7 @@ Verify:
 - Clicking an SDK label (e.g., `jssdk-v6`) collapses only that group's links
 - The active item (blue highlight) is still visible when its SDK group is expanded
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add apps/demo-hub/src/views/partials/header.ejs apps/demo-hub/src/views/partials/footer.ejs
@@ -491,7 +491,7 @@ git commit -m "feat(demo-hub): collapsible provider/sdk groups in demo detail si
 
 ## Task 5: Full verification against acceptance criteria
 
-- [ ] **Step 1: localStorage persistence**
+- [x] **Step 1: localStorage persistence**
 
 1. Open http://localhost:3000
 2. Collapse the PayPal provider section
@@ -499,20 +499,20 @@ git commit -m "feat(demo-hub): collapsible provider/sdk groups in demo detail si
 4. Click the browser Back button
 5. Expected: PayPal section is still collapsed; Braintree is expanded
 
-- [ ] **Step 2: Cross-page state sharing**
+- [x] **Step 2: Cross-page state sharing**
 
 1. On the list page, collapse `paypal/jssdk-v6` (the SDK group, not the whole provider)
 2. Navigate to a PayPal jssdk-v6 demo via the sidebar
 3. Expected: In the sidebar, `jssdk-v6` is collapsed (same localStorage key `paypal/jssdk-v6`)
 
-- [ ] **Step 3: Keyboard navigation**
+- [x] **Step 3: Keyboard navigation**
 
 1. On http://localhost:3000, press Tab until a provider header receives focus
 2. Expected: Blue `outline: 2px solid` focus ring visible
 3. Press Space or Enter
 4. Expected: Provider collapses/expands; icon rotates
 
-- [ ] **Step 4: Reduced-motion**
+- [x] **Step 4: Reduced-motion**
 
 In Chrome DevTools → Rendering tab → enable "Emulate CSS media feature prefers-reduced-motion: reduce".
 
@@ -521,20 +521,20 @@ In Chrome DevTools → Rendering tab → enable "Emulate CSS media feature prefe
 
 Disable the override after testing.
 
-- [ ] **Step 5: Mobile layout unchanged**
+- [x] **Step 5: Mobile layout unchanged**
 
 Resize browser to 375px wide. Verify:
 - Mobile horizontal tabs (`.sidebar-mobile`) appear at top of demo pages — no collapse icons, no collapse behavior
 - List page shows no visible regression in layout
 
-- [ ] **Step 6: Verify all acceptance criteria from spec**
+- [x] **Step 6: Verify all acceptance criteria from spec**
 
-- [ ] Clicking List page provider header → content folds/unfolds, icon rotates
-- [ ] Clicking List page SDK label → only that SDK's product grid folds/unfolds
-- [ ] Refresh page → collapsed/expanded states restored from localStorage
-- [ ] Sidebar provider label folds/unfolds all SDK groups
-- [ ] Sidebar SDK label folds/unfolds only that group's items
-- [ ] Tab + Enter/Space triggers fold (keyboard)
-- [ ] Focused header shows blue outline
-- [ ] Mobile horizontal tabs untouched
-- [ ] `prefers-reduced-motion` skips animation
+- [x] Clicking List page provider header → content folds/unfolds, icon rotates
+- [x] Clicking List page SDK label → only that SDK's product grid folds/unfolds
+- [x] Refresh page → collapsed/expanded states restored from localStorage
+- [x] Sidebar provider label folds/unfolds all SDK groups
+- [x] Sidebar SDK label folds/unfolds only that group's items
+- [x] Tab + Enter/Space triggers fold (keyboard)
+- [x] Focused header shows blue outline
+- [x] Mobile horizontal tabs untouched
+- [x] `prefers-reduced-motion` skips animation

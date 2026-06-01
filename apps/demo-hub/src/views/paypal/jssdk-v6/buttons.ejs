@@ -1,0 +1,80 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · Buttons</span>
+    <h1><%= title %></h1>
+    <p>PayPal / PayLater / BCDC use CN account &nbsp;·&nbsp; Venmo uses US account (USD only)</p>
+  </div>
+
+  <div class="sandbox-card">
+    <div class="amount-row">
+      <div class="currency-group">
+        <label class="field-label">Currency</label>
+        <select class="currency-select" disabled aria-label="Currency (USD only)">
+          <option value="USD" selected>USD</option>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
+            aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">&#9889; Sandbox Mode</span>
+
+    <div class="btn-slot">
+      <div class="btn-slot-label">PayPal</div>
+      <div id="btn-paypal" class="sdk-loading"><div class="sdk-spinner"></div><span>Loading...</span></div>
+    </div>
+
+    <div class="btn-slot">
+      <div class="btn-slot-label">Pay Later</div>
+      <div id="btn-paylater" class="sdk-loading"><div class="sdk-spinner"></div><span>Loading...</span></div>
+    </div>
+
+    <div class="btn-slot">
+      <div style="display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-1)">
+        <span class="btn-slot-label" style="margin-bottom:0">Venmo (US Account)</span>
+        <span class="test-hint" style="margin-top:0">Requires a US IP · always USD</span>
+      </div>
+      <div id="btn-venmo" class="sdk-loading"><div class="sdk-spinner"></div><span>Loading...</span></div>
+    </div>
+
+    <div class="btn-slot">
+      <div class="btn-slot-label">BCDC (Basic Card)</div>
+      <div id="btn-bcdc" class="sdk-loading"><div class="sdk-spinner"></div><span>Loading...</span></div>
+    </div>
+
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:   '<%= cnClientId %>',
+    components: ['paypal-payments', 'paypal-guest-payments'],
+    cnClientId: '<%= cnClientId %>',
+    usClientId: '<%= usClientId %>',
+    pageType:   'checkout',
+    urls: {
+      createOrderCn:  '/paypal/jssdk-v6/api/buttons/create-order-cn',
+      captureOrderCn: '/paypal/jssdk-v6/api/buttons/capture-order-cn',
+      createOrderUs:  '/paypal/jssdk-v6/api/buttons/create-order-us',
+      captureOrderUs: '/paypal/jssdk-v6/api/buttons/capture-order-us',
+      usClientToken:  '/paypal/jssdk-v6/api/buttons/us-client-token',
+    },
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/buttons.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>
