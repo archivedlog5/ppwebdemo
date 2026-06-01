@@ -64,17 +64,37 @@
   <%# Desktop sidebar %>
   <aside class="sidebar" aria-label="Product list">
     <% if (typeof sidebarProducts !== 'undefined') { %>
-      <div class="sidebar-provider"><%= provider %></div>
-      <% Object.entries(sidebarProducts).forEach(function([sdkVer, products]) { %>
-        <div class="sidebar-sdk"><%= sdkVer %></div>
-        <% products.forEach(function(p) { %>
-          <a href="/<%= provider %>/<%= sdkVer %>/<%= p.productKey %>"
-             class="sidebar-item <%= (p.productKey === currentProductKey && sdkVer === currentSdkVersion) ? 'active' : '' %>"
-             aria-current="<%= (p.productKey === currentProductKey && sdkVer === currentSdkVersion) ? 'page' : 'false' %>">
-            <%= p.displayName %>
-          </a>
+      <div class="sidebar-provider"
+           role="button"
+           tabindex="0"
+           aria-expanded="true"
+           aria-controls="sb-prov-<%= provider %>-body"
+           data-collapse-provider="<%= provider %>">
+        <%= provider %>
+        <span class="collapse-icon expanded" aria-hidden="true">&#9658;</span>
+      </div>
+      <div class="collapsible-body" id="sb-prov-<%= provider %>-body">
+        <% Object.entries(sidebarProducts).forEach(function([sdkVer, products]) { %>
+          <div class="sidebar-sdk"
+               role="button"
+               tabindex="0"
+               aria-expanded="true"
+               aria-controls="sb-sdk-<%= provider %>-<%= sdkVer %>-body"
+               data-collapse-sdk="<%= provider %>/<%= sdkVer %>">
+            <%= sdkVer %>
+            <span class="collapse-icon expanded" aria-hidden="true">&#9658;</span>
+          </div>
+          <div class="collapsible-body" id="sb-sdk-<%= provider %>-<%= sdkVer %>-body">
+            <% products.forEach(function(p) { %>
+              <a href="/<%= provider %>/<%= sdkVer %>/<%= p.productKey %>"
+                 class="sidebar-item <%= (p.productKey === currentProductKey && sdkVer === currentSdkVersion) ? 'active' : '' %>"
+                 aria-current="<%= (p.productKey === currentProductKey && sdkVer === currentSdkVersion) ? 'page' : 'false' %>">
+                <%= p.displayName %>
+              </a>
+            <% }) %>
+          </div>
         <% }) %>
-      <% }) %>
+      </div>
     <% } %>
   </aside>
 
