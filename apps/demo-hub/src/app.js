@@ -48,6 +48,7 @@ app.use(v6, require('./routes/paypal/jssdk-v6/bcdc-ecm'));
 app.use(v6, require('./routes/paypal/jssdk-v6/bcdc-ecs'));
 app.use(v6, require('./routes/paypal/jssdk-v6/acdc'));
 app.use(v6, require('./routes/paypal/jssdk-v6/applepay-ecm'))
+app.use(v6, require('./routes/paypal/jssdk-v6/applepay-ecs'))
 app.use(v6, require('./routes/paypal/jssdk-v6/buttons'))
 
 app.use((req, res) => res.status(404).send("Route not found"));

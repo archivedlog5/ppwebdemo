@@ -2,6 +2,30 @@
 
 ---
 
+## JSSDK v6 Apple Pay ECS（2026-06-02）
+
+> 路由：`/paypal/jssdk-v6/applepay-ecs` · 需 Safari + Apple Pay 沙盒钱包卡 · 浏览器非 Safari 时 T5 验证
+
+| ID | 用例 | 操作步骤 | 期望结果 | 状态 |
+|----|------|----------|----------|------|
+| T1 | 官方按钮付款 | Safari + 沙盒钱包卡，点 `<apple-pay-button>` | 拉起 sheet → 选地址/邮箱/电话/配送方式 → `✓ Payment captured · Order: ...` | ⬜ |
+| T2 | 客制按钮付款 | 点 `#custom-applepay-btn` | 同 T1（同一 handler） | ⬜ |
+| T3 | 切 shipping method | sheet 内 Standard↔Express | total 实时更新（item + 5 或 item + 10）；最终 create-order 金额 = sheet total | ⬜ |
+| T4 | 默认配送 | 不切换，直接付款 | chosenShipping = Standard($5)，total = item + 5 | ⬜ |
+| T5 | 非 Safari | Chrome 打开 | 显示 "Apple Pay is not available..."，无未捕获异常 | ⬜ |
+| T6 | 无钱包卡 | Safari 但钱包无卡 | 显示 "no cards configured" 类提示 | ⬜ |
+| T7 | 账号不合格 | isEligible('applepay') 返回 false | 显示 "not eligible for this account"，不渲染按钮 | ⬜ |
+| T8 | 商户验证失败 | validateMerchant 失败（域名未注册等） | abort() + 错误提示，sheet 关闭 | ⬜ |
+| T9 | 用户取消 | sheet 内取消 | oncancel log，无红错，可重试 | ⬜ |
+| T10 | capture 非 COMPLETED | 触发非完成态 | `✗ Capture failed · status: ...`，completePayment(FAILURE) | ⬜ |
+| T11 | 货币切换 | 切 `#demo-currency` | reload 带 `?currency=&amount=`，金额保留 | ⬜ |
+| T12 | inspect 输出 | 任意流程 | console 可见各对象属性+原型方法；重点确认 shippingContact / shippingMethod 事件 v6 形态 | ⬜ |
+| T13 | create-order curl | `curl POST .../api/applepay-ecs/create-order`（带 shippingContact/shippingAmount） | 返回 `{ orderId }`，body = item+shipping breakdown + apple_pay name/email/phone | ⬜ |
+| T14 | eligibility 网络错误 | findEligibleMethods 抛错 | .catch 捕获，显示 `✗ ...`，不静默失败 | ⬜ |
+| T15 | shippingMethod identifier 不匹配 | event.shippingMethod.identifier 非 standard/express | fallback SHIPPING_METHODS[0]，不崩溃 | ⬜ |
+
+---
+
 ## JSSDK v6 ACDC（2026-06-02）
 
 > 路由：`/paypal/jssdk-v6/acdc` · 测试卡：`4032030176760800` · SCA 默认：`SCA_WHEN_REQUIRED`

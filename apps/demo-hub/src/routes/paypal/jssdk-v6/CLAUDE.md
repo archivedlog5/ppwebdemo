@@ -367,7 +367,7 @@ paypal-credit-button {
 | bcdc-ecm, bcdc-ecs | `['paypal-guest-payments']` | ✅ 已实现 |
 | acdc | `['card-fields']` | ✅ 已实现 |
 | applepay-ecm | `['applepay-payments']` | ✅ 已实现 |
-| applepay-ecs | TBD | 等 markdown |
+| applepay-ecs | `['applepay-payments']` | ✅ 已实现 |
 | googlepay-ecm, googlepay-ecs | TBD | 等 markdown |
 | vault-* | TBD | 等 markdown |
 | plm-html, plm-js | TBD | 等 markdown |
@@ -449,6 +449,36 @@ Apple CDN 在 v6 core 之前加载，确保 `window.ApplePaySession` 在 `window
 Apple Pay sheet 必须收到 `completePayment()` 才会关闭，否则 sheet 卡住。
 成功：`{ status: ApplePaySession.STATUS_SUCCESS }`，失败/错误：`{ status: ApplePaySession.STATUS_FAILURE }`。
 `.catch()` 中也必须调用。
+
+### 规则 V6-APPLEPAY-ECS — applepay-ecs 在 ecm 基础上的增量规则
+
+**paymentRequest 额外字段（Object.assign 后置覆盖）：**
+- `requiredShippingContactFields: ['name', 'phone', 'email', 'postalAddress']`
+- `shippingType: 'shipping'`
+- `shippingMethods`: SHIPPING_METHODS 数组（Standard $5 / Express $10，含 identifier）
+- `lineItems`: `[{ label: 'Item Total', amount: value }, { label: chosenShipping.label, amount: shippingAmt }]`
+- `total`: `calcTotal(value, chosenShipping, zd)`（item + chosenShipping.amount，sheet total 与 create-order 金额必须一致）
+
+**新增 Apple Pay session 事件（浏览器原生，不依赖 v6 SDK）：**
+- `onshippingcontactselected`：不按地址重算运费，仅用 `completeShippingContactSelection` 重确认当前 total + lineItems
+- `onshippingmethodselected`：按 `event.shippingMethod.identifier` 查 SHIPPING_METHODS → 更新 `chosenShipping`，fallback 到 Standard；用 `completeShippingMethodSelection` 更新 total + lineItems
+
+**chosenShipping 状态管理：**
+- 每次按钮点击前 reset 为 `SHIPPING_METHODS[0]`（Standard）
+- `onshippingmethodselected` 按 identifier 更新；identifier 不匹配时 fallback 到 Standard（不崩溃）
+
+**create-order 请求 body 额外含：**
+- `shippingContact`、`billingContact`（从 `event.payment` 取）
+- `shippingAmount: chosenShipping.amount`
+
+**后端 create-order body 额外含（对比 ECM）：**
+- breakdown 含 `item_total` + `shipping`（两者分开）
+- `shipping` object（mapApplePayShipping(shippingContact)）
+- `payment_source.apple_pay` 额外含 `name`、`email_address`、`phone_number: { national_number }`（仅 national_number，无 country_code）
+
+**normalizeContact()：** 剥离 phoneNumber 前导 `+`（Apple Pay 可能返回 E.164 格式，PayPal confirmOrder 不接受前导 `+`）
+
+**返回字段：** `res.json({ orderId: order.id })`（v6 小写 d）；capture 读 `{ orderId }`（小写 d）
 
 ---
 

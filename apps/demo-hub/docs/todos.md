@@ -149,7 +149,7 @@
 - [x] **Task 12** — Standalone Buttons（`buttons.js/ejs`，多 funding source；CN 账号：PayPal/PayLater/BCDC；US 账号：Venmo；CN 用 `clientId`，US 用 `clientToken` from `getUSClientToken()`；固定 USD；**2026-06-01 完成**）
 - [x] **Task 13** — ACDC（`acdc.js/ejs`，CardFields v6 API；`createCardFieldsOneTimePaymentSession` 同步；`submit(orderId, { billingAddress })` 命令式；3DS 决策与 v5 一致；调试 inspect() 探查；**2026-06-02 完成**）
 - [x] **Task 14** — Apple Pay ECM（`applepay-ecm.js/ejs`；v6 流程：`findEligibleMethods` → `eligibility.getDetails('applepay')`（注意在 eligibility 上调用，非 instance）→ `createApplePayOneTimePaymentSession()`（同步）→ `formatConfigForPaymentRequest(details.config)` Object.assign 展开 → `new ApplePaySession(4, paymentRequest)` → validateMerchant / completePaymentMethodSelection / confirmOrder 防御式 / capture COMPLETED；**2026-06-02 完成**）
-- [ ] **Task 15** — Apple Pay ECS（`applepay-ecs.js/ejs`）
+- [x] **Task 15** — Apple Pay ECS（`applepay-ecs.js/ejs`；v6 ECS 流程：ECM 骨架 + ECS 增量（SHIPPING_METHODS / chosenShipping / normalizeContact / onshippingcontactselected / onshippingmethodselected）；paymentRequest 用 Object.assign 追加 requiredShippingContactFields + shippingType + shippingMethods + lineItems + calcTotal；create-order body 与 v5 逐字一致（item+shipping breakdown + apple_pay name/email/phone）；返回 orderId 小写 d；**2026-06-02 完成**）
 - [ ] **Task 16** — Google Pay ECM（`googlepay-ecm.js/ejs`，Promise 模式）
 - [ ] **Task 17** — Google Pay ECS（`googlepay-ecs.js/ejs`，Full Callback 模式）
 - [ ] **Task 18** — PayPal Vault w/ Purchase（`vault-paypal-with-purchase.js/ejs`）

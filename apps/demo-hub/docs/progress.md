@@ -2,6 +2,29 @@
 
 ---
 
+## 2026-06-02 — JSSDK v6 Apple Pay ECS（Task 15）
+
+**背景：** 基于需求/设计/计划文档（2026-06-02-*-jssdk-v6-applepay-ecs.md），实现 PayPal JSSDK v6 Apple Pay ECS demo，路由 `/paypal/jssdk-v6/applepay-ecs`。UI 与 v5 applepay-ecs 一致（"Buyer selects in sheet" 提示块 + 官方 `<apple-pay-button>` + 客制化按钮）；实现策略 = v6 applepay-ecm 骨架 + v5 applepay-ecs ECS 流程移植。
+
+**新增文件：**
+- `src/routes/paypal/jssdk-v6/applepay-ecs.js`
+- `src/views/paypal/jssdk-v6/applepay-ecs.ejs`
+- `src/public/js/paypal/jssdk-v6/applepay-ecs.js`
+
+**修改文件：**
+- `src/app.js`（一行挂载）
+- `src/routes/paypal/jssdk-v6/CLAUDE.md`（applepay-ecs ✅，ECS 规则）
+
+**ECS 对比 ECM 的增量：**
+- paymentRequest 追加 `requiredShippingContactFields`（4 项）+ `shippingType: 'shipping'` + `shippingMethods` 数组（Standard $5 / Express $10）+ `lineItems` + `calcTotal()`
+- 新增事件：`onshippingcontactselected`（仅重确认 total，不按地址重算）+ `onshippingmethodselected`（按 identifier 更新 chosenShipping，不匹配 fallback Standard）
+- `onpaymentauthorized` createOrder 额外携带 `shippingContact + billingContact + shippingAmount`
+- `normalizeContact()` 剥离 phoneNumber E.164 前导 `+`
+- 后端 create-order body：breakdown 含 item_total + shipping；payment_source.apple_pay 含 name/email_address/phone_number（national_number only）；return/cancel_url 指 v6 路径
+- 返回 `{ orderId: order.id }`（v6 小写 d）；capture 读 `{ orderId }`
+
+---
+
 ## 2026-06-02 — JSSDK v6 Apple Pay ECM（Task 14）
 
 **背景：** 基于需求/设计/计划四份文档（2026-06-02-*-jssdk-v6-applepay-ecm.md），实现 PayPal JSSDK v6 Apple Pay ECM demo，路由 `/paypal/jssdk-v6/applepay-ecm`。UI 与 v5 applepay-ecm 一致（官方 `<apple-pay-button>` + 客制化按钮），后端 create-order body 与 v5 逐字一致，前端改为 v6 Apple Pay API 流程。
