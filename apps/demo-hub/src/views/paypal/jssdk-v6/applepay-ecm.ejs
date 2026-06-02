@@ -1,0 +1,75 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · Apple Pay</span>
+    <h1><%= title %></h1>
+    <p>Apple Pay via PayPal — Express Checkout Mark. Buyer completes payment inside the Apple Pay sheet. Requires Safari and an Apple Pay–linked card.</p>
+  </div>
+  <div class="sandbox-card">
+    <div class="amount-row">
+      <div class="currency-group">
+        <label class="field-label" for="demo-currency">Currency</label>
+        <select id="demo-currency" class="currency-select" aria-label="Select currency">
+          <% supportedCurrencies.forEach(function(c) { %>
+            <option value="<%= c %>" <%= c === currency ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
+            aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+    <div class="amount-error" id="amount-error" role="alert"></div>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+
+    <div class="field-group">
+      <label class="field-label">Shipping Address <span style="color:var(--fg-muted);font-weight:400">(pre-filled by merchant — not shown in Apple Pay sheet)</span></label>
+      <div class="field-host" style="padding:10px 12px;color:var(--fg-muted);font-family:var(--font-mono);font-size:13px;line-height:1.6;cursor:default">
+        <%= sandboxShipping.name %><br>
+        <%= sandboxShipping.addressLine1 %><br>
+        <%= sandboxShipping.adminArea2 %>, <%= sandboxShipping.adminArea1 %> <%= sandboxShipping.postalCode %><br>
+        <%= sandboxShipping.countryCode %>
+      </div>
+    </div>
+
+    <div id="paypal-button-container" class="sdk-loading">
+      <div class="sdk-spinner"></div><span>Loading Apple Pay...</span>
+    </div>
+
+    <div style="margin-top:12px">
+      <button id="custom-applepay-btn" type="button" disabled
+        style="width:100%;min-height:44px;padding:0 16px;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;color:var(--fg);font-size:13px;font-weight:500;font-family:inherit;letter-spacing:0.02em;cursor:not-allowed;opacity:0.45;transition:background 150ms ease,border-color 150ms ease,transform 100ms ease"
+      >Custom Apple Pay Button<span style="font-size:10px;padding:2px 5px;background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.25);border-radius:3px;color:#c97a10;letter-spacing:0.06em;font-weight:600;line-height:1.4">DEMO</span></button>
+      <p style="margin:6px 0 0;font-size:11px;color:var(--fg-muted);text-align:center;opacity:.7">Functional but not recommended for production</p>
+    </div>
+
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:   '<%= clientId %>',
+    components: ['applepay-payments'],
+    pageType:   'checkout',
+    urls: {
+      createOrder:  '/paypal/jssdk-v6/api/applepay-ecm/create-order',
+      captureOrder: '/paypal/jssdk-v6/api/applepay-ecm/capture-order',
+    },
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/applepay-ecm.js"></script>
+<script src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

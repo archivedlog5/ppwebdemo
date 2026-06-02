@@ -366,10 +366,89 @@ paypal-credit-button {
 | venmo-ecm, venmo-ecs | `['venmo-payments']` | ✅ 已实现 |
 | bcdc-ecm, bcdc-ecs | `['paypal-guest-payments']` | ✅ 已实现 |
 | acdc | `['card-fields']` | ✅ 已实现 |
-| applepay-ecm, applepay-ecs | TBD | 等 markdown |
+| applepay-ecm | `['applepay-payments']` | ✅ 已实现 |
+| applepay-ecs | TBD | 等 markdown |
 | googlepay-ecm, googlepay-ecs | TBD | 等 markdown |
 | vault-* | TBD | 等 markdown |
 | plm-html, plm-js | TBD | 等 markdown |
+
+---
+
+## Apple Pay 专属规则
+
+### 规则 V6-APPLEPAY-1 — 双层资格检查
+
+浏览器检查（先）：`window.ApplePaySession` 存在 → `ApplePaySession.supportsVersion(4)` → `ApplePaySession.canMakePayments()`
+账号检查（后）：`findEligibleMethods({ currencyCode }).isEligible('applepay')`
+
+两层检查文案区分：
+- 浏览器不支持 → "Apple Pay is not available. Please use Safari on a supported Apple device."
+- 账号不合格 → "Apple Pay is not eligible for this account."
+
+### 规则 V6-APPLEPAY-2 — v6 配置路径（不同于 v5）
+
+| v5 | v6 |
+|----|----|
+| `paypalSDK.Applepay().config()` | `eligibility.getDetails('applepay').config`（注意：在 eligibility 上调用） |
+| `applepayInstance.validateMerchant()` | `applePaySession.validateMerchant()` |
+| `applepayInstance.confirmOrder()` | `applePaySession.confirmOrder()` |
+
+**关键**：`getDetails('applepay')` 是 `findEligibleMethods()` 返回的 `eligibility` 对象上的方法，**不是** `instance` 上的方法。
+`applePaySession` 来自 `instance.createApplePayOneTimePaymentSession()`（同步返回）。
+
+### 规则 V6-APPLEPAY-3 — formatConfigForPaymentRequest 用 Object.assign 展开
+
+```js
+var formattedConfig = applePaySession.formatConfigForPaymentRequest(details.config)
+// formattedConfig 已包含 merchantCapabilities + supportedNetworks
+var paymentRequest = Object.assign({}, formattedConfig, {
+  countryCode:                  'US',   // 硬编码覆盖（ECM）
+  currencyCode:                 currency,
+  requiredBillingContactFields: ['name', 'phone', 'email', 'postalAddress'],
+  requiredShippingContactFields: [],
+  total: { label: 'Total', amount: value, type: 'final' },
+})
+```
+
+不要手动从 `formattedConfig` 取 `merchantCapabilities`/`supportedNetworks`，直接展开即可。
+
+### 规则 V6-APPLEPAY-4 — confirmOrder 防御式校验
+
+```js
+var approveApplePayPayment = confirmResult && confirmResult.approveApplePayPayment
+if (approveApplePayPayment && approveApplePayPayment.status) {
+  // 有 status 字段才检查，否则跳过（靠 capture COMPLETED 判断）
+  if (approveApplePayPayment.status !== 'APPROVED') {
+    throw new Error('Apple Pay not approved · status: ' + approveApplePayPayment.status)
+  }
+}
+```
+
+### 规则 V6-APPLEPAY-5 — capture 只认 COMPLETED（规则 13）
+
+同 v5 规则 13：`purchase_units[0].payments.captures[0].status === 'COMPLETED'` 才算成功。不认 PENDING / DECLINED 等非终态。
+
+### 规则 V6-APPLEPAY-6 — 脚本加载顺序（四段式，Apple Pay 专属）
+
+```html
+<script src="/js/paypal/jssdk-v6/init.js"></script>          <!-- 1. singleton -->
+<script src="/js/paypal/jssdk-v6/applepay-ecm.js"></script>  <!-- 2. 产品 JS -->
+<script src="https://applepay.cdn-apple.com/jsapi/1.latest/apple-pay-sdk.js"></script>  <!-- 3. Apple CDN -->
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>            <!-- 4. v6 core -->
+```
+
+Apple CDN 在 v6 core 之前加载，确保 `window.ApplePaySession` 在 `window.load` 时可用。
+
+### 规则 V6-APPLEPAY-7 — 官方 `<apple-pay-button>` + 客制按钮，同一 handler
+
+两个按钮绑同一 click handler `onApplePayClicked(applePaySession, details)`。
+`applePaySession` 是 v6 SDK session（持有 validateMerchant/confirmOrder），`details` 是 getDetails 结果（持有 config）。
+
+### 规则 V6-APPLEPAY-8 — completePayment 必须始终调用
+
+Apple Pay sheet 必须收到 `completePayment()` 才会关闭，否则 sheet 卡住。
+成功：`{ status: ApplePaySession.STATUS_SUCCESS }`，失败/错误：`{ status: ApplePaySession.STATUS_FAILURE }`。
+`.catch()` 中也必须调用。
 
 ---
 

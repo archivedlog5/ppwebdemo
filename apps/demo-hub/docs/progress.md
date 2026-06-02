@@ -2,6 +2,41 @@
 
 ---
 
+## 2026-06-02 — JSSDK v6 Apple Pay ECM（Task 14）
+
+**背景：** 基于需求/设计/计划四份文档（2026-06-02-*-jssdk-v6-applepay-ecm.md），实现 PayPal JSSDK v6 Apple Pay ECM demo，路由 `/paypal/jssdk-v6/applepay-ecm`。UI 与 v5 applepay-ecm 一致（官方 `<apple-pay-button>` + 客制化按钮），后端 create-order body 与 v5 逐字一致，前端改为 v6 Apple Pay API 流程。
+
+**关键技术决策（含运行时发现）：**
+
+- **`getDetails('applepay')` 在 eligibility 上调用，非 instance**：初始实现错误地调用 `instance.getDetails()`，运行时报 `TypeError: instance.getDetails is not a function`。实际 API 为 `eligibility.getDetails('applepay')`（`findEligibleMethods()` 的返回值），且是同步调用（无需 `.then()`）。
+- **`createApplePayOneTimePaymentSession()` 同步返回**：与 `createPayPalOneTimePaymentSession()` 一致，同步返回 session 对象，持有 `validateMerchant()`、`confirmOrder()`、`formatConfigForPaymentRequest()` 三个方法。
+- **`formatConfigForPaymentRequest` 用 `Object.assign` 展开**：该方法返回含 `merchantCapabilities`/`supportedNetworks` 的对象，需用 `Object.assign({}, formattedConfig, { countryCode, currencyCode, ... })` 展开后追加自定义字段（参考 GitHub 官方示例代码）。
+- **confirmOrder 防御式校验**：`confirmResult.approveApplePayPayment.status` 存在时校验 APPROVED，不存在时直接靠 capture COMPLETED 判定（v6 文档未定义返回值，防御式处理）。
+- **四段式脚本加载**：`init.js` → `applepay-ecm.js` → Apple CDN（`applepay.cdn-apple.com`）→ v6 core（defer）。Apple CDN 需在 v6 core 之前确保 `window.ApplePaySession` 可用。
+- **双层资格检查**：浏览器检查（`ApplePaySession` 存在 / `supportsVersion(4)` / `canMakePayments()`）+ SDK 账号检查（`eligibility.isEligible('applepay')`），两种失败文案区分。
+
+**新建文件（3 个）：**
+- `src/routes/paypal/jssdk-v6/applepay-ecm.js`（自定义路由；GET 传 clientId/supportedCurrencies/sandboxShipping；create-order body 与 v5 逐字一致，返回 `{ orderId }` 小写 d；capture 读 `req.body.orderId`）
+- `src/views/paypal/jssdk-v6/applepay-ecm.ejs`（badge "PayPal · JSSDK v6 · Apple Pay"；`supportedCurrencies.forEach`；window.DEMO 含 clientId/components/urls；四段式脚本）
+- `src/public/js/paypal/jssdk-v6/applepay-ecm.js`（v6 Apple Pay 完整流程；`inspect()` 探查所有关键对象；货币/金额 helpers 独立 IIFE）
+
+**修改文件（2 个）：**
+- `src/app.js`（+1 行 v6 applepay-ecm 路由挂载，位于 acdc 之后）
+- `src/routes/paypal/jssdk-v6/CLAUDE.md`（components 表 applepay-ecm → `['applepay-payments']` ✅；新增 V6-APPLEPAY-1 至 V6-APPLEPAY-8 八条专属规则，含 API 发现结论）
+
+**待用户操作：**
+- Supabase SQL Editor 执行 INSERT：
+  ```sql
+  INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
+  VALUES ('paypal', 'jssdk-v6', 'applepay-ecm', 'Apple Pay ECM', 'Apple Pay one-time payment — merchant pre-fills shipping', true, 11);
+  ```
+- 重启 demo-hub，Safari 访问 `/paypal/jssdk-v6/applepay-ecm` 验证页面加载与按钮渲染
+- 按 `docs/test-cases.md` Apple Pay v6 测试矩阵逐项验收
+
+**状态：** Task 14 ✅ 代码完成，待 Supabase INSERT + Safari E2E 验证。
+
+---
+
 ## 2026-06-02 — JSSDK v6 ACDC（Task 13）
 
 **背景：** 基于需求/设计/计划四份文档（2026-06-02-*-jssdk-v6-acdc.md），实现 PayPal JSSDK v6 Advanced Credit/Debit Card demo，路由 `/paypal/jssdk-v6/acdc`。UI 与 v5 ACDC 一致，3DS 决策逻辑与 v5 一致，API 层不变（仍 `/v2/checkout/orders`），前端改为 v6 CardFields 命令式流程。
