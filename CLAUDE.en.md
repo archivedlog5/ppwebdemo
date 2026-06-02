@@ -2,6 +2,17 @@
 
 > This is the English version of `CLAUDE.md`. Both files must be kept in sync — any update to `CLAUDE.md` must be reflected here immediately.
 
+## ⚠️ Opus Model Restriction
+
+**When the current model is Opus: only write markdown. Never write code. Never make code changes.**
+
+- Allowed: Create/edit `.md` files (requirements, design, plans, todos, progress logs)
+- Forbidden: Write or modify any code files (`.js`, `.ejs`, `.ts`, `.css`, `.json`, `.sql`, etc.)
+- Forbidden: Any code generation, refactoring, or bug-fix code writes
+- If code is needed: prompt the user to switch to a non-Opus model (e.g. Sonnet)
+
+---
+
 ## Core Development Principles (Karpathy)
 
 **1. Think Before Coding**

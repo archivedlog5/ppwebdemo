@@ -2,6 +2,17 @@
 
 > 派生自根目录 `CLAUDE.md`，聚焦 demo-hub app。根 CLAUDE.md 的所有通用规则在此同样适用。
 
+## ⚠️ Opus 模型限制
+
+**当前 model 为 Opus 时，只允许写 markdown，禁止写任何代码，禁止执行任何代码改动。**
+
+- 允许：创建/编辑 `.md` 文件（需求、设计、计划、todo、进度等文档）
+- 禁止：编写或修改任何代码文件（`.js`、`.ejs`、`.ts`、`.css`、`.json`、`.sql` 等）
+- 禁止：执行任何代码生成、重构或 bug 修复的代码写入操作
+- 需要写代码时：提示用户切换到非 Opus 模型（如 Sonnet）
+
+---
+
 ## 核心开发原则（Karpathy）
 
 **1. 先思考，再编码（Think Before Coding）**
