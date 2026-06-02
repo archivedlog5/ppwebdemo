@@ -1,0 +1,87 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · ACDC</span>
+    <h1><%= title %></h1>
+    <p>Advanced Credit/Debit Card — hosted card input fields</p>
+  </div>
+  <div class="sandbox-card sandbox-card--wide">
+    <div class="amount-row">
+      <div class="currency-group">
+        <label class="field-label" for="demo-currency">Currency</label>
+        <select id="demo-currency" class="currency-select" aria-label="Select currency">
+          <% supportedCurrencies.forEach(function(c) { %>
+            <option value="<%= c %>" <%= c === currency ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
+            aria-label="Payment amount" />
+        </div>
+      </div>
+      <div class="currency-group">
+        <label class="field-label" for="demo-sca">3DS</label>
+        <select id="demo-sca" class="currency-select" aria-label="3DS SCA method" style="min-width:160px">
+          <option value="SCA_WHEN_REQUIRED" selected>SCA_WHEN_REQUIRED</option>
+          <option value="SCA_ALWAYS">SCA_ALWAYS</option>
+        </select>
+      </div>
+    </div>
+    <div class="amount-error" id="amount-error" role="alert"></div>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+
+    <div class="field-group">
+      <label class="field-label">Name on Card</label>
+      <input id="card-name" type="text" class="field-host"
+        value="<%= sandboxCardholderName %>" placeholder="Full name on card"
+        style="width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:13px;color:var(--fg);outline:none;" />
+    </div>
+    <div class="field-group">
+      <label class="field-label" for="card-number-container">Card Number</label>
+      <div class="field-host sdk-loading" id="card-number-container" style="height:42px;overflow:hidden;">
+        <div class="sdk-spinner"></div><span>Loading...</span>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Expiry</label>
+        <div class="field-host" id="card-expiry-container" style="height:42px;overflow:hidden;"></div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">CVV</label>
+        <div class="field-host" id="card-cvv-container" style="height:42px;overflow:hidden;"></div>
+      </div>
+    </div>
+
+    <button id="acdc-pay-btn" class="pay-btn pay-btn-paypal" type="button">Pay Now</button>
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+    <div class="test-hint">Test card: <strong>4032030176760800</strong> · Any future date · Any CVV</div>
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:   '<%= clientId %>',
+    components: ['card-fields'],
+    pageType:   'checkout',
+    urls: {
+      createOrder:  '/paypal/jssdk-v6/api/acdc/create-order',
+      captureOrder: '/paypal/jssdk-v6/api/acdc/capture-order',
+      getOrder:     '/paypal/jssdk-v6/api/acdc/order/:orderId',
+    },
+    billing: <%- JSON.stringify(sandboxBilling) %>,
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/acdc.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

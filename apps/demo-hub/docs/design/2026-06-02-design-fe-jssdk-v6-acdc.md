@@ -235,6 +235,30 @@ function doCapture(orderId) {
 - 金额校验 `validateAmount()`、零小数位货币、blur 格式化：直接搬 v5 `acdc.js`。
 - `getCurrency()` / `getAmount()` / `getSCA()` / `getName()`：同 v5。
 - `clearLoading(id)`：移除 spinner、清空 host 容器。
+- `mapBilling(billing)`：把 `window.DEMO.billing`（camelCase）映射为 `session.submit()` 要求的字段名。
+
+> **实施发现**：`session.submit()` 的 `billingAddress` 字段名与 v5 CardFields submit 不同，以 v6 官方文档为准：
+
+```js
+function mapBilling(billing) {
+  billing = billing || {}
+  return {
+    streetAddress: billing.addressLine1 || '',  // ≠ addressLine1
+    city:          billing.adminArea2   || '',  // ≠ adminArea2
+    state:         billing.adminArea1   || '',  // ≠ adminArea1
+    postalCode:    billing.postalCode   || '',
+    countryCode:   billing.countryCode  || '',
+  }
+}
+```
+
+| submit 字段（v6 文档） | window.DEMO.billing | 后端 create-order（snake_case） |
+|---|---|---|
+| `streetAddress` | `addressLine1` | `address_line_1` |
+| `city` | `adminArea2` | `admin_area_2` |
+| `state` | `adminArea1` | `admin_area_1` |
+| `postalCode` | `postalCode` | `postal_code` |
+| `countryCode` | `countryCode` | `country_code` |
 
 ## 6. v5 → v6 UI 能力差异（已定调：documented-only）
 
@@ -253,10 +277,14 @@ v6 文档对 `createCardFieldsComponent` 只暴露 `type` / `placeholder` / `sty
 
 ```js
 var STYLE = {
-  input: { 'font-family': "'Space Mono', monospace", 'font-size': '13px', color: 'inherit' },
+  input: { fontFamily: "'Space Mono', monospace", fontSize: '13px', color: 'inherit' },
   '.invalid': { color: '#EF4444' },
 }
 ```
+
+> **实施发现**：v6 style 对象内的 CSS 属性必须用 **camelCase**（`fontFamily`、`fontSize`），不接受 kebab-case 字符串（`'font-family'`、`'font-size'`）。使用 kebab-case 会抛 `DevError: css property is not supported`。
+>
+> **高度控制**：STYLE 的 `height` 只影响 iframe 内部的 input 元素，外层 iframe 高度由 SDK 决定。需在宿主容器上加 `style="height:42px;overflow:hidden;"` 才能真正约束可见高度。STYLE 内无需设置 `height` / `padding`。
 
 CSS 复用 `public/css/sandbox.css`（与 v5 共享 `.field-host`、`.sdk-loading`、`.result-msg` 等）。
 

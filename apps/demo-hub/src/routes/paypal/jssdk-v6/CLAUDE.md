@@ -365,11 +365,90 @@ paypal-credit-button {
 | paylater-ecm, paylater-ecs | `['paypal-payments']` | ✅ 已实现 |
 | venmo-ecm, venmo-ecs | `['venmo-payments']` | ✅ 已实现 |
 | bcdc-ecm, bcdc-ecs | `['paypal-guest-payments']` | ✅ 已实现 |
-| acdc | TBD | 等 markdown |
+| acdc | `['card-fields']` | ✅ 已实现 |
 | applepay-ecm, applepay-ecs | TBD | 等 markdown |
 | googlepay-ecm, googlepay-ecs | TBD | 等 markdown |
 | vault-* | TBD | 等 markdown |
 | plm-html, plm-js | TBD | 等 markdown |
+
+---
+
+## ACDC 专属规则
+
+### 规则 V6-ACDC-1 — eligibility key 为 `advanced_cards`，防御式判定
+
+```js
+instance.findEligibleMethods({ currencyCode: getCurrency() })
+  .then(function (eligibility) {
+    eligibility.isEligible('advanced_cards')  // ✅ key 名
+  })
+```
+
+官方提示："The card may not appear in the eligibility response yet. Integrate defensively."
+→ `isEligible('advanced_cards')` 返回 true **或** key 缺失时，**仍然渲染**卡输入域；仅在明确不合格信号时拦截。
+
+### 规则 V6-ACDC-2 — createCardFieldsOneTimePaymentSession 同步返回
+
+```js
+// ✅ 同步调用，不 await，不 .then()
+var session = instance.createCardFieldsOneTimePaymentSession()
+
+// ❌ 错误：.then() 不存在，抛 TypeError
+instance.createCardFieldsOneTimePaymentSession().then(...)
+```
+
+### 规则 V6-ACDC-3 — 字段用 appendChild（不是 v5 的 .render()）
+
+```js
+var numberField = session.createCardFieldsComponent({ type: 'number', placeholder: '...', style: STYLE })
+document.querySelector('#card-number-container').appendChild(numberField)
+// 同样适用 expiry / cvv
+```
+
+### 规则 V6-ACDC-4 — submit 是命令式，billingAddress 字段名用文档定义
+
+v6 CardFields 官方写法：点击时先 await createOrder() 拿 orderId，再 await session.submit()。
+这是 CardFields 专属；V6-2（session.start 必须传 Promise）仅适用于 Button session。
+
+```js
+async function onPayClick(session) {
+  var orderId = await createOrder()                         // 显式获取 orderId
+  var result  = await session.submit(orderId, {             // submit(orderId, opts) → { data, state }
+    billingAddress: mapBilling(window.DEMO.billing),
+  })
+  await handleSubmitResult(result, payBtn)
+}
+```
+
+**⚠️ billingAddress 字段名与 v5/后端不同：**
+
+| submit billingAddress | 后端 create-order（snake_case） | window.DEMO.billing |
+|---|---|---|
+| `streetAddress` | `address_line_1` | `addressLine1` |
+| `city` | `admin_area_2` | `adminArea2` |
+| `state` | `admin_area_1` | `adminArea1` |
+| `postalCode` | `postal_code` | `postalCode` |
+| `countryCode` | `country_code` | `countryCode` |
+
+`mapBilling()` 负责把 `window.DEMO.billing`（camelCase）映射为 submit 需要的字段名。
+
+### 规则 V6-ACDC-5 — submit 返回 { data, state }，state 机处理结果
+
+| state | 含义 | 处理 |
+|-------|------|------|
+| `'succeeded'` | 支付流程完成（含 3DS） | 读 `data.liabilityShift` → decide3DSAndCapture |
+| `'canceled'` | 用户关闭 3DS 弹窗 | 显示取消提示，按钮重新可用 |
+| `'failed'` | 卡校验/处理失败 | 显示 `data.message` |
+
+### 规则 V6-ACDC-6 — 3DS 决策与 v5 ACDC 完全一致
+
+- `data.liabilityShift` 为 `undefined` 或 `'POSSIBLE'` → 直接 capture。
+- 其他值 → GET order details → 读 `payment_source.card.authentication_result`：
+  - `liability_shift === 'NO'` + enrollment ∈ `{N, U, B}` → capture（未入会，frictionless）。
+  - `liability_shift === 'UNKNOWN'` → 显示 "please retry"。
+  - 其他 → 显示 "3D Secure declined"。
+
+唯一字面差异：orderId 小写 d（`data.orderId`、`:orderId`）。
 
 ---
 

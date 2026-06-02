@@ -2,6 +2,44 @@
 
 ---
 
+## 2026-06-02 — JSSDK v6 ACDC（Task 13）
+
+**背景：** 基于需求/设计/计划四份文档（2026-06-02-*-jssdk-v6-acdc.md），实现 PayPal JSSDK v6 Advanced Credit/Debit Card demo，路由 `/paypal/jssdk-v6/acdc`。UI 与 v5 ACDC 一致，3DS 决策逻辑与 v5 一致，API 层不变（仍 `/v2/checkout/orders`），前端改为 v6 CardFields 命令式流程。
+
+**关键技术决策：**
+
+- **`createCardFieldsOneTimePaymentSession()` 同步返回**：与 `createPayPalGuestOneTimePaymentSession`（BCDC，异步）不同，ACDC 同步返回；不能 `.then()` 调用。
+- **submit 是命令式**：click 时先 `await createOrder()` 拿 orderId（字符串），再 `await session.submit(orderId, { billingAddress })`，不套用 V6-2（那是 button session.start 专属的 Promise 传递规则）。
+- **字段挂载用 `appendChild`**：`createCardFieldsComponent({ type })` 返回 `HTMLElement`，直接 `appendChild` 到宿主容器（非 v5 的 `.render()`）。
+- **防御式资格判定**：`advanced_cards` key 可能不在 eligibility 响应里，缺失时仍渲染（官方指引 "integrate defensively"）。
+- **STYLE 用 camelCase**：v6 style 对象要求 `fontFamily`/`fontSize` 而非 kebab-case；`height`/`padding`/`color` 等也用 camelCase。
+- **billingAddress 字段名**：`session.submit()` 的 `billingAddress` 字段按文档为 `streetAddress`/`city`/`state`/`postalCode`/`countryCode`（非 v5 的 `addressLine1`/`adminArea2`/`adminArea1`）。
+- **容器高度控制**：v6 SDK STYLE 的 `height` 只影响 iframe 内部 input，外层 iframe 高度需在宿主容器上加 `height:42px; overflow:hidden;` 才能截断。
+
+**调试探查（design-fe §8）：**
+- 加入 `inspect()` 工具函数（own keys + proto methods + DOM check），对 `paypal` / `instance` / `eligibility` / `session` / 三个 field 组件 / `submit result` 逐一打印。
+- session 和 field 对象同时保留 `console.log(obj)` 直接引用 + `inspect()` 深度探查，双通道覆盖。
+- `decide3DSAndCapture` 进入 GET order 分支时，用 `console.group` 打印 `authentication_result` 完整对象及所有子字段（`liability_shift`、`enrollment_status`、`authentication_status`、`cavv`、`cavv_algorithm`、`eci_indicator`、`xid`）。
+
+**新建文件（4 个）：**
+- `src/routes/paypal/jssdk-v6/acdc.js`（自定义路由：GET render + POST create-order + GET order/:orderId + POST capture-order；CN 账号；返回 `{ orderId }` 小写 d）
+- `src/views/paypal/jssdk-v6/acdc.ejs`（移植 v5 结构；`supportedCurrencies.forEach`；`window.DEMO` 含 clientId/components/billing；三段式脚本；宿主容器 `height:42px`）
+- `src/public/js/paypal/jssdk-v6/acdc.js`（v6 CardFields 命令式；3DS 决策同 v5；inspect() 探查；mapBilling 字段名修正）
+
+**修改文件（3 个）：**
+- `src/app.js`（+1 行 v6 acdc 路由挂载）
+- `src/routes/paypal/jssdk-v6/CLAUDE.md`（components 表 acdc → `['card-fields']` ✅；新增 V6-ACDC-1 到 V6-ACDC-6 六条专属规则）
+- `apps/demo-hub/docs/todos.md`（Task 13 → ✅）
+
+**待用户操作：**
+- Supabase SQL Editor 执行 INSERT（`demohub.products` 插入 acdc 行，`sort_order` 取 v6 组内最大 +1）
+- 重启 demo-hub，访问 `/paypal/jssdk-v6/acdc` 验证页面加载与卡字段渲染
+- 按 `docs/test-cases.md` ACDC v6 测试矩阵逐项验收
+
+**状态：** Task 13 ✅ 代码完成，待 Supabase INSERT + E2E 验证。
+
+---
+
 ## 2026-06-01 — JSSDK v6 Standalone Buttons（Task 12）
 
 **背景：** 在同一页面渲染四个按钮（PayPal / PayLater / BCDC / Venmo），CN 账号用于前三者，US 账号用于 Venmo。v6 SDK `createInstance` 多次调用同一 `paypal` 全局且加载同一 SDK 脚本，无法通过 `data-namespace` 方案隔离（v6 Web Component 注册是全局单例，两次加载触发 `NotSupportedError: already been used with this registry`）。最终方案：单 SDK 加载，CN 用 `clientId`（via `getPPInstance()`），US 用 `clientToken`（从后端 `GET /api/buttons/us-client-token` 获取，调用 `/v1/oauth2/token` 带 `response_type=client_token&domains[]=...`）。

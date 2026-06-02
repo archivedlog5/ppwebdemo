@@ -1,6 +1,6 @@
 # demo-hub — Todos
 
-最后更新：2026-06-01
+最后更新：2026-06-02
 
 ---
 
@@ -147,7 +147,7 @@
 - [x] **Task 9** — Venmo ECM + ECS（`venmo-ecm.js/ejs`、`venmo-ecs.js/ejs` 路由+视图+前端 JS；使用 US 账号；`createVenmoOneTimePaymentSession`；仅 `auto` 模式；`findEligibleMethods({ currencyCode: 'USD' })`；**2026-06-01 完成**）
 - [x] **Task 10** — BCDC ECM + ECS（`bcdc-ecm.js/ejs`、`bcdc-ecs.js/ejs`；`createPayPalGuestOneTimePaymentSession`（async）；eligibility key `basic_cards`；`paypal-basic-card-container` + `paypal-basic-card-button`；components `['paypal-guest-payments']`；无 custom trigger；固定 `presentationMode: 'auto'`；**2026-06-01 完成**）
 - [x] **Task 12** — Standalone Buttons（`buttons.js/ejs`，多 funding source；CN 账号：PayPal/PayLater/BCDC；US 账号：Venmo；CN 用 `clientId`，US 用 `clientToken` from `getUSClientToken()`；固定 USD；**2026-06-01 完成**）
-- [ ] **Task 13** — ACDC（`acdc.js/ejs`，Card Fields v6 API）
+- [x] **Task 13** — ACDC（`acdc.js/ejs`，CardFields v6 API；`createCardFieldsOneTimePaymentSession` 同步；`submit(orderId, { billingAddress })` 命令式；3DS 决策与 v5 一致；调试 inspect() 探查；**2026-06-02 完成**）
 - [ ] **Task 14** — Apple Pay ECM（`applepay-ecm.js/ejs`）
 - [ ] **Task 15** — Apple Pay ECS（`applepay-ecs.js/ejs`）
 - [ ] **Task 16** — Google Pay ECM（`googlepay-ecm.js/ejs`，Promise 模式）
