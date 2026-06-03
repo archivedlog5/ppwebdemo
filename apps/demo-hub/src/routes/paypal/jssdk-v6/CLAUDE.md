@@ -368,7 +368,8 @@ paypal-credit-button {
 | acdc | `['card-fields']` | ✅ 已实现 |
 | applepay-ecm | `['applepay-payments']` | ✅ 已实现 |
 | applepay-ecs | `['applepay-payments']` | ✅ 已实现 |
-| googlepay-ecm, googlepay-ecs | TBD | 等 markdown |
+| googlepay-ecm | `['googlepay-payments']` | ✅ 已实现 |
+| googlepay-ecs | TBD | 等 markdown |
 | vault-* | TBD | 等 markdown |
 | plm-html, plm-js | TBD | 等 markdown |
 
@@ -739,3 +740,111 @@ async function getUSClientToken() {
 ### 规则 V6-BUTTONS-3 — 货币固定 USD
 
 Standalone Buttons 页面有 Venmo（只支持 USD），currency selector disabled，`getCurrency()` 直接返回 `'USD'`。
+
+---
+
+## Google Pay 专属规则
+
+### 规则 V6-GOOGLEPAY-1 — components 数组
+
+`googlepay-ecm` 使用 `['googlepay-payments']`（与 applepay 的 `applepay-payments` 对应）。
+
+### 规则 V6-GOOGLEPAY-2 — 三层资格检查
+
+1. **Google Pay SDK 可用性**（浏览器）：`window.google && window.google.payments && window.google.payments.api && window.google.payments.api.PaymentsClient`
+2. **账号资格**：`findEligibleMethods({ currencyCode }).isEligible('googlepay')`
+3. **设备/账号支持**：`paymentsClient.isReadyToPay({ allowedPaymentMethods, apiVersion, apiVersionMinor })`
+
+三层全通过才渲染按钮，每层失败显示不同文案。
+
+### 规则 V6-GOOGLEPAY-3 — v6 配置路径（不同于 v5）
+
+| 步骤 | v5 | v6 |
+|------|----|----|
+| 取 SDK | `paypalSDK.Googlepay()` 全局同步 | `getPPInstance()` → `instance.createGooglePayOneTimePaymentSession()`（同步） |
+| 取配置 | `Googlepay().config()` → Promise | `eligibility.getDetails('googlepay').config` + `session.formatConfigForPaymentRequest(config)`（同步） |
+| 账号资格 | 无 | `findEligibleMethods().isEligible('googlepay')` |
+| confirmOrder | `Googlepay().confirmOrder(...)` | `googlePaySession.confirmOrder(...)` |
+
+**关键**：`getDetails('googlepay')` 在 `eligibility` 对象上调用，**不是** `instance` 上的方法。`googlePaySession` 来自 `instance.createGooglePayOneTimePaymentSession()`（同步返回）。
+
+### 规则 V6-GOOGLEPAY-4 — ECM = Promise 模式（与 v5 一致，已实测确认）
+
+**v6 ECM 使用 Promise 模式**，与 v5 ECM 相同。实测（2026-06-03）：Promise 模式可正常拉起 sheet 并完成付款，**不触发 OR_BIBED_06**。
+
+> 历史更正：本规则早期写为"ECM 必须用 Callback 模式，否则 OR_BIBED_06"。2026-06-03 重写本 demo 时实测：Callback 模式与 Promise 模式**均可用**，先前的 OR_BIBED_06 是上一版（已废弃）实现里另一个 bug 的误判，并非 Promise 模式本身所致。最终按用户决策 + 设计文档采用 Promise 模式（对齐 v5；3DS 弹窗在 sheet 关闭后才弹，不被遮挡）。
+
+```js
+// PaymentsClient 不传 paymentDataCallbacks（Promise 模式）
+var paymentsClient = new google.payments.api.PaymentsClient({ environment: 'TEST' })
+
+// loadPaymentData request 不含 callbackIntents
+var req = Object.assign({}, BASE_REQUEST, {
+  allowedPaymentMethods: googlePayConfig.allowedPaymentMethods,
+  merchantInfo:          googlePayConfig.merchantInfo,
+  transactionInfo:       { countryCode: 'US', currencyCode, totalPriceStatus: 'FINAL', totalPrice, totalPriceLabel: 'Total' },
+  shippingAddressRequired: false,
+  emailRequired:           true,
+})
+```
+
+**流程：** 点按钮 → `paymentsClient.loadPaymentData(req)` 开 sheet → 用户确认 → sheet 关闭，Promise `resolve(paymentData)` → 取 `paymentData.email` → `createOrder` → `processPayment`（`confirmOrder` → 3DS → capture）。`.catch` 中 `err.statusCode === 'CANCELED'` 静默。
+
+> ⚠️ **仅免挑战（SCA_WHEN_REQUIRED）可用。** SCA_ALWAYS 的 3DS 在 v6 走不通——详见 V6-GOOGLEPAY-7（已知限制，callback 模式也修不了）。
+
+**`formatConfigForPaymentRequest(details.config)`** 返回含 `allowedPaymentMethods`（带 tokenizationSpecification）/`merchantInfo`/`apiVersion`/`apiVersionMinor` 的 config，用于拼装 `loadPaymentData` 请求 + `isReadyToPay`。
+
+**ECS 另议**：ECS 额外需要 Full Callback 模式（`onPaymentDataChanged` + `SHIPPING_ADDRESS`/`SHIPPING_OPTION`/`PAYMENT_AUTHORIZATION` intents），与 ECM 不同（等 ECS 实现时补充规则）。
+
+### 规则 V6-GOOGLEPAY-5 — createGooglePayOneTimePaymentSession + formatConfigForPaymentRequest 同步返回
+
+- `instance.createGooglePayOneTimePaymentSession()` 同步返回 `googlePaySession`（不是 Promise）
+- `googlePaySession.formatConfigForPaymentRequest(details.config)` 同步返回 `googlePayConfig`
+- 实测后在 `inspect()` 输出确认；若实测为 Promise 再加 `await`（目前按同步处理）
+
+### 规则 V6-GOOGLEPAY-6 — confirmOrder 返回形态
+
+`googlePaySession.confirmOrder({ orderId, paymentMethodData })` 是 **async**（返回 Promise）。实测返回形态（2026-06-03 inspect）：
+- 免挑战：`{ id, status: 'APPROVED', links, payment_source }` → 直接 `doCapture`
+- 3DS：`{ id, status: 'PAYER_ACTION_REQUIRED', purchase_units, links, payment_source }` → 进入 `handlePayerAction` —— **但在 v6 走不通，见 V6-GOOGLEPAY-7**
+
+> confirmOrder 完整签名（proto 实测）：`async confirmOrder({ billingAddress, email, orderId, paymentMethodData, shippingAddress })`，本 demo 只传 `{ orderId, paymentMethodData }`。
+
+### 规则 V6-GOOGLEPAY-7 — 3DS（SCA_ALWAYS）当前不支持（实测结论 2026-06-03）
+
+**结论：v6 Google Pay ECM demo 的 3DS 走不通，按"已知限制"处理。** 免挑战（SCA_WHEN_REQUIRED）正常 capture；SCA_ALWAYS 触发 `PAYER_ACTION_REQUIRED` 后无法完成。
+
+实测发现（inspect + 两种模式都试过）：
+
+1. **`googlePaySession.initiatePayerAction` 形态**：`length:0`、**普通函数（非 async）**、调用返回 `undefined`（v5 是返回 Promise 的 thenable）。proto 上只有 `formatConfigForPaymentRequest / getGooglePayConfig / confirmOrder / initiatePayerAction`，**没有 `hasReturned` / `resume`**。
+2. **Promise 模式**：sheet 关闭后调 `confirmOrder` 拿到 `PAYER_ACTION_REQUIRED` → 调 `initiatePayerAction()` **没有弹任何 3DS 挑战**（void no-op），随后 GET order 的 `payment_source.google_pay.card.authentication_result` 全为 `undefined` → 落到 `✗ 3DS error · liability_shift: undefined`。无 `resume()` 可等，拿不到结果。
+3. **Callback 模式**（`onPaymentAuthorized` + `callbackIntents:['PAYMENT_AUTHORIZATION']`，sheet 仍开）：`confirmOrder` 内部的 `POST .../graphql?ApproveGooglePayPayment` 被 `ERR_CONNECTION_RESET` 打断（CN 直连 sandbox.paypal.com 的网络问题），同样无法完成。**用户判定：callback 模式也解决不了这个 3DS 问题**。
+
+**最终方案（用户拍板）**：ship **Promise 模式**（对齐 v5、免挑战可用）。`handlePayerAction` 保留为防御兜底：best-effort 调 `initiatePayerAction()`（无参）+ GET order + `handle3DS` 决策表；当前环境下 SCA_ALWAYS 会显示 3DS 错误，属已知限制，不是 bug。
+
+> 代码现状：`googlepay-ecm.js` 为 Promise 模式（`PaymentsClient` 无 `paymentDataCallbacks`，请求无 `callbackIntents`）。如未来要支持 3DS，需 PayPal 提供 v6 Google Pay 可驱动 payer-action 的机制（带 Promise 返回或 resume），目前 SDK 形态不具备。
+
+### 规则 V6-GOOGLEPAY-8 — 脚本加载顺序（四段式，Google Pay 专属）
+
+```html
+<script src="/js/paypal/jssdk-v6/init.js"></script>          <!-- 1. singleton -->
+<script src="/js/paypal/jssdk-v6/googlepay-ecm.js"></script>  <!-- 2. 产品 JS -->
+<script src="https://pay.google.com/gp/p/js/pay.js"></script> <!-- 3. Google Pay CDN -->
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>  <!-- 4. v6 core -->
+```
+
+Google Pay CDN 在 v6 core 之前加载，确保 `window.google.payments.api.PaymentsClient` 在 `window.load` 时可用。
+
+### 规则 V6-GOOGLEPAY-9 — 官方 createButton + 客制按钮，同一 handler
+
+两个按钮绑同一 click handler `onGooglePayButtonClicked(googlePaySession, googlePayConfig)`。
+`googlePaySession` 来自 `instance.createGooglePayOneTimePaymentSession()`（持有 `confirmOrder` 和可能的 `initiatePayerAction`）；`googlePayConfig` 来自 `formatConfigForPaymentRequest`。
+模块级 `paymentsClient`（Google `PaymentsClient`，Promise 模式无 callbacks）在 handler 内调 `loadPaymentData`。
+
+### 规则 V6-GOOGLEPAY-10 — ECM phone 用 SANDBOX_PHONE 预填
+
+ECM（`shippingAddressRequired: false`）Google Pay sheet 无地址区，无法收电话 → 后端 create-order 用 `demoParams.SANDBOX_PHONE` 预填（对应 v5 规则 17）。
+
+### 规则 V6-GOOGLEPAY-11 — capture 只认 COMPLETED（规则 13）
+
+同 v5 规则 13：`purchase_units[0].payments.captures[0].status === 'COMPLETED'` 才算成功。

@@ -1,6 +1,6 @@
 # demo-hub — Todos
 
-最后更新：2026-06-02
+最后更新：2026-06-03
 
 ---
 
@@ -150,7 +150,7 @@
 - [x] **Task 13** — ACDC（`acdc.js/ejs`，CardFields v6 API；`createCardFieldsOneTimePaymentSession` 同步；`submit(orderId, { billingAddress })` 命令式；3DS 决策与 v5 一致；调试 inspect() 探查；**2026-06-02 完成**）
 - [x] **Task 14** — Apple Pay ECM（`applepay-ecm.js/ejs`；v6 流程：`findEligibleMethods` → `eligibility.getDetails('applepay')`（注意在 eligibility 上调用，非 instance）→ `createApplePayOneTimePaymentSession()`（同步）→ `formatConfigForPaymentRequest(details.config)` Object.assign 展开 → `new ApplePaySession(4, paymentRequest)` → validateMerchant / completePaymentMethodSelection / confirmOrder 防御式 / capture COMPLETED；**2026-06-02 完成**）
 - [x] **Task 15** — Apple Pay ECS（`applepay-ecs.js/ejs`；v6 ECS 流程：ECM 骨架 + ECS 增量（SHIPPING_METHODS / chosenShipping / normalizeContact / onshippingcontactselected / onshippingmethodselected）；paymentRequest 用 Object.assign 追加 requiredShippingContactFields + shippingType + shippingMethods + lineItems + calcTotal；create-order body 与 v5 逐字一致（item+shipping breakdown + apple_pay name/email/phone）；返回 orderId 小写 d；**2026-06-02 完成**）
-- [ ] **Task 16** — Google Pay ECM（`googlepay-ecm.js/ejs`，Promise 模式）
+- [x] **Task 16** — Google Pay ECM（`googlepay-ecm.js/ejs`；**Promise 模式实测确认可用，无 OR_BIBED_06**；v6 流程：`findEligibleMethods({currencyCode}).isEligible('googlepay')` → `eligibility.getDetails('googlepay')` → `createGooglePayOneTimePaymentSession()`（同步）→ `formatConfigForPaymentRequest(details.config)`（同步）→ `new PaymentsClient({environment:'TEST'})`（无 callbacks）→ `isReadyToPay` → 官方 createButton + 客制按钮同 handler → `loadPaymentData(req).then(paymentData)` 取 email → createOrder → `confirmOrder` → capture COMPLETED；三层资格检查；inspect 全程探查；create-order body 与 v5 逐字一致，返回 orderId 小写 d；**3DS（SCA_ALWAYS）为已知限制——v6 `initiatePayerAction()` 是 void no-op、无 `resume()`，callback 模式也修不了，免挑战可用**；**2026-06-03 完成**）
 - [ ] **Task 17** — Google Pay ECS（`googlepay-ecs.js/ejs`，Full Callback 模式）
 - [ ] **Task 18** — PayPal Vault w/ Purchase（`vault-paypal-with-purchase.js/ejs`）
 - [ ] **Task 19** — PayPal Vault Setup-only（`vault-paypal-setup-only.js/ejs`）

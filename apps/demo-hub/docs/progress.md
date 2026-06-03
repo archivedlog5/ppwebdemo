@@ -2,6 +2,45 @@
 
 ---
 
+## 2026-06-03 — JSSDK v6 Google Pay ECM（Task 16）
+
+**背景：** 基于 2026-06-02 的 req/design-fe/design-be/plan 四份文档，重写 PayPal JSSDK v6 Google Pay ECM demo，路由 `/paypal/jssdk-v6/googlepay-ecm`。UI 与 v5 googlepay-ecm 一致（货币/金额/3DS 选择器 + 商户预填 Shipping+Phone 展示 + 官方 Google Pay 按钮 + 客制按钮）；后端 create-order body 与 v5 逐字一致，前端改为 v6 Google Pay API 流程。
+
+**关键技术决策（付款流程模式）：**
+
+- **最终采用 Promise 模式（v5-style），实测确认可用。** 实现时先按当时 CLAUDE.md 规则 V6-GOOGLEPAY-4（"ECM 必须 Callback 模式，否则 OR_BIBED_06"）写了 Callback 模式，验证可用、无 OR_BIBED_06；随后按用户要求改回 Promise 模式（不传 `paymentDataCallbacks`、`loadPaymentData` 请求不含 `callbackIntents`），**同样验证可用、无 OR_BIBED_06**。
+- **结论：Callback 与 Promise 两种模式在 v6 ECM 下均可用。** 先前规则里"Promise 模式必触发 OR_BIBED_06"系上一版（已废弃）实现里另一 bug 的误判，已在 CLAUDE.md V6-GOOGLEPAY-4 更正。Promise 模式与设计文档一致、对齐 v5，且 3DS 弹窗在 sheet 关闭后才弹不被遮挡，故作为最终方案。
+- **v6 配置链（同步）：** `findEligibleMethods({currencyCode}).isEligible('googlepay')` → `eligibility.getDetails('googlepay')` → `instance.createGooglePayOneTimePaymentSession()` → `session.formatConfigForPaymentRequest(details.config)`。
+- **三层资格检查：** Google Pay SDK 浏览器可用性（`window.google.payments.api.PaymentsClient`）+ 账号资格（`isEligible('googlepay')`）+ 设备/账号（`isReadyToPay`）。
+- **3DS（SCA_ALWAYS）= 已知限制，不支持（实测结论）：** v6 `googlePaySession.initiatePayerAction()` 实测为**无参 + void no-op**（非 v5 的 Promise）、session **无 `resume()`**。Promise 模式下 confirmOrder 拿到 `PAYER_ACTION_REQUIRED` 后 `initiatePayerAction()` 不弹挑战、GET order 无 auth 结果 → 显示 3DS 错误。改 callback 模式后 confirmOrder 的 `ApproveGooglePayPayment` 又遇 `ERR_CONNECTION_RESET`（CN→sandbox.paypal.com 网络重置）。**用户拍板：callback 模式也解决不了，ship Promise 模式**，3DS 列为已知限制。免挑战（SCA_WHEN_REQUIRED）正常 capture。`handlePayerAction` 保留为防御兜底。详见 CLAUDE.md V6-GOOGLEPAY-7。
+- **全程 inspect()** 探查 instance/eligibility/details/googlePaySession/googlePayConfig/paymentData/confirmOrder result/order details/capture（ACDC 风格）。
+
+**新建文件（3 个）：**
+- `src/routes/paypal/jssdk-v6/googlepay-ecm.js`（自定义路由；CN 账号；GET 注入 clientId/supportedCurrencies/sandboxShipping/sandboxPhone，无 sdkUrl/extraScripts；create-order body 与 v5 逐字一致，返回 `{ orderId }`；GET order/:orderId；capture 读 `req.body.orderId`）
+- `src/views/paypal/jssdk-v6/googlepay-ecm.ejs`（badge "PayPal · JSSDK v6 · Google Pay"；`supportedCurrencies.forEach`；保留 3DS/SCA 选择器 + Shipping&Phone 预填块；window.DEMO 含 clientId/components/urls/shipping；四段式脚本 init→产品 JS→pay.js→v6 core defer）
+- `src/public/js/paypal/jssdk-v6/googlepay-ecm.js`（v6 Google Pay 完整流程，Promise 模式；inspect 探查；货币/金额 helpers）
+
+**修改文件（4 个 md，含 symlink 计 1 处源文件）：**
+- `src/routes/paypal/jssdk-v6/CLAUDE.md`（V6-GOOGLEPAY-4 Callback→Promise 更正；V6-GOOGLEPAY-9 handler 签名更新；V6-GOOGLEPAY-7 probe 现状备注）
+- `docs/todos.md`（Task 16 → ✅）
+- `docs/test-cases.md`（新增 Google Pay ECM v6 测试矩阵）
+- `docs/progress.md`（本条）
+
+> `src/app.js` 已含 googlepay-ecm 挂载行（无需改动）。
+
+**待用户操作：**
+- Supabase SQL Editor 执行 INSERT：
+  ```sql
+  INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
+  VALUES ('paypal', 'jssdk-v6', 'googlepay-ecm', 'Google Pay ECM', 'Google Pay via PayPal v6 — Express Checkout Mark', true, <v6 组内最大 sort_order + 1>);
+  ```
+- 重启 demo-hub，Chrome + 沙盒 Google Pay 钱包卡验证
+- 测试 3DS（SCA_ALWAYS）后把 probe 结论（Branch A/B）回填到 CLAUDE.md V6-GOOGLEPAY-7
+
+**状态：** Task 16 ✅ 代码完成（Promise 模式），免挑战付款已实测通过；3DS（SCA_ALWAYS）实测确认为已知限制（不支持）。待 Supabase INSERT。
+
+---
+
 ## 2026-06-02 — JSSDK v6 Apple Pay ECS（Task 15）
 
 **背景：** 基于需求/设计/计划文档（2026-06-02-*-jssdk-v6-applepay-ecs.md），实现 PayPal JSSDK v6 Apple Pay ECS demo，路由 `/paypal/jssdk-v6/applepay-ecs`。UI 与 v5 applepay-ecs 一致（"Buyer selects in sheet" 提示块 + 官方 `<apple-pay-button>` + 客制化按钮）；实现策略 = v6 applepay-ecm 骨架 + v5 applepay-ecs ECS 流程移植。

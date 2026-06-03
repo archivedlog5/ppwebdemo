@@ -2,6 +2,33 @@
 
 ---
 
+## JSSDK v6 Google Pay ECM（2026-06-03）
+
+> 路由：`/paypal/jssdk-v6/googlepay-ecm` · 需 Chrome + Google Pay 沙盒钱包卡 · **付款模式：Promise（v5-style），实测无 OR_BIBED_06**
+
+| ID | 用例 | 操作步骤 | 期望结果 | 状态 |
+|----|------|----------|----------|------|
+| T1 | 官方按钮付款 | Chrome + 沙盒 Google Pay 卡，点官方按钮 | 拉起 sheet → `✓ Payment captured · Order: ...` | ✅ |
+| T2 | 客制按钮付款 | 点 `#custom-googlepay-btn` | 同 T1（同一 handler） | ✅ |
+| T3 | 无 Google Pay SDK | `window.google.payments` 缺失（脚本被拦） | 显示 "Google Pay SDK is not available"，无未捕获异常 | ⬜ |
+| T4 | isReadyToPay false | 设备/账号无 Google Pay | 清 spinner，显示 "not available on this device or account" | ⬜ |
+| T5 | 账号不合格 | `isEligible('googlepay')` false | 显示 "not eligible"，不渲染按钮 | ⬜ |
+| T6 | 用户取消 | sheet 内取消（statusCode CANCELED） | 静默，无红错，可重试 | ⬜ |
+| T7 | 3DS（SCA_ALWAYS）| `#demo-sca`=SCA_ALWAYS → 触发 PAYER_ACTION_REQUIRED | **已知限制（不支持）**：v6 `initiatePayerAction()` 是 void no-op、session 无 `resume()`，3DS 无法完成；显示 3DS 错误。callback 模式也修不了。详见 CLAUDE.md V6-GOOGLEPAY-7 | ⚠️ N/A |
+| T8 | capture 非 COMPLETED | 触发非完成态 | `✗ Capture failed · status: ...`，不误报成功 | ⬜ |
+| T9 | 货币切换 | 切 `#demo-currency` | reload 带 `?currency=&amount=`，金额保留 | ⬜ |
+| T10 | inspect 输出 | 任意流程 | console 可见各对象属性+原型方法（重点 googlePaySession 是否含 initiatePayerAction、confirmOrder 返回形态、formatConfigForPaymentRequest 输出） | ⬜ |
+| T11 | create-order curl | `curl POST .../api/googlepay-ecm/create-order`（body `{amount,currency,scaMethod}`）| 返回 `{ orderId }`，body 结构（payment_source.google_pay + shipping + verification.method）= v5；免 Chrome | ⬜ |
+| T12 | eligibility 网络错误 | findEligibleMethods 抛错 | `.catch` 捕获，显示 `✗ ...`，不静默失败 | ⬜ |
+| T13 | GET order curl | `curl GET .../api/googlepay-ecm/order/<id>` | 返回原始 PayPal order JSON | ⬜ |
+
+### 验收备注
+
+- T1/T2 正常付款（免挑战）已实测通过（Promise 模式，无 OR_BIBED_06）。
+- T7 3DS（SCA_ALWAYS）**实测确认为已知限制、不支持**：v6 `googlePaySession.initiatePayerAction()` 无参 + void no-op、session 无 `resume()`；Promise 模式拿不到 auth 结果，callback 模式 confirmOrder 又遇 `ERR_CONNECTION_RESET`（CN→sandbox.paypal.com）。用户拍板：ship Promise 模式，3DS 列为已知限制。详见 CLAUDE.md V6-GOOGLEPAY-7。
+
+---
+
 ## JSSDK v6 Apple Pay ECS（2026-06-02）
 
 > 路由：`/paypal/jssdk-v6/applepay-ecs` · 需 Safari + Apple Pay 沙盒钱包卡 · 浏览器非 Safari 时 T5 验证
