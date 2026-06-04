@@ -369,7 +369,7 @@ paypal-credit-button {
 | applepay-ecm | `['applepay-payments']` | ✅ 已实现 |
 | applepay-ecs | `['applepay-payments']` | ✅ 已实现 |
 | googlepay-ecm | `['googlepay-payments']` | ✅ 已实现 |
-| googlepay-ecs | TBD | 等 markdown |
+| googlepay-ecs | `['googlepay-payments']` | ✅ 已实现 |
 | vault-* | TBD | 等 markdown |
 | plm-html, plm-js | TBD | 等 markdown |
 
