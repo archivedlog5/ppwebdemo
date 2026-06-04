@@ -824,6 +824,8 @@ var req = Object.assign({}, BASE_REQUEST, {
 
 > 代码现状：`googlepay-ecm.js` 为 Promise 模式（`PaymentsClient` 无 `paymentDataCallbacks`，请求无 `callbackIntents`）。如未来要支持 3DS，需 PayPal 提供 v6 Google Pay 可驱动 payer-action 的机制（带 Promise 返回或 resume），目前 SDK 形态不具备。
 
+**UI 标注（2026-06-04）：** `googlepay-ecm.ejs` 已在页面上标记此限制——3DS 下拉框设为 `disabled`（固定显示 SCA_WHEN_REQUIRED）+ 黄色 warning 横条说明 "3DS not supported in JSSDK v6 yet"，告知用户后续会更新。
+
 ### 规则 V6-GOOGLEPAY-8 — 脚本加载顺序（四段式，Google Pay 专属）
 
 ```html

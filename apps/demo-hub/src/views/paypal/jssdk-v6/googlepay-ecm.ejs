@@ -28,15 +28,20 @@
         </div>
       </div>
       <div class="currency-group">
-        <label class="field-label" for="demo-sca">3DS</label>
-        <select id="demo-sca" class="currency-select" aria-label="3DS SCA method" style="min-width:160px">
+        <label class="field-label" for="demo-sca">3DS <span style="font-size:10px;padding:1px 5px;background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.3);border-radius:3px;color:#c97a10;font-weight:600;letter-spacing:0.05em;vertical-align:middle">TBD</span></label>
+        <select id="demo-sca" class="currency-select" disabled aria-label="3DS SCA method" style="min-width:160px;opacity:0.5;cursor:not-allowed">
           <option value="SCA_WHEN_REQUIRED" selected>SCA_WHEN_REQUIRED</option>
           <option value="SCA_ALWAYS">SCA_ALWAYS</option>
         </select>
+        <p style="margin:4px 0 0;font-size:11px;color:var(--fg-muted);line-height:1.4">3DS not available in v6 yet</p>
       </div>
     </div>
     <div class="amount-error" id="amount-error" role="alert"></div>
-    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:10px">⚡ Sandbox Mode</span>
+    <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;margin-bottom:16px;background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.25);border-radius:6px;font-size:12px;color:var(--fg-muted);line-height:1.5">
+      <span style="color:#c97a10;font-size:14px;flex-shrink:0;margin-top:1px">⚠</span>
+      <span><strong style="color:var(--fg)">3DS not supported in JSSDK v6 yet.</strong> <code style="font-size:11px">initiatePayerAction()</code> is a no-op in v6 — only <strong>SCA_WHEN_REQUIRED</strong> (frictionless) is supported. This will be updated when the v6 SDK adds 3DS support.</span>
+    </div>
 
     <div class="field-group">
       <label class="field-label">Shipping Address &amp; Phone <span style="color:var(--fg-muted);font-weight:400">(pre-filled by merchant — not shown in Google Pay sheet)</span></label>
