@@ -370,9 +370,69 @@ paypal-credit-button {
 | applepay-ecs | `['applepay-payments']` | ✅ 已实现 |
 | googlepay-ecm | `['googlepay-payments']` | ✅ 已实现 |
 | googlepay-ecs | `['googlepay-payments']` | ✅ 已实现 |
-| vault-* | TBD | 等 markdown |
+| vault-paypal-with-purchase | `['paypal-payments']` | ✅ 已实现 |
 | plm-html | `['paypal-messages']` | ✅ 已实现 |
 | plm-js | TBD | 等 markdown |
+
+---
+
+## Vault PayPal with Purchase 专属规则
+
+### 规则 V6-VAULT-1 — 认证路径 = clientId（非 clientToken / id_token）
+
+v5 vault 用 `id_token`（需要后端调 `fetchIdToken()`）；v6 vault 标准路径为 `clientId`，与普通 PayPal 按钮完全相同。不需要 id_token，不需要额外的认证端点。
+
+### 规则 V6-VAULT-2 — eligibility 用 paymentFlow: 'VAULT_WITH_PAYMENT'
+
+```js
+instance.findEligibleMethods({
+  currencyCode: getCurrency(),
+  paymentFlow: 'VAULT_WITH_PAYMENT',   // vault 专属参数
+})
+// 资格检查 key
+eligibility.isEligible('paypal')
+```
+
+若 `findEligibleMethods` 不接受 `paymentFlow` 参数，回退为不带 `paymentFlow`，记 `docs/debug-log.md`。
+
+### 规则 V6-VAULT-3 — session 加 savePayment: true
+
+```js
+var paymentSessionOptions = {
+  onApprove: ...,
+  onCancel:  ...,
+  onError:   ...,
+  savePayment: true,   // 因 create-order body 含 store_in_vault: ON_SUCCESS
+}
+```
+
+### 规则 V6-VAULT-4 — vault token 来源 = capture 响应（后端已提取为顶层字段）
+
+后端 capture-order 额外提取：
+```js
+const vaultInfo = data?.payment_source?.paypal?.attributes?.vault
+const vaultId   = vaultInfo?.id || null
+const customerId = vaultInfo?.customer?.id || null
+res.json({ ...data, vaultId, customerId })
+```
+
+前端优先读后端提取的顶层字段，降级读 response 原路径：
+```js
+var vaultId    = order.vaultId    || (vault && vault.id) || null
+var customerId = order.customerId || (vault && vault.customer && vault.customer.id) || null
+```
+
+### 规则 V6-VAULT-5 — create-order body 与 v5 逐字一致，仅 return/cancel url 改 v6 路径
+
+- v5：`return_url: .../paypal/jssdk-v5/vault-paypal-with-purchase`
+- v6：`return_url: .../paypal/jssdk-v6/vault-paypal-with-purchase`
+- 其他字段（vault 属性、customer.merchant_customer_id、brand_name、purchase_units）完全一致
+- 后端 create-order 返回 `{ orderId: order.id }`（小写 d，遵守 V6-1）
+- 后端 capture-order 读 `const { orderId } = req.body`（小写 d，遵守 V6-1）
+
+### 规则 V6-VAULT-6 — 无 presentation-mode 下拉，无 custom-trigger 按钮（v5 UI only）
+
+本 demo 不引入 v6 ECM 的 presentation-mode 选择器或 custom-trigger 按钮。FALLBACK_MODES 固定为 `['auto', 'popup', 'redirect', 'modal']`（无 `payment-handler`）。
 
 ---
 
