@@ -151,22 +151,27 @@
 - [x] **Task 14** — Apple Pay ECM（`applepay-ecm.js/ejs`；v6 流程：`findEligibleMethods` → `eligibility.getDetails('applepay')`（注意在 eligibility 上调用，非 instance）→ `createApplePayOneTimePaymentSession()`（同步）→ `formatConfigForPaymentRequest(details.config)` Object.assign 展开 → `new ApplePaySession(4, paymentRequest)` → validateMerchant / completePaymentMethodSelection / confirmOrder 防御式 / capture COMPLETED；**2026-06-02 完成**）
 - [x] **Task 15** — Apple Pay ECS（`applepay-ecs.js/ejs`；v6 ECS 流程：ECM 骨架 + ECS 增量（SHIPPING_METHODS / chosenShipping / normalizeContact / onshippingcontactselected / onshippingmethodselected）；paymentRequest 用 Object.assign 追加 requiredShippingContactFields + shippingType + shippingMethods + lineItems + calcTotal；create-order body 与 v5 逐字一致（item+shipping breakdown + apple_pay name/email/phone）；返回 orderId 小写 d；**2026-06-02 完成**）
 - [x] **Task 16** — Google Pay ECM（`googlepay-ecm.js/ejs`；**Promise 模式实测确认可用，无 OR_BIBED_06**；v6 流程：`findEligibleMethods({currencyCode}).isEligible('googlepay')` → `eligibility.getDetails('googlepay')` → `createGooglePayOneTimePaymentSession()`（同步）→ `formatConfigForPaymentRequest(details.config)`（同步）→ `new PaymentsClient({environment:'TEST'})`（无 callbacks）→ `isReadyToPay` → 官方 createButton + 客制按钮同 handler → `loadPaymentData(req).then(paymentData)` 取 email → createOrder → `confirmOrder` → capture COMPLETED；三层资格检查；inspect 全程探查；create-order body 与 v5 逐字一致，返回 orderId 小写 d；**3DS（SCA_ALWAYS）为已知限制——v6 `initiatePayerAction()` 是 void no-op、无 `resume()`，callback 模式也修不了，免挑战可用**；**2026-06-03 完成**）
-- [ ] **Task 17** — Google Pay ECS（`googlepay-ecs.js/ejs`，Full Callback 模式）
-- [ ] **Task 18** — PayPal Vault w/ Purchase（`vault-paypal-with-purchase.js/ejs`）
-- [ ] **Task 19** — PayPal Vault Setup-only（`vault-paypal-setup-only.js/ejs`）
-- [ ] **Task 20** — ACDC Vault w/ Purchase（`vault-acdc-with-purchase.js/ejs`）
-- [ ] **Task 21** — ACDC Vault Setup-only（`vault-acdc-setup-only.js/ejs`）
+- [x] **Task 17** — Google Pay ECS（`googlepay-ecs.js/ejs`，Full Callback 模式；route+view+js 已建并挂载；**2026-06-04 完成**）
+- [x] **Task 18** — PayPal Vault w/ Purchase（`vault-paypal-with-purchase.js/ejs`；clientId 认证、`paymentFlow:'VAULT_WITH_PAYMENT'`、`savePayment:true`、capture 提取 vaultId/customerId；route+view+js 已建并挂载；**2026-06-05 完成**）
+- [x] **Task 19** — PayPal Vault Setup-only（`vault-paypal-setup-only.js/ejs`；`createPayPalSavePaymentSession` + Vault v3 两步 token（setup-token → payment-token）；`paymentFlow:'VAULT_WITHOUT_PAYMENT'`；route+view+js 已建并挂载；**2026-06-05 完成**）
+- [x] **Task 20** — ACDC Vault w/ Purchase（`vault-acdc-with-purchase.js/ejs`）
+  - 需求：`docs/req/2026-06-05-req-jssdk-v6-vault-acdc-with-purchase.md` ✅
+  - 设计：`docs/design/2026-06-05-design-be-jssdk-v6-vault-acdc-with-purchase.md` + `...-fe-...` ✅
+  - 计划：`docs/plans/2026-06-05-plan-jssdk-v6-vault-acdc-with-purchase-v1.md` ✅（**2026-06-05 过 eng review，CLEARED**）
+  - 模型 = v6 acdc（card-fields 一次性 session）+ v5 vault-acdc-with-purchase（vault 层）；create-order body 与 v5 逐字一致，仅 orderId 小写 d；3DS 镜像 v5（SCA 禁用）
+  - **2026-06-05 实现完成**（route + EJS + JS 已建，app.js 已挂载，CLAUDE.md 已更新规则）；⏳ **Supabase INSERT 待用户手动执行**
+- [x] **Task 21** — ACDC Vault Setup-only（`vault-acdc-setup-only.js/ejs`；`createCardFieldsSavePaymentSession` + Vault v3 两步 token（3 端点，含 GET setup-token）；v5 严格 3DS 门；route+view+js 已建并挂载；**2026-06-05 完成**）
 - [x] **Task 23** — PLM HTML（`plm-html.js/ejs`）
   - 设计文档：`docs/design/2026-06-04-design-fe-plm-html-v6.md` ✅
   - 实现计划：`docs/superpowers/plans/2026-06-04-plm-html-v6.md` ✅
   - 实现：**2026-06-04 完成**（GET-only 路由 + EJS 3 placements + 8 行 Style Gallery + 前端 JS）
-- [ ] **Task 24** — PLM JS（`plm-js.js/ejs`）
+- [x] **Task 24** — PLM JS（`plm-js.js/ejs`；JS API `createPayPalMessages` + `fetchContent`；国家/币种切换；route+view+js 已建并挂载；**2026-06-05 完成**）
 
 ---
 
 ## 待启动（后续讨论）
 
-- [ ] PayPal JSSDK v6 — Tasks 12–21（等各产品 v6 markdown 到位）
+- [x] PayPal JSSDK v6 — Tasks 12–24 全部完成（含 Task 20 ACDC Vault w/ Purchase，**2026-06-05**）；⏳ Task 20 Supabase INSERT 待用户手动执行
 - [ ] Braintree Web SDK — Drop-in UI、Hosted Fields
 - [ ] Braintree GraphQL — 产品待定
 - [ ] Stripe stripe-js — 产品待定

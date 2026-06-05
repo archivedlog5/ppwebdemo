@@ -1,0 +1,111 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · ACDC Vault</span>
+    <h1><%= title %></h1>
+    <p>Advanced card payment with optional vault — check the box to save the card on successful purchase.</p>
+  </div>
+  <div class="sandbox-card sandbox-card--wide">
+    <div class="amount-row">
+      <div class="currency-group">
+        <label class="field-label" for="demo-currency">Currency</label>
+        <select id="demo-currency" class="currency-select" aria-label="Select currency">
+          <% var _cur = currency || 'USD' %>
+          <% (supportedCurrencies || ['USD']).forEach(function(c) { %>
+            <option value="<%= c %>" <%= _cur === c ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
+            aria-label="Payment amount" />
+        </div>
+      </div>
+      <div class="currency-group">
+        <label class="field-label" for="demo-sca">3DS</label>
+        <select id="demo-sca" class="currency-select" aria-label="3DS SCA method" style="min-width:160px;opacity:0.4;cursor:not-allowed" disabled>
+          <option value="SCA_WHEN_REQUIRED" selected>SCA_WHEN_REQUIRED</option>
+          <option value="SCA_ALWAYS">SCA_ALWAYS</option>
+        </select>
+      </div>
+    </div>
+    <div class="amount-error" id="amount-error" role="alert"></div>
+    <p style="font-size:11px;color:var(--fg-subtle);margin:0 0 12px">
+      This demo focuses on vault functionality only. For 3DS testing, visit the <a href="/paypal/jssdk-v6/acdc" style="color:var(--fg-muted);text-decoration:underline">ACDC demo</a>.
+    </p>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+
+    <div class="field-group">
+      <label class="field-label">Name on Card</label>
+      <input id="card-name" type="text" class="field-host"
+        value="<%= sandboxCardholderName %>" placeholder="Full name on card"
+        style="width:100%;box-sizing:border-box;font-family:var(--font-mono);font-size:13px;color:var(--fg);outline:none;" />
+    </div>
+    <div class="field-group">
+      <label class="field-label" for="card-number-container">Card Number</label>
+      <div class="field-host sdk-loading" id="card-number-container" style="height:42px;overflow:hidden;">
+        <div class="sdk-spinner"></div><span>Loading...</span>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field-group">
+        <label class="field-label">Expiry</label>
+        <div class="field-host" id="card-expiry-container" style="height:42px;overflow:hidden;"></div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">CVV</label>
+        <div class="field-host" id="card-cvv-container" style="height:42px;overflow:hidden;"></div>
+      </div>
+    </div>
+
+    <div class="field-group" style="margin-top:4px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--fg-muted)">
+        <input type="checkbox" id="save-card" checked
+          style="width:15px;height:15px;cursor:pointer;accent-color:var(--brand)" />
+        <span>Save card for future purchases (<code style="font-size:12px">store_in_vault: ON_SUCCESS</code>)</span>
+      </label>
+    </div>
+
+    <button id="acdc-pay-btn" class="pay-btn pay-btn-paypal" type="button">Pay Now</button>
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+
+    <div id="vault-result" style="display:none;margin-top:12px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:6px;font-size:13px;line-height:1.8">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:6px">Vault Result</div>
+      <div><span style="color:var(--fg-muted)">Vault Token:&nbsp;</span><span id="vault-id" style="font-family:monospace;color:var(--fg)">—</span></div>
+      <div><span style="color:var(--fg-muted)">Customer ID:&nbsp;</span><span id="customer-id" style="font-family:monospace;color:var(--fg)">—</span></div>
+    </div>
+
+    <div class="test-hint">
+      Test card: <strong>4012 0000 3333 0026</strong> · Any future date · Any CVV ·
+      <a href="https://developer.paypal.com/docs/checkout/save-payment-methods/during-purchase/js-sdk/cards/" target="_blank" rel="noopener" style="color:inherit;opacity:0.7">more cards ↗</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:   '<%= clientId %>',
+    components: ['card-fields'],
+    pageType:   'checkout',
+    urls: {
+      createOrder:  '/paypal/jssdk-v6/api/vault-acdc-with-purchase/create-order',
+      getOrder:     '/paypal/jssdk-v6/api/vault-acdc-with-purchase/order/:orderId',
+      captureOrder: '/paypal/jssdk-v6/api/vault-acdc-with-purchase/capture-order',
+    },
+    billing:       <%- JSON.stringify(sandboxBilling) %>,
+    defaultAmount: '<%= defaultAmount || "100.00" %>',
+    currency:      '<%= currency %>',
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/vault-acdc-with-purchase.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

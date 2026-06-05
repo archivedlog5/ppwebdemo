@@ -57,6 +57,7 @@ app.use(v6, require('./routes/paypal/jssdk-v6/buttons'))
 app.use(v6, require('./routes/paypal/jssdk-v6/vault-paypal-with-purchase'))
 app.use(v6, require('./routes/paypal/jssdk-v6/vault-paypal-setup-only'))
 app.use(v6, require('./routes/paypal/jssdk-v6/vault-acdc-setup-only'))
+app.use(v6, require('./routes/paypal/jssdk-v6/vault-acdc-with-purchase'))
 
 app.use((req, res) => res.status(404).send("Route not found"));
 

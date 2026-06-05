@@ -373,6 +373,7 @@ paypal-credit-button {
 | vault-paypal-with-purchase | `['paypal-payments']` | ✅ 已实现 |
 | vault-paypal-setup-only | `['paypal-payments']` | ✅ 已实现 |
 | vault-acdc-setup-only | `['card-fields']` | ✅ 已实现 |
+| vault-acdc-with-purchase | `['card-fields']` | ✅ 已实现 |
 | plm-html | `['paypal-messages']` | ✅ 已实现 |
 | plm-js | TBD | 等 markdown |
 
@@ -1083,3 +1084,52 @@ eligibility.isEligible('advanced_cards')   // 资格 key（同 ACDC）
 | P3 | save session `submit()` 第二参 `{ billingAddress }` | 是否被接受（不报错） | 不接受则移除第二参，记 debug-log |
 | P4 | `findEligibleMethods({paymentFlow:'VAULT_WITHOUT_PAYMENT'})` | 是否接受 paymentFlow；`advanced_cards` 是否合格 | 不接受则回退无 paymentFlow，记 debug-log |
 | P5 | GET setup-token 响应（严格门触发时） | `status` + `payment_source.card.verification_status` 真实值 | 确认判定有效后删日志（关联 Finding 1） |
+
+---
+
+## Vault ACDC with Purchase 专属规则
+
+### 规则 V6-ACDC-VAULT-1 — 模型：Card Fields One-Time Payment Session + Orders v2 API
+
+- 入口：`createCardFieldsOneTimePaymentSession()`（同步返回，不 await/.then；同 V6-ACDC-2）。**不是** Save Session，save 靠 server create-order body 的 `attributes.vault.store_in_vault: ON_SUCCESS`（probe P1：无参调用即可，session 无需 vault 选项）。
+- 字段渲染 `createCardFieldsComponent({type}).appendChild`（同 V6-ACDC-3）。
+- **3 个端点**：create-order / GET order `:orderId` / capture-order（对比 setup-only 的 2 个 Vault v3 端点，此处用 Orders v2）。
+
+### 规则 V6-ACDC-VAULT-2 — create-order body 与 v5 vault-acdc-with-purchase 逐字一致
+
+- `orderId` 小写 d（V6-1）：create 返回 `{ orderId }`、GET `:orderId`、capture body `{ orderId }`、前端 `d.orderId`、`getOrder.replace(':orderId', id)`。
+- `saveVault === true` → 在 `cardAttributes` 追加 `vault: { store_in_vault: 'ON_SUCCESS' }` + `customer: { merchant_customer_id: 'CUST_' + randomHex }`。
+- `saveVault === false` → 不附加 vault 属性，正常一次性扣款。
+
+### 规则 V6-ACDC-VAULT-3 — eligibility：paymentFlow = VAULT_WITH_PAYMENT，防御式
+
+```js
+instance.findEligibleMethods({ currencyCode: getCurrency(), paymentFlow: 'VAULT_WITH_PAYMENT' })
+eligibility.isEligible('advanced_cards')   // 资格 key（同 ACDC）
+```
+防御式渲染（同 V6-ACDC-1）：明确合格或 key 缺失都渲染卡域。若 `paymentFlow` 不被接受 → 回退无 paymentFlow，记 debug-log（probe P2）。
+
+### 规则 V6-ACDC-VAULT-4 — capture 提取 vaultId/customerId，showVaultResult 展示
+
+后端 capture-order 额外提取：
+```js
+const vaultInfo  = data?.payment_source?.card?.attributes?.vault || null
+const vaultId    = vaultInfo?.id || null
+const customerId = vaultInfo?.customer?.id || null
+res.json({ ...data, vaultId, customerId })
+```
+前端读后端顶层字段 `order.vaultId` / `order.customerId`，调 `showVaultResult`。Capture 成功仍以 `captures[0].status === 'COMPLETED'` 为门（规则 13）。
+
+### 规则 V6-ACDC-VAULT-5 — 3DS 镜像 v5：SCA 选择器 disabled，注意链接指向 v6 acdc
+
+- SCA 下拉 `disabled`（固定 `SCA_WHEN_REQUIRED`），页面说明「For 3DS testing, visit the ACDC demo」（链接 `/paypal/jssdk-v6/acdc`）。
+- `decide3DSAndCapture` 逻辑与 v6 acdc / v5 完全一致（GET order → `authentication_result` 决策表），作为 3DS 兜底保留。
+
+### 规则 V6-ACDC-VAULT-6 — 探针清单（首次实测后删日志，结论记 debug-log）
+
+| 编号 | 探查点 | 关注 | 定型后处理 |
+|------|--------|------|-----------|
+| P1 | `createCardFieldsOneTimePaymentSession()` 无参，save 靠 server body | 卡是否真的存入 vault（capture 返 vaultId 非空） | 若 vaultId 为空，给 session 加 vault/savePayment 选项，记 debug-log |
+| P2 | `findEligibleMethods({ paymentFlow: 'VAULT_WITH_PAYMENT' })` | 是否接受 paymentFlow；`advanced_cards` 是否合格 | 不接受则移除 paymentFlow，记 debug-log |
+| P3 | capture 返回 `vaultId`/`customerId` | 路径 `payment_source.card.attributes.vault.{id, customer.id}` 是否正确 | 确认非空后删日志 |
+| P4 | `submit()` 返回 `result.data.orderId` | key 是否小写 d；`liabilityShift` 是否存在 | 确认后删日志 |

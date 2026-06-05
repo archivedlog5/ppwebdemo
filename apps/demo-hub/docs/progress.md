@@ -2,6 +2,51 @@
 
 ---
 
+## 2026-06-05 — JSSDK v6 ACDC Vault with Purchase 实现完成（Task 20）
+
+**代码实现（Sonnet 模型执行）：**
+
+- **`src/routes/paypal/jssdk-v6/vault-acdc-with-purchase.js`** — 3 端点（create-order / GET order / capture-order）；`saveVault` 条件加 `vault.store_in_vault:ON_SUCCESS` + random `CUST_` merchant_customer_id；capture 提取 `payment_source.card.attributes.vault.{id, customer.id}` → 顶层 `vaultId`/`customerId`；`orderId` 全链路小写 d（V6-1）
+- **`src/views/paypal/jssdk-v6/vault-acdc-with-purchase.ejs`** — 三段式脚本加载；SCA 下拉 disabled；save-card checkbox 默认勾选；Vault Result 面板；链接指向 v6 acdc demo
+- **`src/public/js/paypal/jssdk-v6/vault-acdc-with-purchase.js`** — IIFE；`createCardFieldsOneTimePaymentSession()`（无参）；`getVaultChecked`/`showVaultResult`；`doCapture` 后调 `showVaultResult`；P1–P4 probe 日志（首跑后删）；`decide3DSAndCapture` GET 兜底保留
+- **`src/app.js`** — 追加 `app.use(v6, require('./routes/paypal/jssdk-v6/vault-acdc-with-purchase'))` 于 vault-acdc-setup-only 之后
+- **`src/routes/paypal/jssdk-v6/CLAUDE.md`** — 追加 V6-ACDC-VAULT-1..6 规则 + 组件表新增 vault-acdc-with-purchase 行
+
+**待用户操作：**
+1. 在 Supabase SQL Editor 执行 INSERT（Task 5 SQL，sort_order = vault-acdc-setup-only 的 sort_order + 1）
+2. 重启 demo-hub（`npm run dev:demo-hub`）
+3. 手动 DoD 验收（勾选 save-card 测试卡 4012 0000 3333 0026 → 确认 Vault Token 非空；不勾选 → 确认 not returned）
+4. 首跑后删探针（P1–P4 `inspect()` 调用 + `inspect` 函数），并将结论记入 `docs/debug-log.md`
+
+---
+
+## 2026-06-05 — JSSDK v6 ACDC Vault with Purchase 设计 + 计划 + Eng Review（Task 20）
+
+**背景：** 为 `/paypal/jssdk-v6/vault-acdc-with-purchase` 完成需求、前后端设计、实现计划，并过 `/plan-eng-review`，待切非 Opus 模型执行代码。
+
+**模型：** v6 `acdc`（card-fields 一次性 `createCardFieldsOneTimePaymentSession` + submit 状态机 + 3DS decide+capture）**＋** v5 `vault-acdc-with-purchase`（vault 层：save-card 复选框 → `store_in_vault: ON_SUCCESS` + `merchant_customer_id`；capture 提取 `vaultId`/`customerId`；Vault Result 框）。
+
+**关键决策（用户拍板）：**
+- create-order body 与 v5 **逐字一致**，唯一差异 `orderId` 小写 d（V6-1）。
+- 3DS **忠实镜像 v5**：SCA 下拉禁用、固定 `SCA_WHEN_REQUIRED`、保留「3DS 测试见 ACDC demo」提示（链接改 v6 acdc）。
+- 3DS 兜底（GET order + decide3DSAndCapture GET 分支）**保留**（对齐 v6 acdc/v5，近 dead 但作安全网）。
+
+**新建文件（4 个 markdown）：**
+- `docs/req/2026-06-05-req-jssdk-v6-vault-acdc-with-purchase.md`
+- `docs/design/2026-06-05-design-be-jssdk-v6-vault-acdc-with-purchase.md`
+- `docs/design/2026-06-05-design-fe-jssdk-v6-vault-acdc-with-purchase.md`
+- `docs/plans/2026-06-05-plan-jssdk-v6-vault-acdc-with-purchase-v1.md`（含 Eng Review Report + GSTACK REVIEW REPORT）
+
+**Eng Review 结论：** CLEARED — 按计划实现。5 代码文件、0 新服务（footprint 同 vault-acdc-setup-only）。1 个 watch-item：探针 **P1** —— 确认 `createCardFieldsOneTimePaymentSession()` 无参是否真存卡（PayPal 按钮 vault 当年用 `savePayment: true`）；集成文档示例为无参 + server `store_in_vault`，故无参为正确默认，万一不存卡再加选项并记 debug-log。
+
+**待用户操作：**
+- 切非 Opus 模型实现 Task 1/3/4（route/ejs/js）+ Task 6（CLAUDE.md 规则段 V6-ACDC-VAULT-1..6 + components 表）。
+- Supabase INSERT 一行（`product_key='vault-acdc-with-purchase'`，sort_order 取 v6 组 max+1）。
+
+**状态：** Task 20 设计 + 计划 + eng review ✅，待实现代码。
+
+---
+
 ## 2026-06-04 — JSSDK v6 PLM HTML 实现（Task 23）
 
 **背景：** 基于 2026-06-04 的设计文档 + 实现计划，实现 PayPal JSSDK v6 PLM HTML demo，路由 `/paypal/jssdk-v6/plm-html`。
