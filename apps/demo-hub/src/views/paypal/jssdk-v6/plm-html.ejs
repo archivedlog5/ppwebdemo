@@ -1,0 +1,145 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<%
+var PLM_COUNTRIES = ['US','AU','DE','ES','FR','IT','GB','CA']
+var GALLERY = [
+  { logoType: 'MONOGRAM', logoPosition: 'LEFT',   textColor: 'BLACK',      dark: false },
+  { logoType: 'WORDMARK', logoPosition: 'LEFT',   textColor: 'BLACK',      dark: false },
+  { logoType: 'TEXT',     logoPosition: 'INLINE', textColor: 'BLACK',      dark: false },
+  { logoType: 'WORDMARK', logoPosition: 'INLINE', textColor: 'BLACK',      dark: false },
+  { logoType: 'WORDMARK', logoPosition: 'TOP',    textColor: 'BLACK',      dark: false },
+  { logoType: 'MONOGRAM', logoPosition: 'LEFT',   textColor: 'MONOCHROME', dark: false },
+  { logoType: 'WORDMARK', logoPosition: 'LEFT',   textColor: 'MONOCHROME', dark: false },
+  { logoType: 'MONOGRAM', logoPosition: 'LEFT',   textColor: 'WHITE',      dark: true  },
+]
+%>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · PLM — HTML</span>
+    <h1><%= title %></h1>
+    <p>Pay Later messaging via <code>&lt;paypal-message&gt;</code> web component with <code>auto-bootstrap</code>. Change the amount — all placements update automatically.</p>
+  </div>
+
+  <div class="sandbox-card" style="max-width:680px">
+
+    <%# ── Controls ─────────────────────────────────────────────────────── %>
+    <div class="amount-row" style="margin-bottom:6px">
+      <div class="currency-group">
+        <label class="field-label" for="demo-country">Buyer Country</label>
+        <select id="demo-country" class="currency-select" aria-label="Select buyer country">
+          <% PLM_COUNTRIES.forEach(function(c) { %>
+            <option value="<%= c %>" <%= country === c ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00" aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+    <div class="amount-error" id="amount-error" role="alert" style="margin-bottom:14px"></div>
+
+    <%# ══ PLACEMENTS ════════════════════════════════════════════════════════ %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:14px">Placements</div>
+
+    <%# — Product Page ── %>
+    <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+      Product Page &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">logo-type="WORDMARK"</code>
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:18px;min-height:32px">
+      <paypal-message
+        auto-bootstrap
+        amount="<%= defaultAmount %>"
+        currency-code="<%= currency %>"
+        logo-type="WORDMARK"
+        logo-position="LEFT"
+        text-color="BLACK"
+      ></paypal-message>
+    </div>
+
+    <%# — Cart ── %>
+    <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+      Cart &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">logo-type="WORDMARK" logo-position="RIGHT"</code>
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:18px;min-height:32px">
+      <paypal-message
+        auto-bootstrap
+        amount="<%= defaultAmount %>"
+        currency-code="<%= currency %>"
+        logo-type="WORDMARK"
+        logo-position="RIGHT"
+        text-color="BLACK"
+      ></paypal-message>
+    </div>
+
+    <%# — Checkout ── %>
+    <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+      Checkout &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">logo-type="TEXT" logo-position="INLINE"</code>
+    </div>
+    <div style="background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:26px;min-height:32px">
+      <paypal-message
+        auto-bootstrap
+        amount="<%= defaultAmount %>"
+        currency-code="<%= currency %>"
+        logo-type="TEXT"
+        logo-position="INLINE"
+        text-color="BLACK"
+      ></paypal-message>
+    </div>
+
+    <%# ══ STYLE GALLERY ═════════════════════════════════════════════════════ %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:14px">Style Gallery</div>
+
+    <% GALLERY.forEach(function(g) { %>
+      <div style="font-size:12px;font-weight:600;color:var(--fg-muted);margin-bottom:8px">
+        <code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">logo-type="<%= g.logoType %>"</code>
+        <% if (g.logoPosition !== 'LEFT') { %>
+          &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">logo-position="<%= g.logoPosition %>"</code>
+        <% } %>
+        <% if (g.textColor !== 'BLACK') { %>
+          &nbsp;<code style="font-size:10px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">text-color="<%= g.textColor %>"</code>
+        <% } %>
+      </div>
+      <div style="background:<%= g.dark ? '#1a1a2e' : '#fff' %>;border-radius:8px;padding:14px 18px;margin-bottom:18px;min-height:32px">
+        <paypal-message
+          auto-bootstrap
+          amount="<%= defaultAmount %>"
+          currency-code="<%= currency %>"
+          logo-type="<%= g.logoType %>"
+          logo-position="<%= g.logoPosition %>"
+          text-color="<%= g.textColor %>"
+        ></paypal-message>
+      </div>
+    <% }) %>
+
+    <div class="test-hint">
+      Supported markets: <strong>US</strong> · <strong>AU</strong> · <strong>DE</strong> · <strong>ES</strong> · <strong>FR</strong> · <strong>IT</strong> · <strong>GB</strong> · <strong>CA</strong>.
+      Country selection maps to <code>currency-code</code> on each message element.
+    </div>
+
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:         '<%= clientId %>',
+    components:       ['paypal-messages'],
+    pageType:         'product-details',
+    testBuyerCountry: '<%= country %>',
+    currency:         '<%= currency %>',
+    country:          '<%= country %>',
+    defaultAmount:    '<%= defaultAmount %>',
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/plm-html.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

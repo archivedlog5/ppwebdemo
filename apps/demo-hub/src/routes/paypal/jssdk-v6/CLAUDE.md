@@ -371,7 +371,51 @@ paypal-credit-button {
 | googlepay-ecm | `['googlepay-payments']` | ✅ 已实现 |
 | googlepay-ecs | `['googlepay-payments']` | ✅ 已实现 |
 | vault-* | TBD | 等 markdown |
-| plm-html, plm-js | TBD | 等 markdown |
+| plm-html | `['paypal-messages']` | ✅ 已实现 |
+| plm-js | TBD | 等 markdown |
+
+---
+
+## PLM 专属规则
+
+### 规则 V6-PLM-1 — createPayPalMessages() 必须传 currencyCode + buyerCountry
+
+```js
+// ❌ 错误：无参调用，messages API 返回 422
+sdkInstance.createPayPalMessages()
+
+// ✅ 正确：传当前货币和国家，SDK 据此拉取对应语言和产品的 message 模板
+sdkInstance.createPayPalMessages({
+  currencyCode: window.DEMO.currency || 'USD',   // 'USD' / 'GBP' / 'AUD' / 'EUR' / ...
+  buyerCountry: window.DEMO.country  || 'US',    // 'US' / 'GB' / 'AU' / 'DE' / 'ES' / 'FR' / 'IT' / 'CA'
+})
+```
+
+国家切换时刷页，服务端重新映射 currency，`window.DEMO.currency` / `window.DEMO.country` 同步更新，重新调 `createPayPalMessages()` 即可。
+
+### 规则 V6-PLM-2 — auto-bootstrap 模式不需要调 fetchContent()
+
+所有 `<paypal-message>` 元素带 `auto-bootstrap` 属性，SDK 的 PayPalMessages 数据层自动 observe 属性变化（`amount`、`currency-code` 等）并重新拉取 message 内容。JS 只需：
+1. 调 `createPayPalMessages({ currencyCode, buyerCountry })` 启动数据层
+2. 金额变化时 `el.setAttribute('amount', val)` 触发 SDK 自动更新
+
+不需要手动调 `fetchContent()`（那是 JS API 模式，用于 plm-js demo）。
+
+### 规则 V6-PLM-3 — 脚本加载顺序（三段式，无需单独 paypal-messages script）
+
+```html
+<script src="/js/paypal/jssdk-v6/init.js"></script>        <!-- 1. singleton -->
+<script src="/js/paypal/jssdk-v6/plm-html.js"></script>    <!-- 2. 产品 JS -->
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>  <!-- 3. v6 core -->
+```
+
+`components: ['paypal-messages']` 传给 `createInstance()`，core SDK 会按需加载 messages 组件，**无需单独引入** `paypal-messages` script（v5 需要 URL 参数 `components=messages`，v6 不同）。
+
+### 规则 V6-PLM-4 — 路由为 GET-only 自定义路由，不用工厂函数
+
+plm-html 无订单 API，`_factory.js` 的 `buildBody` 为必填项，不能用工厂。需写独立 GET 路由：
+- GET handler：读 `?country` / `?amount` → 映射 currency → `res.render()`
+- 无 POST 端点
 
 ---
 

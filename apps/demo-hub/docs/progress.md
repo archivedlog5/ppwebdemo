@@ -2,6 +2,62 @@
 
 ---
 
+## 2026-06-04 — JSSDK v6 PLM HTML 实现（Task 23）
+
+**背景：** 基于 2026-06-04 的设计文档 + 实现计划，实现 PayPal JSSDK v6 PLM HTML demo，路由 `/paypal/jssdk-v6/plm-html`。
+
+**新建文件（3 个）：**
+- `src/routes/paypal/jssdk-v6/plm-html.js`（GET-only 自定义路由；COUNTRY_TO_CUR 映射；注入 clientId/currency/country/defaultAmount）
+- `src/views/paypal/jssdk-v6/plm-html.ejs`（3 placements + 8 行 Style Gallery；11× `<paypal-message auto-bootstrap>`；country select + amount input）
+- `src/public/js/paypal/jssdk-v6/plm-html.js`（IIFE；`syncAmount()` → `setAttribute('amount', val)`；country change → URL reload；`getPPInstance()` → `createPayPalMessages()` on window.load）
+
+**修改文件（2 个）：**
+- `src/app.js`（+1 行 v6 plm-html 路由挂载，位于 googlepay-ecs 之后 buttons 之前）
+- `docs/todos.md`（Task 23 → ✅）
+
+**技术说明：**
+- `auto-bootstrap` 模式：SDK 自动 observe `amount` / `currency-code` 等属性变化，无需调用 `fetchContent()`，与 v5 plm-div 的 `data-pp-amount` + MutationObserver 效果相同
+- 脚本加载：`init.js` → `plm-html.js` → `core` defer（三段式，无需单独 `paypal-messages` script；components `['paypal-messages']` 让 core 按需加载）
+- 11 个 `<paypal-message>` 元素已验证：全部有 `auto-bootstrap`、`amount="100.00"`、`currency-code="USD"`，logo-type/logo-position/text-color 均符合设计
+- **`createPayPalMessages({ currencyCode, buyerCountry })` 必须传参**：调用时传 `{ currencyCode: 'USD', buyerCountry: 'US' }`（从 `window.DEMO.currency` / `window.DEMO.country` 读取），否则 messages API 返回 422。不同国家传对应值（GB → `{ currencyCode: 'GBP', buyerCountry: 'GB' }`）。已验证 US 正常渲染 "Pay in 4 interest-free payments of $25.00"。
+
+**待用户操作：**
+- Supabase SQL Editor 执行：
+  ```sql
+  SELECT MAX(sort_order) FROM demohub.products WHERE provider = 'paypal' AND sdk_version = 'jssdk-v6';
+  -- 用返回值 + 1 作为 sort_order
+  INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, description, enabled, sort_order)
+  VALUES ('paypal', 'jssdk-v6', 'plm-html', 'PLM — HTML', 'Pay Later messaging via <paypal-message> auto-bootstrap HTML attributes', true, <max+1>);
+  ```
+- 重启 demo-hub，验证首页 jssdk-v6 组出现 "PLM — HTML" 卡片
+
+**状态：** Task 23 ✅ 代码完成，待 Supabase INSERT。
+
+---
+
+## 2026-06-04 — JSSDK v6 PLM HTML 设计 + 计划（Task 23）
+
+**背景：** 为 `/paypal/jssdk-v6/plm-html` 完成需求分析、设计文档、实现计划，待切 Sonnet 执行代码。
+
+**关键设计决策：**
+
+- **纯 HTML 配置模式（`auto-bootstrap`）**：所有 `<paypal-message>` 元素带 `auto-bootstrap` 属性，SDK 的 PayPalMessages 数据层自动 observe 属性变化重新拉取内容，无需调用 `fetchContent()`。
+- **无工厂函数**：plm-html 无订单 API，不能用 `_factory.js`（`buildBody` 强制要求），使用 GET-only 自定义路由。
+- **Hybrid SDK 加载**：`window.DEMO.components = ['paypal-messages']`，由 `init.js` 的 `createInstance` 动态加载 messages 组件，不单独加载 `paypal-messages` script，与项目现有 v6 模式一致。
+- **页面两区**：Placement 区（Product/Cart/Checkout，每个对应 WORDMARK+LEFT / WORDMARK+RIGHT / TEXT+INLINE）+ Style Gallery（8 行，覆盖 MONOGRAM/WORDMARK/TEXT × BLACK/MONOCHROME/WHITE，WHITE 行用深色背景 `#1a1a2e`）。
+- **v6 无 flex/banner**：v5 plm-div 的 Home 8x1 / Category 20x1 在 v6 不存在，已去掉，Placement 区只有 3 个。
+- **国家选择器**：保留 8 国（US/AU/DE/ES/FR/IT/GB/CA），映射到 `currency-code` 属性；切换时刷页传 `?country=XX&currency=YYY`，无 `buyercountry` override（v6 不支持）。
+
+**新建文档（2 个）：**
+- `docs/design/2026-06-04-design-fe-plm-html-v6.md`（设计文档）
+- `docs/superpowers/plans/2026-06-04-plm-html-v6.md`（实现计划，4 Tasks）
+
+**修改文档（2 个）：**
+- `docs/todos.md`（Task 23 标注设计+计划已完成）
+- `docs/progress.md`（本条）
+
+---
+
 ## 2026-06-03 — JSSDK v6 Google Pay ECM（Task 16）
 
 **背景：** 基于 2026-06-02 的 req/design-fe/design-be/plan 四份文档，重写 PayPal JSSDK v6 Google Pay ECM demo，路由 `/paypal/jssdk-v6/googlepay-ecm`。UI 与 v5 googlepay-ecm 一致（货币/金额/3DS 选择器 + 商户预填 Shipping+Phone 展示 + 官方 Google Pay 按钮 + 客制按钮）；后端 create-order body 与 v5 逐字一致，前端改为 v6 Google Pay API 流程。

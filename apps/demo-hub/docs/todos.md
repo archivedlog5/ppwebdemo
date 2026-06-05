@@ -1,6 +1,6 @@
 # demo-hub — Todos
 
-最后更新：2026-06-03
+最后更新：2026-06-04
 
 ---
 
@@ -156,7 +156,10 @@
 - [ ] **Task 19** — PayPal Vault Setup-only（`vault-paypal-setup-only.js/ejs`）
 - [ ] **Task 20** — ACDC Vault w/ Purchase（`vault-acdc-with-purchase.js/ejs`）
 - [ ] **Task 21** — ACDC Vault Setup-only（`vault-acdc-setup-only.js/ejs`）
-- [ ] **Task 23** — PLM HTML（`plm-html.js/ejs`）
+- [x] **Task 23** — PLM HTML（`plm-html.js/ejs`）
+  - 设计文档：`docs/design/2026-06-04-design-fe-plm-html-v6.md` ✅
+  - 实现计划：`docs/superpowers/plans/2026-06-04-plm-html-v6.md` ✅
+  - 实现：**2026-06-04 完成**（GET-only 路由 + EJS 3 placements + 8 行 Style Gallery + 前端 JS）
 - [ ] **Task 24** — PLM JS（`plm-js.js/ejs`）
 
 ---
