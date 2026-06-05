@@ -372,6 +372,7 @@ paypal-credit-button {
 | googlepay-ecs | `['googlepay-payments']` | ✅ 已实现 |
 | vault-paypal-with-purchase | `['paypal-payments']` | ✅ 已实现 |
 | vault-paypal-setup-only | `['paypal-payments']` | ✅ 已实现 |
+| vault-acdc-setup-only | `['card-fields']` | ✅ 已实现 |
 | plm-html | `['paypal-messages']` | ✅ 已实现 |
 | plm-js | TBD | 等 markdown |
 
@@ -1023,3 +1024,62 @@ confirm 响应 `{ paymentTokenId, customerId }`，展示到 `#payment-token-id` 
 | T2: `paymentFlow:'VAULT_WITHOUT_PAYMENT'` 被接受 + eligibility 含 paypal | `onPayPalWebSdkLoaded` 内 `console.dir(eligibility)` | 若 paymentFlow 不接受：回退无 paymentFlow |
 | T3: onApprove data.vaultSetupToken 真实 key | `onApprove` 内 `console.dir(data)` | 若 key 不同（如 billingToken）：按实际调整 |
 | T4: confirm 响应 paymentTokenId / customer.id 结构 | `createPaymentToken` 内 `console.dir(res)` | 确认结构后删日志 |
+
+---
+
+## Vault ACDC Setup-Only 专属规则
+
+> 状态：📝 待实现（设计+计划已就绪，2026-06-05 过 eng review）。文件：`vault-acdc-setup-only.{js,ejs}` + 路由。
+> 模型 = v6 Card Fields **Save Session** + Vault v3 两步 token。本质是 v6 `acdc`（card-fields）+ v5 `vault-acdc-setup-only`（vault 流程 + 严格门）的组合。
+> 与 v6 `vault-paypal-setup-only` 的区别：入口是 Card Fields（非 paypal-button），approve 走 `submit()` 状态机（非 onApprove 回调），且多一个 GET setup-token 端点（严格门用）。
+
+### 规则 V6-ACDC-SETUP-1 — 模型：Card Fields Save Session + Vault v3 两步 token，不碰 Orders API
+
+- 流程：`POST /v3/vault/setup-tokens`（create） → `session.submit(setupTokenId)` 买家 approve/3DS → 严格门 → `POST /v3/vault/payment-tokens`（confirm）。
+- session 用 **`createCardFieldsSavePaymentSession()`**（同步返回，不 await/.then；同 V6-ACDC-2）；**不是** `createCardFieldsOneTimePaymentSession()`，**没有** `savePayment` 选项（save session 本身即 vault）。
+- 字段渲染 `createCardFieldsComponent({type}).appendChild`（同 V6-ACDC-3）。
+- **3 个端点**：create-setup-token / GET setup-token/:id / confirm-setup-token（端点名逐字沿用 v5）。比 v6 vault-paypal-setup-only 多 GET（严格门读 verification_status 需要）。
+
+### 规则 V6-ACDC-SETUP-2 — 严格 3DS 门（逐字沿用 v5，eng review 拍板保留）
+
+`submit()` 返回 `{ state, data }`，`state === 'succeeded'` 时：
+- `data.liabilityShift` ∈ {`YES`, `POSSIBLE`} → 直接 `doConfirm(data.vaultSetupToken)`。
+- 否则 GET setup-token → `status === 'APPROVED' && payment_source.card.verification_status === 'VERIFIED'` → confirm；否则 `✗ Card not saved · <reason>`，按钮恢复。
+- `canceled` → "3D Secure cancelled — card not saved"，按钮恢复；`failed` → 显示 `data.message`，按钮恢复。
+
+> 逻辑与 v5 `vault-acdc-setup-only.js` 的 `onApprove` 完全一致，唯一区别：data 源从回调 `onApprove(data)` 改为 `submit()` 的 `result.data`。
+> ⚠️ **首跑 watch-item（eng review Finding 1）**：确认 `SCA_WHEN_REQUIRED` 免挑战保存不被误拒（即 `verification_status` 该路径为 `VERIFIED`，或 liabilityShift 回 `POSSIBLE`）。这是 demo 主 happy path。低风险（v5 precedent），由探针 P2/P5 覆盖；若误拒再按实际调整并记 `docs/debug-log.md`。
+
+### 规则 V6-ACDC-SETUP-3 — eligibility：currency=USD + paymentFlow=VAULT_WITHOUT_PAYMENT，防御式
+
+```js
+instance.findEligibleMethods({ currencyCode: 'USD', paymentFlow: 'VAULT_WITHOUT_PAYMENT' })
+eligibility.isEligible('advanced_cards')   // 资格 key（同 ACDC）
+```
+防御式渲染（同 V6-ACDC-1）：明确合格或 key 缺失都渲染卡输入域，仅明确不合格信号才拦截。若 `paymentFlow` 不被接受 → 回退无 paymentFlow，记 debug-log（探针 P4）。
+
+### 规则 V6-ACDC-SETUP-4 — create-setup-token body 与 v5 逐字一致（仅 return/cancel url 改 v6）
+
+- 顶层 `customer.merchant_customer_id`：随机 `'CUST_' + randomBytes(6).hex.toUpperCase()`（与 v5 一致；**注意**与 v6 vault-paypal-setup-only 的硬编码 `MERCHANT_CUST_001` 不同，此为刻意）。
+- `payment_source.card`：`billing_address`（SANDBOX_BILLING，snake_case）+ `experience_context.{return_url, cancel_url}`（v6 路径）+ `verification_method`（直挂 card 下，从 `req.body.scaMethod` 白名单取，默认 SCA_WHEN_REQUIRED）。
+- 后端 CN 账号（`getCNToken`），header 加 `PayPal-Request-Id: acdc-setup-${Date.now()}`。返回 `{ setupTokenId }`。
+
+### 规则 V6-ACDC-SETUP-5 — billingAddress 双传（用户拍板）
+
+- ① create-setup-token body 含 `payment_source.card.billing_address`（snake_case，后端）。
+- ② `session.submit(setupTokenId, { billingAddress: mapBilling(window.DEMO.billing) })`（camelCase，前端；`mapBilling` 同 v6 acdc：`streetAddress/city/state/postalCode/countryCode`）。
+- 探针 P3：确认 save-session 的 `submit()` 接受第二参；若不接受 → 去掉第二参（body 已覆盖 billing），记 debug-log。
+
+### 规则 V6-ACDC-SETUP-6 — DRY：保留每文件复制（eng review 拍板）
+
+新 JS 文件从 v6 `acdc.js` 复制 `STYLE/inspect/clearLoading/mapBilling/showResult` + 从 v5 复制严格门/`showVaultResult`。**保留各文件独立复制**，不抽共享模块——沿用"每产品一个独立 IIFE、仅 init.js 共享"的既有架构，符合 surgical-change 原则。
+
+### 规则 V6-ACDC-SETUP-7 — 探针清单（首次实测后删日志，结论记 debug-log）
+
+| 编号 | 探查点 | 关注 | 定型后处理 |
+|------|--------|------|-----------|
+| P1 | `createCardFieldsSavePaymentSession()` 的 session | 是否同步返回；方法集（submit / createCardFieldsComponent） | 确认同步，记 debug-log |
+| P2 | `submit()` 的 `result.data` | key 是否 `vaultSetupToken`；`liabilityShift` 是否存在 | 确认后删日志 |
+| P3 | save session `submit()` 第二参 `{ billingAddress }` | 是否被接受（不报错） | 不接受则移除第二参，记 debug-log |
+| P4 | `findEligibleMethods({paymentFlow:'VAULT_WITHOUT_PAYMENT'})` | 是否接受 paymentFlow；`advanced_cards` 是否合格 | 不接受则回退无 paymentFlow，记 debug-log |
+| P5 | GET setup-token 响应（严格门触发时） | `status` + `payment_source.card.verification_status` 真实值 | 确认判定有效后删日志（关联 Finding 1） |
