@@ -1,0 +1,144 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<% var PLM_COUNTRIES = ['US','AU','DE','ES','FR','IT','GB','CA'] %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · PLM — JS</span>
+    <h1><%= title %></h1>
+    <p>Pay Later messaging via <code>fetchContent()</code> + <code>setContent()</code> + <code>createLearnMore()</code>.
+      Amount changes walk the cache path (<code>content.update()</code> → <code>onTemplateReady</code>);
+      style changes walk the server path (re-fetch → <code>onContentReady</code>).</p>
+  </div>
+
+  <div class="sandbox-card" style="max-width:680px">
+
+    <%# ── Country + Amount ─────────────────────────────────────────────────── %>
+    <div class="amount-row" style="margin-bottom:6px">
+      <div class="currency-group">
+        <label class="field-label" for="demo-country">Buyer Country</label>
+        <select id="demo-country" class="currency-select" aria-label="Select buyer country">
+          <% PLM_COUNTRIES.forEach(function(c) { %>
+            <option value="<%= c %>" <%= country === c ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00" aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+    <div class="amount-error" id="amount-error" role="alert" style="margin-bottom:14px"></div>
+
+    <%# ── Style Controls ───────────────────────────────────────────────────── %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:10px">
+      Style
+      <span style="font-weight:400;text-transform:none;font-size:10px;color:var(--fg-muted);letter-spacing:0">(change → re-<code>fetchContent</code>, server path → <code>onContentReady</code>)</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <div class="currency-group">
+        <label class="field-label" for="demo-logo-type">Logo Type</label>
+        <select id="demo-logo-type" class="currency-select">
+          <option value="WORDMARK">WORDMARK</option>
+          <option value="MONOGRAM">MONOGRAM</option>
+          <option value="TEXT">TEXT</option>
+        </select>
+      </div>
+      <div class="currency-group">
+        <label class="field-label" for="demo-logo-position">Logo Position</label>
+        <select id="demo-logo-position" class="currency-select">
+          <option value="LEFT">LEFT</option>
+          <option value="RIGHT">RIGHT</option>
+          <option value="TOP">TOP</option>
+          <option value="INLINE">INLINE</option>
+        </select>
+      </div>
+      <div class="currency-group">
+        <label class="field-label" for="demo-text-color">
+          Text Color
+          <span style="font-weight:400;font-size:10px;color:var(--fg-muted)">&nbsp;WHITE: for dark bg</span>
+        </label>
+        <select id="demo-text-color" class="currency-select">
+          <option value="BLACK">BLACK</option>
+          <option value="MONOCHROME">MONOCHROME</option>
+          <option value="WHITE">WHITE</option>
+        </select>
+      </div>
+    </div>
+
+    <%# ── Learn More Controls ──────────────────────────────────────────────── %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:10px">Learn More</div>
+    <div style="display:flex;align-items:flex-end;gap:14px;margin-bottom:20px;flex-wrap:wrap">
+      <div class="currency-group">
+        <label class="field-label" for="demo-presentation">Presentation Mode</label>
+        <select id="demo-presentation" class="currency-select">
+          <option value="AUTO">AUTO</option>
+          <option value="MODAL">MODAL</option>
+          <option value="POPUP">POPUP</option>
+          <option value="REDIRECT">REDIRECT</option>
+        </select>
+      </div>
+      <div style="padding-bottom:6px">
+        <span id="redirect-note" style="font-size:11px;color:#f5a623"></span>
+      </div>
+    </div>
+
+    <%# ── JS-Configured Message ────────────────────────────────────────────── %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:14px">JS-Configured Message</div>
+    <div style="background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:20px;min-height:40px">
+      <paypal-message id="paypal-message"></paypal-message>
+    </div>
+
+    <%# ── Current JS Config ────────────────────────────────────────────────── %>
+    <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:10px">Current JS Config</div>
+    <pre id="plm-js-config"
+      style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:12px 14px;font-size:12px;font-family:var(--font-mono);color:var(--fg-muted);overflow-x:auto;margin-bottom:22px;line-height:1.6"
+    ></pre>
+
+    <%# ── Event Log ────────────────────────────────────────────────────────── %>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--fg-subtle)">
+        Event Log
+        <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:11px;color:var(--fg-muted)">&nbsp;onContentReady · onTemplateReady · paypal-message-click · LearnMore.*</span>
+      </div>
+      <button id="clear-log-btn" type="button"
+        style="padding:3px 10px;background:rgba(255,255,255,0.06);border:1px solid var(--border);border-radius:5px;font-size:11px;color:var(--fg-muted);cursor:pointer">
+        Clear
+      </button>
+    </div>
+    <div id="plm-event-log"
+      style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:7px;padding:10px 14px;min-height:80px;max-height:220px;overflow-y:auto;margin-bottom:20px;font-size:12px">
+      <div style="color:var(--fg-subtle);font-size:12px">Events will appear here...</div>
+    </div>
+
+    <div class="test-hint">
+      Supported markets: <strong>US</strong> · <strong>AU</strong> · <strong>DE</strong> · <strong>ES</strong> · <strong>FR</strong> · <strong>IT</strong> · <strong>GB</strong> · <strong>CA</strong>.
+      Country selection maps to <code>currencyCode</code> + <code>buyerCountry</code> passed to <code>createPayPalMessages()</code>.
+      <br>Style note: <code>MONOGRAM</code> logoType expects <code>LEFT</code> position; <code>TEXT</code> logoType expects <code>INLINE</code> position.
+    </div>
+
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:         '<%= clientId %>',
+    components:       ['paypal-messages'],
+    pageType:         'product-details',
+    testBuyerCountry: '<%= country %>',
+    currency:         '<%= currency %>',
+    country:          '<%= country %>',
+    defaultAmount:    '<%= defaultAmount %>',
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/plm-js.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>
