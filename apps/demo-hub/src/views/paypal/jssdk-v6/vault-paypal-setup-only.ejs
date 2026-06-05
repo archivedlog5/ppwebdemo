@@ -1,0 +1,55 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar,
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v6 · Vault Setup</span>
+    <h1><%= title %></h1>
+    <p>Pure vault enrollment — no purchase. Creates a setup token, buyer approves, confirms to payment token.</p>
+  </div>
+  <div class="sandbox-card">
+    <div class="amount-display">
+      <div class="amount-label">Payment</div>
+      <div class="amount-value" style="font-size:22px">Setup Only</div>
+      <span class="sandbox-mode-badge">⚡ Zero-Dollar Auth</span>
+    </div>
+
+    <div class="field-group" style="margin-bottom:16px">
+      <div class="field-host" style="padding:10px 12px;color:var(--fg-muted);font-size:13px;line-height:1.6;border-radius:6px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07)">
+        <span style="color:var(--fg-subtle);font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase">Vault Behavior</span><br>
+        <code style="font-size:12px;color:var(--fg-subtle)">usage_pattern: IMMEDIATE · shipping_preference: NO_SHIPPING</code> · Stores the PayPal payment method with no purchase. The <strong>payment token</strong> and <strong>customer ID</strong> are shown below after approval.
+      </div>
+    </div>
+
+    <div id="paypal-button-container" class="sdk-loading">
+      <div class="sdk-spinner"></div><span>Loading PayPal...</span>
+    </div>
+
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+
+    <div id="vault-result" style="display:none;margin-top:12px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:6px;font-size:13px;line-height:1.8">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--fg-subtle);margin-bottom:6px">Vault Result</div>
+      <div><span style="color:var(--fg-muted)">Payment Token:&nbsp;</span><span id="payment-token-id" style="font-family:monospace;color:var(--fg)">—</span></div>
+      <div><span style="color:var(--fg-muted)">Customer ID:&nbsp;</span><span id="customer-id" style="font-family:monospace;color:var(--fg)">—</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    clientId:   '<%= clientId %>',
+    components: ['paypal-payments'],
+    pageType:   'checkout',
+    urls: {
+      createSetupToken:  '/paypal/jssdk-v6/api/vault-paypal-setup-only/create-setup-token',
+      confirmSetupToken: '/paypal/jssdk-v6/api/vault-paypal-setup-only/confirm-setup-token',
+    },
+  }
+</script>
+<script src="/js/paypal/jssdk-v6/init.js"></script>
+<script src="/js/paypal/jssdk-v6/vault-paypal-setup-only.js"></script>
+<script defer src="https://www.sandbox.paypal.com/web-sdk/v6/core"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>
