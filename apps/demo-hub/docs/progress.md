@@ -2,6 +2,24 @@
 
 ---
 
+## 2026-06-08 — Fastlane Quick Start（fastlane-pui）实现完成
+
+**代码实现（Sonnet 模型执行）：**
+
+- **`src/config/paypal.js`** — `getUSClientToken` 加可选 `{ intent } = {}` 参数（非破坏性；v6 现有调用不受影响）
+- **`src/routes/paypal/jssdk-v5/fastlane-pui.js`** — 自定义路由；GET 渲染（intent=sdk_init client token）；POST create-order（single_use_token + shipping camelCase→snake_case 映射，USD 锁定）；`buildFastlaneOrderBody` + `mapShipping`；成功判定 captures[0].status=COMPLETED
+- **`src/views/paypal/jssdk-v5/fastlane-pui.ejs`** — 三段式表单（Customer / Shipping / Payment）；`window.DEMO` 注入；`data-sdk-client-token` 加载 Fastlane SDK；无 `sdkUrl` 传 header（header 仅条件性加载）
+- **`src/public/js/paypal/jssdk-v5/fastlane-pui.js`** — IIFE；Fastlane 初始化/email/OTP 认证/收货/FastlanePaymentComponent/下单全流程；inspect/probe 规则：逐个 console.log 每个返回对象
+- **`src/app.js`** — 追加 `app.use(v5, require('./routes/paypal/jssdk-v5/fastlane-pui'))` 于 plm-js 之后
+- **`src/routes/paypal/jssdk-v5/CLAUDE.md`** — SDK params 表新增 fastlane-pui 行；自定义路由备注新增 fastlane-pui.js 说明
+
+**待用户操作：**
+1. 在 Supabase SQL Editor 执行 INSERT（见 Task 6 SQL）
+2. 重启 demo-hub（`npm run dev:demo-hub`）
+3. 手动 QA：访客路径（测试卡 4005 5192 0000 0004）+ 会员路径（OTP 111111）+ 确认 captures[0].status=COMPLETED（自动扣款）
+
+---
+
 ## 2026-06-05 — JSSDK v6 ACDC Vault with Purchase 实现完成（Task 20）
 
 **代码实现（Sonnet 模型执行）：**

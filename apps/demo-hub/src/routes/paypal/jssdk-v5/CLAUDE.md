@@ -51,6 +51,7 @@
 | vault-return | `components=buttons&commit=true&buyer-country=US` + id_token（**必须含 commit=true**） |
 | plm-div | `components=messages` |
 | plm-js | `components=messages` |
+| fastlane-pui | `components=fastlane&buyer-country=US&currency=USD` + `data-sdk-client-token`（intent=sdk_init） |
 
 ---
 
@@ -71,6 +72,13 @@
 // vault-return.js       — 自定义；PayPal → SDK Buttons（data-user-id-token 识别回头买家）；card → Pay Now（vault_id）；apple_pay → 禁用；PayPal-Request-Id 头；**SDK URL 必须含 commit=true&buyer-country=US，否则弹出登录 popup**
 // plm-div.js            — 工厂路由；sdkParams:"components=messages"；国家选择器（US/AU/DE/ES/FR/IT/GB/CA）；优先读 ?country param；data-pp-buyercountry 注入每个 message div；max-width:680px
 // plm-js.js             — 工厂路由；同 plm-div 国家选择；JS API：paypalSDK.Messages({amount,placement,buyerCountry,style,onRender,onClick,onApply}).render('#plm-js-container')；金额变化重新调 Messages()
+// fastlane-pui.js       — Fastlane Quick Start（Payment UI 组件）；US 账户；client token 用 getUSClientToken({intent:'sdk_init'})，orders 用 getUSToken()；create-order body：payment_source.card.single_use_token + purchase_units（USD 锁定）；shipping camelCase→snake_case 映射（mapShipping）
+//   前端 CSS 三态：fl-active（当前展开）/ fl-visited（已完成，显摘要+Edit）/ locked（无 class，dimmed）；三步始终在 DOM 中可见，不 display:none
+//   Email 流程：lookupCustomerByEmail → member（triggerAuthenticationFlow OTP）或 guest
+//   Member 路径：setShippingSummary(profileData.shippingAddress) + markVisited(stepShipping) 直接跳 Payment，不隐藏 Shipping
+//   Guest 路径：setActive(stepShipping) 展开地址表单；checkbox #shipping-required-checkbox 控制 #shipping-address-fields 显隐（取消勾选→跳过字段校验直接 Continue）
+//   Member edit 地址：showShippingAddressSelector → selectionChanged → setShippingSummary(newAddr) + setShippingAddress(newAddr)
+//   Checkout 成功判定 captures[0].status==='COMPLETED'（规则 13）；提示格式 '✓ COMPLETED · Capture ID: <id>'；成功后 Checkout + 全部 Edit 按钮（email/shipping/payment）永久 disabled，整个表单锁定，刷新页面重试
 ```
 
 ---

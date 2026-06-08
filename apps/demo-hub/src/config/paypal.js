@@ -48,20 +48,24 @@ async function getUSToken() {
 }
 
 /**
- * Browser-safe client token for PayPal v6 SDK (US account).
- * Uses response_type=client_token with domain whitelisting.
+ * Browser-safe client token (US account) with domain whitelisting.
+ * @param {object} [opts]
+ * @param {string} [opts.intent] - e.g. 'sdk_init' for Fastlane. Omit for default behavior.
  * Not cached — called once per page load.
  */
-async function getUSClientToken() {
+async function getUSClientToken({ intent } = {}) {
   const clientId = process.env.PAYPAL_US_CLIENT_ID;
   const clientSecret = process.env.PAYPAL_US_CLIENT_SECRET;
   const domains = process.env.PAYPAL_US_MERCHANT_DOMAINS;
 
-  const body = new URLSearchParams({
+  const params = {
     grant_type: "client_credentials",
     response_type: "client_token",
     "domains[]": domains,
-  }).toString();
+  };
+  if (intent) params.intent = intent;
+
+  const body = new URLSearchParams(params).toString();
 
   console.log("[getUSClientToken] formBody:", body);
 

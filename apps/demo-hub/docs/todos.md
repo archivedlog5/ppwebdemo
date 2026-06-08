@@ -1,6 +1,6 @@
 # demo-hub — Todos
 
-最后更新：2026-06-04
+最后更新：2026-06-08
 
 ---
 
@@ -166,6 +166,30 @@
   - 实现计划：`docs/superpowers/plans/2026-06-04-plm-html-v6.md` ✅
   - 实现：**2026-06-04 完成**（GET-only 路由 + EJS 3 placements + 8 行 Style Gallery + 前端 JS）
 - [x] **Task 24** — PLM JS（`plm-js.js/ejs`；JS API `createPayPalMessages` + `fetchContent`；国家/币种切换；route+view+js 已建并挂载；**2026-06-05 完成**）
+
+---
+
+## Fastlane（JSSDK v5）
+
+> 需求：`docs/req/2026-06-08-req-fastlane-pui.md`
+> 设计：`docs/design/2026-06-08-design-fe-fastlane-pui.md` + `...-be-...`
+> 计划：`docs/plans/2026-06-08-plan-fastlane-pui-v1.md`
+
+- [x] **Task FL-1** — fastlane-pui（Fastlane Quick Start / Payment UI 组件）**2026-06-08 代码完成**
+  - 决策：纯 Fastlane Quick Start；US 账户（`PAYPAL_US_*`）；币种锁 USD；intent CAPTURE；仅 create-order（`payment_source.card.single_use_token`）
+  - [x] Task 1：`getUSClientToken({ intent })` 加可选参数（config/paypal.js）
+  - [x] Task 2：路由 `fastlane-pui.js`（GET 渲染 + POST create-order + shipping 映射）
+  - [x] Task 3：视图 `fastlane-pui.ejs`（三段式表单始终可见 + fl-* CSS 三态 + scoped `<style>` + `data-sdk-client-token`）
+  - [x] Task 4：前端 `fastlane-pui.js`（email→OTP→收货→FastlanePaymentComponent→下单 + inspect/probe；member 路径 Shipping `markVisited` 显地址摘要；CSS 三态 fl-active/fl-visited/locked；shipping checkbox 控制地址字段显隐；member edit 地址后 `setShippingSummary` 刷新摘要；成功提示含 Capture ID；成功后 Checkout + 全部 Edit 按钮永久 disabled，刷新页面重试）
+  - [x] Task 5：`app.js` 挂载
+  - [ ] Task 6：⏳ **Supabase INSERT 待用户手动执行** + 重启
+  - [ ] Task 7：QA（guest/member/OTP/边界）+ **自动扣款确认**（若返回 CREATED 则补 capture-order）
+  - [x] Task 8：更新 v5 CLAUDE.md + progress.md
+
+### Fastlane Deferred（后续独立迭代）
+
+- [ ] **fastlane-pui-multifunding** — Fastlane + PayPal/Venmo/PayLater 多 funding（Buttons 组件并存；参考用户 demo code；SDK 加 `buttons&enable-funding=venmo,paylater`；radio 切换；PayPal/Venmo 走 create+capture 两步）
+- [ ] **fastlane-flex**（可选）— Flexible 集成，单独使用 `FastlaneCardComponent` + watermark 自建表单
 
 ---
 
