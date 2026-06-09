@@ -2,6 +2,87 @@
 
 ---
 
+## 2026-06-09 — fastlane-fp API 3DS orderId 问题修复（sessionKey 方案）
+
+**问题**：API 3DS 回调 URL 为 `...?state=undefined&code=undefined&liability_shift=POSSIBLE`，PayPal card 3DS 不回传 orderId（与标准 Buttons `?token=<orderId>` 行为不同），导致 return handler 无法发起 capture。
+
+**方案**：pre-generate sessionKey → embed in return_url → store Map after create-order → lookup on return
+
+具体实现（`fastlane-fp.js` 路由文件）：
+- 模块顶部加 `const crypto = require('crypto')` 和 `const threeDSSessionStore = new Map()`
+- `create-order` POST handler：API flow 时 `sessionKey = crypto.randomBytes(16).hex()`，传入 `buildFastlaneOrderBody` 嵌入 `return_url?session=<key>`；调 PayPal 成功后 `threeDSSessionStore.set(sessionKey, order.id)`，`setTimeout` 10分钟自动 delete
+- `buildFastlaneOrderBody`：接受 `sessionKey` 参数，`return_url` 改为 `...?session=${sessionKey}`
+- `return` GET handler：读 `req.query.session` → `threeDSSessionStore.get(key)` 得 orderId → delete（单次）→ 发 capture
+
+同步更新文档（5 个 markdown）：req §7 / be 设计 §2.2/§2.3/§3/§8 / plan Task 1 / CLAUDE.md / todos Task 7
+
+---
+
+## 2026-06-09 — fastlane-fp 两处修订（bug fix + 新功能）
+
+**Bug fix：member-有卡 Payment 步 Edit 按钮不可见**
+
+原因：`setActive(stepPayment)` 只加 `fl-active`，CSS `.fl-visited:not(.fl-active)` 规则导致 Edit 按钮始终隐藏。
+修复：
+- `fastlane-fp.js` — member-有卡分支 `setActive(stepPayment)` 后紧接 `markVisited(stepPayment)`
+- `fastlane-fp.ejs` — 追加 CSS 规则 `.fl-step.fl-active.fl-visited .fl-step__edit { opacity: 1; pointer-events: auto; }`
+
+**新功能：3DS Flow 下拉加 "None / When Required" 选项（默认）**
+
+原因：强制 JSSDK/API 3DS 不方便日常测试普通卡。
+修复：
+- `fastlane-fp.ejs` — `<select>` 加 `<option value="none">` 作为第一项/默认
+- `fastlane-fp.js` — checkout 加 `if (threeDSFlow === 'none')` 分支直接 `createAndJudge`，原 jssdk 改为 `else if`
+
+**同步更新文档**（6 个 markdown）：req / fe 设计 / be 设计 / plan / todos / CLAUDE.md
+
+---
+
+## 2026-06-09 — Fastlane Flexible（fastlane-fp）代码实现完成（Tasks 1–5, 8）
+
+**代码实现（Sonnet 模型执行）：**
+
+- **`src/routes/paypal/jssdk-v5/fastlane-fp.js`** — 自定义路由（3 端点）
+  - GET 渲染：`components=fastlane,three-domain-secure&buyer-country=US&currency=USD`；`sdkClientToken = getUSClientToken({ intent:'sdk_init' })`；USD 锁定
+  - POST create-order：读 `{ paymentToken, shippingAddress, billingAddress, amount, threeDSFlow }`；`buildFastlaneOrderBody`（API flow 注入 `card.attributes.verification.method=SCA_ALWAYS` + `card.experience_context.return_url/cancel_url`；return_url 由 `req.protocol+host` 动态拼）；`mapShipping` 从 pui 复制（规则 1，不跨产品共用）；inspect/probe 打印 request body + order body + PayPal 响应
+  - GET return：inspect `req.query` 确认 orderId 参数名（推断 `?token=`）；`fp_cancel` → 渲染取消态；服务端 `POST /v2/checkout/orders/:id/capture`；规则 13 判定 `captures[0].status === 'COMPLETED'`；完整 order JSON 渲染到结果页
+  - D1 决策（用户已拍板）：简单 POST capture，已知刷新 return 页显示 ORDER_ALREADY_CAPTURED 为预期行为
+  - D2 决策：`mapShipping` 复制到本文件（不动 pui.js）
+- **`src/views/paypal/jssdk-v5/fastlane-fp-return.ejs`** — API 3DS return 结果页（不加载 Fastlane SDK）；三态（success `✓ COMPLETED` / cancelled / error）；`<pre>` 展示完整 order JSON；返回 Demo 链接
+- **`src/views/paypal/jssdk-v5/fastlane-fp.ejs`** — 四段式表单（Customer / Shipping / **Billing** / Payment）；复用 pui 三态 CSS（`fl-active` / `fl-visited` / locked）；序号扩到 1/2/3/4；`#step-billing[hidden]{display:none}` 供 member-有卡隐藏；Payment 步内 3DS Flow `<select>`（JSSDK / API）+ `#selected-card` + `#card-component` + `#payment-watermark`；`data-sdk-client-token` 加载 Fastlane SDK；`window.DEMO` 注入 createOrder URL + amount + currency
+- **`src/public/js/paypal/jssdk-v5/fastlane-fp.js`** — IIFE + `'use strict'`，全程 inspect/probe console.log：
+  - 初始化：`FastlaneCardComponent`（非 pui 的 `FastlanePaymentComponent`）+ `FastlaneWatermarkComponent`
+  - Email → `lookupCustomerByEmail` → `triggerAuthenticationFlow`；member-有卡（隐藏 Billing + renderSelectedCard + watermark → Payment）/ member-无卡（Shipping → Billing）/ guest（Shipping → Billing）
+  - 收货提交 → Billing（与 pui 区别：不跳 Payment，先到 Billing）
+  - 账单提交：组装 flat `billingAddress`；`FastlaneCardComponent({ fields: { phoneNumber/postalCode/cardholderName } })` 渲染卡组件
+  - JSSDK 3DS：`window.paypal.ThreeDomainSecureClient.isEligible(params)` → `show()` → inspect nonce / authenticationState / liabilityShift → 替换 `paymentToken.id = results.nonce` → create-order → `judgeInline`（规则 13）
+  - API 3DS：create-order → `PAYER_ACTION_REQUIRED` → `window.location.href = payer-action href` 跳转；非 PAYER_ACTION_REQUIRED → `judgeInline` 内联判定
+  - member-有卡：`showCardSelector` 换卡；`showShippingAddressSelector` 换地址
+  - D3 决策：所有辅助函数（formatPhone/getAddressSummary/validateFields/setActive/markVisited/showResult/setBillingSummary/renderSelectedCard）复制到本文件（产品自包含，不动 pui.js）
+  - 成功后全部 Edit + Checkout 按钮 disabled，刷新重试
+- **`src/app.js`** — 追加 `app.use(v5, require('./routes/paypal/jssdk-v5/fastlane-fp'))` 于 fastlane-pui 之后
+- **`src/routes/paypal/jssdk-v5/CLAUDE.md`** — SDK params 表新增 fastlane-fp 行；自定义路由备注新增 fastlane-fp 详细说明
+
+**待用户操作（按顺序）：**
+1. Supabase SQL Editor 执行（见 be 设计 §6.1 的 INSERT — 自动取 sort_order max+1）
+2. 重启 demo-hub（`npm run dev:demo-hub`）
+3. 手动 QA（Task 7 清单，12 个场景）：
+   - guest + JSSDK 3DS（卡 4000 0000 0000 2503 → 挑战 → `✓ COMPLETED`）
+   - guest + API 3DS（卡 5329 8797 3531 6929 → 跳转 → return 页 `✓ COMPLETED`）
+   - guest + 普通卡（JSSDK flow, not eligible → 直接下单成功）
+   - member-有卡（OTP 111111 → Billing 隐藏 → Payment 显存卡 → Checkout）
+   - member 换卡/换地址（showCardSelector / showShippingAddressSelector 生效）
+   - member-无卡（走 Billing + 卡组件）
+   - API 3DS 取消（return 页取消提示）
+   - OTP 失败回退（错误 OTP → 访客流程）
+   - JSSDK 3DS 认证失败（显示错误，按钮恢复）
+   - API 3DS 未触发挑战（judgeInline 内联判定）
+   - 虚拟商品（不勾选 shipping-required）
+   - member-有卡 × API 3DS
+4. inspect/probe 定稿后回填 fe/be 设计文档（去掉推断标记），记 debug-log
+
+---
+
 ## 2026-06-08 — Fastlane Quick Start（fastlane-pui）实现完成
 
 **代码实现（Sonnet 模型执行）：**

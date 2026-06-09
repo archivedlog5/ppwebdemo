@@ -52,6 +52,7 @@
 | plm-div | `components=messages` |
 | plm-js | `components=messages` |
 | fastlane-pui | `components=fastlane&buyer-country=US&currency=USD` + `data-sdk-client-token`（intent=sdk_init） |
+| fastlane-fp  | `components=fastlane,three-domain-secure&buyer-country=US&currency=USD` + `data-sdk-client-token`（intent=sdk_init）— three-domain-secure 必须，ThreeDomainSecureClient 需要 |
 
 ---
 
@@ -79,6 +80,22 @@
 //   Guest 路径：setActive(stepShipping) 展开地址表单；checkbox #shipping-required-checkbox 控制 #shipping-address-fields 显隐（取消勾选→跳过字段校验直接 Continue）
 //   Member edit 地址：showShippingAddressSelector → selectionChanged → setShippingSummary(newAddr) + setShippingAddress(newAddr)
 //   Checkout 成功判定 captures[0].status==='COMPLETED'（规则 13）；提示格式 '✓ COMPLETED · Capture ID: <id>'；成功后 Checkout + 全部 Edit 按钮（email/shipping/payment）永久 disabled，整个表单锁定，刷新页面重试
+// fastlane-fp.js        — Fastlane Flexible（FastlaneCardComponent，非 FastlanePaymentComponent）；US 账户；components=fastlane,three-domain-secure（ThreeDomainSecureClient 需要）；USD 锁定；四步表单（Customer/Shipping/Billing/Payment）
+//   Billing 步（Flexible 新增）：自建 billing- 前缀表单；member-有卡时 #step-billing[hidden] 整步隐藏；getPaymentToken({ billingAddress }) 传 flat 地址对象
+//   member-有卡路径：Shipping visited（profile 地址）→ Billing hidden → Payment 显 renderSelectedCard + watermark；payment-edit → showCardSelector 换卡
+//   member-无卡路径：Shipping visited → Billing active（填账单）→ Payment（渲染卡组件）
+//   guest 路径：Shipping active → Billing active → Payment（渲染卡组件）
+//   3DS Flow 下拉三选项（none 为默认）：none = 直接下单不强制 3DS；jssdk = ThreeDomainSecureClient SCA_ALWAYS；api = 服务端注入 SCA_ALWAYS + experience_context 全页跳转
+//   None flow：直接 createAndJudge，不走任何 3DS，方便普通卡日常测试
+//   JSSDK 3DS：window.paypal.ThreeDomainSecureClient.isEligible(params) → show() → authenticationState='succeeded' + liabilityShift='POSSIBLE' → paymentToken.id = results.nonce → create-order → judgeInline（规则 13）；not eligible → 直接 create-order
+//   API 3DS：create-order body 加 card.attributes.verification.method=SCA_ALWAYS + card.experience_context.return_url/cancel_url（动态 origin）；前端判 PAYER_ACTION_REQUIRED → window.location.href = payer-action href → GET /fastlane-fp/return 服务端 capture → 渲染 fastlane-fp-return.ejs（success/cancelled/error 三态 + 完整 order JSON）
+//   ⚠️ PayPal card 3DS 回调参数为 state/code/liability_shift，不含 orderId（与 Buttons ?token= 不同）
+//   解法：create-order 前生成 sessionKey，嵌入 return_url?session=<key>；PayPal 原样回传；return handler 从模块级 threeDSSessionStore Map 反查 orderId，单次使用后 delete，10分钟自动过期
+//   member-有卡 Payment 步：setActive(stepPayment) 后紧接 markVisited(stepPayment)，CSS 加 .fl-step.fl-active.fl-visited .fl-step__edit 规则，使 Edit 按钮在展开状态下仍可见（触发 showCardSelector 换卡）
+//   D1（用户拍板）：return 页简单 POST capture；刷新显 ORDER_ALREADY_CAPTURED 为预期行为，不修
+//   D2：mapShipping 复制到本文件（不动 pui.js，不抽公共文件，规则 1）
+//   D3：辅助函数（formatPhone/getAddressSummary/validateFields/setActive/markVisited 等）复制到 fastlane-fp.js（产品自包含）
+//   全程 inspect/probe console.log：Fastlane init / lookupCustomerByEmail / triggerAuthenticationFlow / FastlaneCardComponent / getPaymentToken / showShippingAddressSelector / showCardSelector / isEligible / show() / create-order 响应 / return capture 响应
 ```
 
 ---

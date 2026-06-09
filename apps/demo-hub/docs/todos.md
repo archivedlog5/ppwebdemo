@@ -1,6 +1,6 @@
 # demo-hub — Todos
 
-最后更新：2026-06-08
+最后更新：2026-06-09
 
 ---
 
@@ -186,10 +186,27 @@
   - [ ] Task 7：QA（guest/member/OTP/边界）+ **自动扣款确认**（若返回 CREATED 则补 capture-order）
   - [x] Task 8：更新 v5 CLAUDE.md + progress.md
 
+### Fastlane Flexible (fastlane-fp)
+
+> 需求：`docs/req/2026-06-09-req-fastlane-fp.md`
+> 设计：`docs/design/2026-06-09-design-fe-fastlane-fp.md` + `...-be-...`
+> 计划：`docs/plans/2026-06-09-plan-fastlane-fp-v1.md`
+
+- [x] **Task FL-2** — fastlane-fp（Fastlane Flexible / `FastlaneCardComponent`）**2026-06-09 代码完成**
+  - 决策：Flexible 卡组件 + 自建 Billing 表单；3DS **三套** flow（None/When Required + JSSDK + API）；API flow 独立 return 页 + 服务端 capture；US 账户；币种锁 USD；intent CAPTURE；多 funding 不做（留 todo）
+  - [x] Task 1：路由 `fastlane-fp.js`（GET 渲染 + POST create-order〔三套 3DS 分支，后端 none/jssdk 行为一致〕+ GET return〔服务端 capture〕；复制 mapShipping）
+  - [x] Task 2：return 结果页 `fastlane-fp-return.ejs`（success/cancelled/error 三态 + order JSON + 返回链接；不加载 SDK）
+  - [x] Task 3：主视图 `fastlane-fp.ejs`（四步 Customer/Shipping/Billing/Payment；复用 pui 三态 CSS + `.fl-step.fl-active.fl-visited .fl-step__edit` 新规则；3DS Flow 下拉〔**none 默认**/ jssdk / api〕；#card-component/#payment-watermark/#selected-card）
+  - [x] Task 4：前端 `fastlane-fp.js`（email→OTP→收货→账单→FastlaneCardComponent→3DS〔None 直接下单；JSSDK isEligible/show + nonce 替换；API redirect〕→下单 + inspect/probe；member-有卡 Payment 步 `markVisited` 使 Edit 可见，触发 `showCardSelector`；规则 13；成功锁表单）
+  - [x] Task 5：`app.js` 挂载
+  - [ ] Task 6：⏳ **Supabase INSERT 待用户手动执行** + 重启
+  - [ ] Task 7：QA（guest/member-有卡/member-无卡 × None/JSSDK/API；API 取消；inspect 定稿 order body 字段/nonce 替换；✅ return 参数已确认：state/code/liability_shift，orderId 由 sessionKey→Map 反查）
+  - [x] Task 8：更新 v5 CLAUDE.md + progress.md + 所有设计文档（回填待 QA 后补充）
+
 ### Fastlane Deferred（后续独立迭代）
 
-- [ ] **fastlane-pui-multifunding** — Fastlane + PayPal/Venmo/PayLater 多 funding（Buttons 组件并存；参考用户 demo code；SDK 加 `buttons&enable-funding=venmo,paylater`；radio 切换；PayPal/Venmo 走 create+capture 两步）
-- [ ] **fastlane-flex**（可选）— Flexible 集成，单独使用 `FastlaneCardComponent` + watermark 自建表单
+- [ ] **fastlane-fp-multifunding** — Fastlane Flexible + PayPal/Venmo/PayLater 多 funding（Buttons 组件并存；参考用户 Flexible demo code；SDK 加 `buttons&enable-funding=venmo,paylater`；radio 切换；PayPal/Venmo 走 create+capture 两步）
+- [ ] **fastlane-pui-multifunding** — Fastlane Quick Start + PayPal/Venmo/PayLater 多 funding（同上，基于 fastlane-pui）
 
 ---
 
