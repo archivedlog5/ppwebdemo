@@ -2,6 +2,28 @@
 
 ---
 
+## 2026-06-10 — contact-module — 结果区不显示
+
+**现象：** capture 成功后 `#result` 区域无任何显示（静默，无报错）。
+
+**根因：** `showResult` 设置的 CSS 类名错误。
+
+```js
+// 错误（类不存在）
+el.className = 'result-msg result-' + type   // → 'result-msg result-success'
+
+// 正确（与 sandbox.css 选择器 .result-msg.success / .result-msg.error 一致）
+el.className = 'result-msg ' + type          // → 'result-msg success'
+```
+
+`sandbox.css` 定义 `display:none` 在 `.result-msg`，`display:block` 在 `.result-msg.success` 和 `.result-msg.error`。类名不匹配时元素永远 `display:none`，文字虽写入 `textContent` 但不可见。
+
+**Fix：** `src/public/js/paypal/jssdk-v5/contact-module.js` `showResult` 函数改用 `'result-msg ' + type`（无 `result-` 前缀）。
+
+**适用：** 所有新建产品 JS 文件中的 `showResult` 应照此模式，不加 `result-` 前缀。
+
+---
+
 ## 2026-06-05 — vault-acdc-setup-only (v6) — P3 Finding
 
 **Probe:** P3 — does save-payment session `submit()` accept `{ billingAddress }` as 2nd arg?

@@ -1,0 +1,171 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar, sdkUrl
+}) %>
+
+<style>
+  .cm-us-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    background: var(--color-surface2, #1e1e2e);
+    border-left: 3px solid var(--color-accent, #7c8cf8);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--color-fg, #cdd6f4);
+    line-height: 1.5;
+  }
+  .cm-us-notice-icon {
+    color: var(--color-accent, #7c8cf8);
+    font-style: normal;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .cm-control-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    margin-bottom: 12px;
+  }
+  .cm-pref-group,
+  .cm-currency-group,
+  .cm-amount-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cm-pref-select {
+    padding: 6px 10px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 6px;
+    background: var(--bg-card, #fff);
+    color: var(--text, #111);
+    font-size: 14px;
+    cursor: pointer;
+    min-width: 220px;
+  }
+  .cm-currency-text {
+    padding: 6px 10px;
+    border: 1px solid var(--border, #ddd);
+    border-radius: 6px;
+    background: var(--bg-card, #fff);
+    color: var(--text-secondary, #888);
+    font-size: 14px;
+    min-width: 80px;
+    user-select: none;
+  }
+  .cm-pref-hint {
+    font-size: 12px;
+    color: var(--text-secondary, #888);
+    margin: 0 0 12px;
+    min-height: 16px;
+  }
+  .cm-contact-display {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    background: var(--color-surface2, #1e1e2e);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--color-fg, #cdd6f4);
+    line-height: 1.7;
+  }
+  .cm-contact-display-title {
+    font-weight: 600;
+    color: var(--color-fg, #cdd6f4);
+    margin-bottom: 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+  }
+  .cm-info-notice {
+    margin: 14px 0;
+    padding: 10px 14px;
+    background: var(--color-surface2, #1e1e2e);
+    border-left: 3px solid var(--color-accent, #7c8cf8);
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--color-fg, #cdd6f4);
+    line-height: 1.5;
+    opacity: 0.85;
+  }
+</style>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-paypal">PayPal · JSSDK v5 · Contact Module</span>
+    <h1><%= title %></h1>
+    <p>Buyer views and edits their shared email &amp; phone number at PayPal checkout (<code>contact_preference</code>)</p>
+  </div>
+
+  <div class="sandbox-card">
+    <!-- US-only notice -->
+    <div class="cm-us-notice" role="note">
+      <em class="cm-us-notice-icon" aria-hidden="true">ⓘ</em>
+      <div>
+        <strong>Contact Module is US-only.</strong>
+        This demo uses a US sandbox merchant. Currency is locked to USD.
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="cm-control-row">
+      <div class="cm-pref-group">
+        <label class="field-label" for="contact-preference">Contact preference</label>
+        <select id="contact-preference" class="cm-pref-select" aria-label="Select contact preference">
+          <option value="UPDATE_CONTACT_INFO" selected>UPDATE_CONTACT_INFO — buyer can view &amp; edit</option>
+          <option value="RETAIN_CONTACT_INFO">RETAIN_CONTACT_INFO — buyer can view, not edit</option>
+          <option value="NO_CONTACT_INFO">NO_CONTACT_INFO — buyer won't see contact</option>
+        </select>
+      </div>
+      <div class="cm-currency-group">
+        <label class="field-label">Currency</label>
+        <div class="cm-currency-text" aria-label="Currency locked to USD">USD</div>
+      </div>
+      <div class="cm-amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount || '100.00' %>" placeholder="0.00"
+            aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+
+    <p class="cm-pref-hint" id="pref-hint" aria-live="polite"></p>
+
+    <!-- Fixed contact info display -->
+    <div class="cm-contact-display" role="note" aria-label="Contact info to be sent">
+      <div class="cm-contact-display-title">Contact info sent to PayPal</div>
+      <div>Email: <strong><%= demoContact.email_address %></strong></div>
+      <div>Phone: <strong>+<%= demoContact.phone_number.country_code %> <%= demoContact.phone_number.national_number %></strong></div>
+    </div>
+
+    <div class="amount-error" id="amount-error" role="alert"></div>
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:14px">⚡ Sandbox Mode</span>
+
+    <div id="paypal-button-container"></div>
+
+    <div class="cm-info-notice" role="note">
+      With <strong>UPDATE_CONTACT_INFO</strong>, the buyer can edit their email and phone in the PayPal popup.
+      After payment, the result shows the <em>final</em> contact info retrieved from the order (server-side GET Order).
+    </div>
+
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+  window.DEMO = {
+    urls: {
+      createOrder:  '/paypal/jssdk-v5/api/contact-module/create-order',
+      captureOrder: '/paypal/jssdk-v5/api/contact-module/capture-order',
+    },
+  }
+</script>
+<script src="/js/paypal/jssdk-v5/contact-module.js"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>

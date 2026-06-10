@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-06-10 — Contact Module 实现完成（JSSDK v5）
+
+**新增 demo：** `paypal/jssdk-v5/contact-module` — 买家在 PayPal 结账查看/编辑 email 与电话（contact_preference，US only）
+
+**本次代码产出（Sonnet 实现）：**
+- `src/routes/paypal/jssdk-v5/contact-module.js`：自定义路由 3 端点（GET 渲染 / create-order / capture-order）；US-only `getUSToken`；内置 `CONTACT_PREFS` 白名单（非法 fallback `UPDATE_CONTACT_INFO`）+ `DEMO_CONTACT`（固定 sandbox 联系方式）；ECS 建单体含 `contact_preference` + `SET_PROVIDED_ADDRESS` + `shipping.email_address/phone_number`；Approach A：capture 端点内先 GET Order 读联系方式再 capture，返回 `{id, status, captureId, contact, raw}`；全程 inspect/probe console.log
+- `src/views/paypal/jssdk-v5/contact-module.ejs`：US-only 提示条（accent 左边框复用现有 token）；contact preference 下拉（三选项，默认 UPDATE）；`#pref-hint` 动态英文提示行；USD 纯文本锁定；只读联系方式展示区；info notice；无 sdk-loading spinner
+- `src/public/js/paypal/jssdk-v5/contact-module.js`：IIFE；`updatePrefHint()` 随下拉 change + page load 初始化；amount blur 格式化 + `validateAmount`；`paypalSDK.Buttons` createOrder（发 amount + contactPreference）/ onApprove（capture + 规则 13 复判 raw + 展示最终 email/phone）/ onCancel / onError；showResult 正确 CSS 类（`result-msg success/error`）
+- `src/app.js`：v5 区块 shipping-module 之后追加挂载一行
+- `src/routes/paypal/jssdk-v5/CLAUDE.md`：SDK params 表加 contact-module 行；自定义路由备注加 contact-module 段；新增规则 21
+
+**关键决策：** 下拉三种 preference（默认 UPDATE）；固定 sandbox 联系方式（email + phone）；结果仅展示最终联系方式（不做 before/after）；US 商户 + USD 锁定；Approach A 单端点折叠 GET Order + capture。
+
+**待办：** ⏳ Supabase INSERT 用户手动执行；Task CM-6 浏览器端到端 QA（UPDATE/RETAIN/NO 三种 preference 行为 + inspect/probe 定稿）。
+
+---
+
+## 2026-06-10 — Contact Module 设计 + 计划（JSSDK v5，仅文档）
+
+**本次产出（Opus 只写 markdown）：**
+- `docs/req/2026-06-10-req-jssdk-v5-contact-module.md`、`docs/design/2026-06-10-design-be-...`、`docs/design/2026-06-10-design-fe-...`、`docs/plans/2026-06-10-plan-jssdk-v5-contact-module-v1.md`
+
+---
+
 ## 2026-06-09 — Shipping Module 实现完成（JSSDK v5）
 
 **新增 demo：** `paypal/jssdk-v5/shipping-module` — server-side shipping callbacks（PayPal Buttons + GET_FROM_FILE + order_update_callback_config）

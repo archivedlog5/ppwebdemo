@@ -1,6 +1,6 @@
 # demo-hub — Todos
 
-最后更新：2026-06-09
+最后更新：2026-06-10
 
 ---
 
@@ -230,6 +230,29 @@
 
 - [ ] **Venmo payment_source** — 需 US 账户 + buyer-country=US；callback_events 同 PayPal
 - [ ] **client-side 回调** — onShippingAddressChange / onShippingOptionsChange（文档不推荐，与 Venmo 不兼容）
+
+---
+
+## Contact Module（JSSDK v5）
+
+> 需求：`docs/req/2026-06-10-req-jssdk-v5-contact-module.md`
+> 设计：`docs/design/2026-06-10-design-be-jssdk-v5-contact-module.md` + `...-fe-...`
+> 计划：`docs/plans/2026-06-10-plan-jssdk-v5-contact-module-v1.md`
+> 状态：设计 + 计划完成（Opus 只写文档）；代码待切换非 Opus 模型实现
+
+- [x] **Task CM-1** — 路由 `contact-module.js`（GET + create-order + capture-order；US-only `getUSToken`；内置 `CONTACT_PREFS` 白名单 + `DEMO_CONTACT`；contact_preference + shipping 联系方式；Approach A：capture 内 GET Order 读联系方式；inspect/probe console.log）
+- [x] **Task CM-2** — 视图 `contact-module.ejs`（US-only 提示条；contact preference 下拉；USD 锁定；只读联系方式展示；info notice）
+- [x] **Task CM-3** — 前端 `contact-module.js`（readControls：amount + contactPreference；amount blur；Buttons createOrder/onApprove 规则 13 复判 raw；展示最终 contact）
+- [x] **Task CM-4** — `app.js` 挂载（v5 区块 shipping-module 之后）
+- [ ] **Task CM-5** — ⏳ **Supabase INSERT 待用户手动执行** + 重启 demo-hub
+- [ ] **Task CM-6** — 本地 QA（curl create-order 三 preference + 非法 fallback + 金额校验）+ 浏览器端到端（UPDATE/RETAIN/NO 联系方式行为）
+- [x] **Task CM-7** — `src/routes/paypal/jssdk-v5/CLAUDE.md` 更新（SDK params 表 + 自定义路由备注 + 规则 21）
+
+### Contact Module Deferred（非本期）
+
+- [ ] **可编辑联系方式输入框** — 页面改 email/phone + RETAIN 单字段 / 空值 fallback 边界
+- [ ] **before/after 对比面板** — merchant 传入 vs 买家返回
+- [ ] **Venmo / card / 其他 payment_source**；多币种 / CN 商户
 
 ---
 

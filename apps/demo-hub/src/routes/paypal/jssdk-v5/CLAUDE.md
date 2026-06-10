@@ -54,6 +54,7 @@
 | fastlane-pui | `components=fastlane&buyer-country=US&currency=USD` + `data-sdk-client-token`（intent=sdk_init） |
 | fastlane-fp  | `components=fastlane,three-domain-secure&buyer-country=US&currency=USD` + `data-sdk-client-token`（intent=sdk_init）— three-domain-secure 必须，ThreeDomainSecureClient 需要 |
 | shipping-module | `components=buttons&buyer-country=US&currency=<dynamic>`（CN 和 US 均加 buyer-country=US）；GET_FROM_FILE + order_update_callback_config |
+| contact-module | `components=buttons&buyer-country=US&currency=USD`（US-only，固定 USD）；SET_PROVIDED_ADDRESS + contact_preference 下拉 |
 
 ---
 
@@ -82,6 +83,7 @@
 //   Member edit 地址：showShippingAddressSelector → selectionChanged → setShippingSummary(newAddr) + setShippingAddress(newAddr)
 //   Checkout 成功判定 captures[0].status==='COMPLETED'（规则 13）；提示格式 '✓ COMPLETED · Capture ID: <id>'；成功后 Checkout + 全部 Edit 按钮（email/shipping/payment）永久 disabled，整个表单锁定，刷新页面重试
 // fastlane-fp.js        — Fastlane Flexible（FastlaneCardComponent，非 FastlanePaymentComponent）；US 账户；components=fastlane,three-domain-secure（ThreeDomainSecureClient 需要）；USD 锁定；四步表单（Customer/Shipping/Billing/Payment）
+// contact-module.js    — Contact Module；3 端点（GET/create-order/capture-order）；US-only（getUSToken / PAYPAL_US_CLIENT_ID）；SDK URL 固定 components=buttons&buyer-country=US&currency=USD；contact_preference UI 下拉三选项（UPDATE/RETAIN/NO），后端白名单校验，非法 fallback UPDATE；DEMO_CONTACT 内置常量（email+phone）不可页面编辑；create-order：ECS 体 + SET_PROVIDED_ADDRESS + contact_preference + shipping（...C.SANDBOX_SHIPPING + email_address + phone_number）；capture-order：Approach A — 先 GET Order 读 shipping.email_address/phone_number（inspect/probe log），再 capture（inspect/probe log），返回 {id,status,captureId,contact,raw}；规则 13 判定 captures[0].status==='COMPLETED'；货币锁 USD；#pref-hint 动态英文文案随下拉更新；watch-item：弹窗流是否显示联系方式编辑器（文档示例为 redirect 流，若弹窗不触发则回退 redirect 流）
 // shipping-module.js    — server-side shipping callbacks；4 端点（GET/create-order/callback/capture-order）；CN/US 切换；callback_url 内嵌 item_total/currency/decline/merchant 无状态（规则 20）；GET_FROM_FILE + CONTINUE（ECS 才有 review 页选地址，PAY_NOW 不适用）；两个商户 SDK URL 均含 buyer-country=US；callback：先 NaN/负数守卫→DC守卫→decline 分支（422）→成功路径（D2 取整顺序 itemR+taxR+shipR → valueR）；三选项 Free $0（默认）/USPS $7/1-Day $10；税率 5%；响应 id 用 order id（inspect/probe 核实）；Venmo/client-side 回调留 todo
 //   State rules (from shipping_address, check area1 and area2):
 //   DC → 无条件 422 STATE_ERROR（area1==='DC' || area2==='DC'；优先于 decline 参数）
@@ -194,3 +196,13 @@ Google Pay 返回 E.164（`+14155552671`），PayPal 需要 `{ country_code: '1'
 - 拒绝用 HTTP 422 `{ name:'UNPROCESSABLE_ENTITY', details:[{issue:<REASON>}] }`；ADDRESS_ERRORS（地址类）在地址事件触发；OPTION_ERRORS（选项类）在选项事件触发；事件与错误类型不匹配则走成功路径。
 - 响应顶层 `id` 先用回调请求体的 `id`（order id）；若 PayPal 校验失败再改商户 ID（env）。定稿前 inspect/probe 打印真实回调字段核实。
 - **PayPal callback body 地址字段**：普通州 `admin_area_1` = state 缩写（如 `"NY"`），`admin_area_2` = city。DC 是特例：`admin_area_1="Washington"`，`admin_area_2="DC"`（缩写在 area2）。state-specific 逻辑须同时判断两个字段：`area1 === 'DC' || area2 === 'DC'`，`area1 === 'NY' || area2 === 'NY'`。
+
+### 规则 21 — Contact module 用 contact_preference + shipping 联系方式，US-only
+
+- `payment_source.paypal.experience_context.contact_preference` 三值：`NO_CONTACT_INFO`（默认/隐藏）/
+  `UPDATE_CONTACT_INFO`（可看可编辑）/ `RETAIN_CONTACT_INFO`（可看不可编辑）。前端下拉切换，后端白名单校验，非法 fallback `UPDATE_CONTACT_INFO`。
+- 联系方式通过 `purchase_units[0].shipping.email_address` + `phone_number` 传递；须配 `shipping_preference: SET_PROVIDED_ADDRESS` + 完整 address（`C.SANDBOX_SHIPPING`）。
+- 模块 **US-only**：统一 `getUSToken()` + `PAYPAL_US_CLIENT_ID`，SDK URL 加 `buyer-country=US`；货币锁 USD，无 CN/US 切换，无 currency 下拉。
+- 取回买家最新（可能编辑过）联系方式：**Approach A — capture 端点内先 GET Order 读 `shipping.email_address`/`phone_number`，再 capture**（单端点折叠，返回 `{id, status, captureId, contact, raw}`）。inspect/probe 核对 capture 响应是否已含联系方式，若含可省 GET Order 调用。
+- capture 成功判定沿用规则 13（`captures[0].status === 'COMPLETED'`）；前端用 `raw` 复判。
+- **watch-item**：文档示例均为 redirect 流；Buttons 弹窗流首次 e2e 须确认联系方式编辑器真实出现。若不出现 → 回退 redirect 流（记 debug-log）。
