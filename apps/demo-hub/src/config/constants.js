@@ -159,6 +159,32 @@ const VENMO_SHIPPING = {
   },
 };
 
+// ── 荷兰收货地址（iDEAL APM，purchase_units[0].shipping）──────────────
+const NL_SHIPPING = {
+  name: { full_name: "Cross Wen" },
+  address: {
+    address_line_1: "Keizersgracht 123",
+    address_line_2: "",
+    admin_area_2: "Amsterdam",
+    admin_area_1: "NH",
+    postal_code: "1015 CJ",
+    country_code: "NL",
+  },
+};
+
+// ── 比利时收货地址（Bancontact APM，purchase_units[0].shipping）────────
+const BE_SHIPPING = {
+  name: { full_name: "Cross Wen" },
+  address: {
+    address_line_1: "Grote Markt 1",
+    address_line_2: "",
+    admin_area_2:   "Brussels",
+    admin_area_1:   "Brussels",
+    postal_code:    "1000",
+    country_code:   "BE",
+  },
+};
+
 /**
  * 服务端金额校验
  * @param {string} amount
@@ -253,6 +279,8 @@ module.exports = {
   SANDBOX_BILLING,
   SANDBOX_PHONE,
   VENMO_SHIPPING,
+  NL_SHIPPING,
+  BE_SHIPPING,
 
   // 工具函数
   isZeroDecimal,
