@@ -210,6 +210,29 @@
 
 ---
 
+## Shipping Module（JSSDK v5）
+
+> 需求：`docs/req/2026-06-09-req-jssdk-v5-shipping-module.md`
+> 设计：`docs/design/2026-06-09-design-be-jssdk-v5-shipping-module.md` + `...-fe-...`
+> 计划：`docs/plans/2026-06-09-plan-jssdk-v5-shipping-module-v1.md`
+
+- [x] **Task SM-1** — 路由 `shipping-module.js`（GET + create-order + callback + capture-order；CN/US 切换；buildCallbackUrl 内嵌 item_total/currency/decline；D2 取整顺序；422 拒绝逻辑；inspect/probe console.log）
+- [x] **Task SM-2** — 视图 `shipping-module.ejs`（Merchant/Currency/Amount/Subscribe/Decline 控件；sticky selected；info notice；sdk-loading）
+- [x] **Task SM-3** — 前端 `shipping-module.js`（readControls；merchant+currency reload；amount blur；Buttons createOrder/onApprove 规则 13；capture 展示最终金额）
+- [x] **Task SM-4** — `app.js` 挂载（v5 区块 fastlane-fp 之后）
+- [x] **Task SM-5** — `.env.example` 加 `PUBLIC_BASE_URL`
+- [x] **Task SM-6** — `src/routes/paypal/jssdk-v5/CLAUDE.md` 更新（SDK params 表 + 自定义路由备注 + 规则 20）
+- [ ] **Task SM-7** — ⏳ **Supabase INSERT 待用户手动执行** + 重启 demo-hub
+- [ ] **Task SM-8** — 本地 QA（curl callback 全场景：首次回调/选项回调/decline/奇数分/脏数据守卫）
+- [ ] **Task SM-9** — 服务器 QA（部署 demo.cwen5.com 后 inspect/probe 定稿）
+
+### Shipping Module Deferred（非本期）
+
+- [ ] **Venmo payment_source** — 需 US 账户 + buyer-country=US；callback_events 同 PayPal
+- [ ] **client-side 回调** — onShippingAddressChange / onShippingOptionsChange（文档不推荐，与 Venmo 不兼容）
+
+---
+
 ## 待启动（后续讨论）
 
 - [x] PayPal JSSDK v6 — Tasks 12–24 全部完成（含 Task 20 ACDC Vault w/ Purchase，**2026-06-05**）；⏳ Task 20 Supabase INSERT 待用户手动执行

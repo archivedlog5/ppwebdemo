@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-06-09 — Shipping Module 实现完成（JSSDK v5）
+
+**新增 demo：** `paypal/jssdk-v5/shipping-module` — server-side shipping callbacks（PayPal Buttons + GET_FROM_FILE + order_update_callback_config）
+
+**实现内容：**
+- `src/routes/paypal/jssdk-v5/shipping-module.js`：4 handler（GET 渲染 / create-order / callback / capture-order）
+  - CN/US 切换（merchant query/body）；CN SDK URL 加 `buyer-country=US`
+  - `buildCallbackUrl`：cart 信息（item_total/currency/decline）内嵌 callback_url query（无状态，文档推荐）
+  - callback 端点：NaN/负数守卫 → decline 分支（422 + ADDRESS/OPTION_ERRORS 按事件区分）→ 成功路径（D2 取整顺序保证金额一致性）
+  - 三运送选项 Free $0（默认）/ USPS Priority $7 / 1-Day $10；税率固定 5%
+  - 响应顶层 id 用回调请求体的 order id（服务器实测核实）
+- `src/views/paypal/jssdk-v5/shipping-module.ejs`：Merchant/Currency/Amount 控件行 + Subscribe 复选框 + Simulate decline 下拉 + info notice + scoped style
+- `src/public/js/paypal/jssdk-v5/shipping-module.js`：readControls 发全部控件；merchant/currency change → reload 保留彼此；capture 展示最终金额（含运费）；规则 13 COMPLETED 判定
+- `src/app.js`：v5 区块 fastlane-fp 之后挂载
+- `.env.example`：新增 `PUBLIC_BASE_URL`
+- `src/routes/paypal/jssdk-v5/CLAUDE.md`：SDK params 表 + 自定义路由备注 + 规则 20
+
+**已知决策：**
+- D1：假定 `.env` 一定配了 `PUBLIC_BASE_URL`，不做漏配兜底
+- D2：先取整再求和（itemR/taxR/shipR → valueR），奇数分税额下 value 与 breakdown 之和严格一致
+
+**待完成（服务器）：**
+- Supabase INSERT（用户手动执行）→ 重启 → 本地 curl QA → 部署后 inspect/probe 定稿
+
+---
+
 ## 2026-06-09 — fastlane-fp API 3DS orderId 问题修复（sessionKey 方案）
 
 **问题**：API 3DS 回调 URL 为 `...?state=undefined&code=undefined&liability_shift=POSSIBLE`，PayPal card 3DS 不回传 orderId（与标准 Buttons `?token=<orderId>` 行为不同），导致 return handler 无法发起 capture。

@@ -53,6 +53,7 @@
 | plm-js | `components=messages` |
 | fastlane-pui | `components=fastlane&buyer-country=US&currency=USD` + `data-sdk-client-token`（intent=sdk_init） |
 | fastlane-fp  | `components=fastlane,three-domain-secure&buyer-country=US&currency=USD` + `data-sdk-client-token`（intent=sdk_init）— three-domain-secure 必须，ThreeDomainSecureClient 需要 |
+| shipping-module | `components=buttons&buyer-country=US&currency=<dynamic>`（CN 和 US 均加 buyer-country=US）；GET_FROM_FILE + order_update_callback_config |
 
 ---
 
@@ -81,6 +82,10 @@
 //   Member edit 地址：showShippingAddressSelector → selectionChanged → setShippingSummary(newAddr) + setShippingAddress(newAddr)
 //   Checkout 成功判定 captures[0].status==='COMPLETED'（规则 13）；提示格式 '✓ COMPLETED · Capture ID: <id>'；成功后 Checkout + 全部 Edit 按钮（email/shipping/payment）永久 disabled，整个表单锁定，刷新页面重试
 // fastlane-fp.js        — Fastlane Flexible（FastlaneCardComponent，非 FastlanePaymentComponent）；US 账户；components=fastlane,three-domain-secure（ThreeDomainSecureClient 需要）；USD 锁定；四步表单（Customer/Shipping/Billing/Payment）
+// shipping-module.js    — server-side shipping callbacks；4 端点（GET/create-order/callback/capture-order）；CN/US 切换；callback_url 内嵌 item_total/currency/decline/merchant 无状态（规则 20）；GET_FROM_FILE + CONTINUE（ECS 才有 review 页选地址，PAY_NOW 不适用）；两个商户 SDK URL 均含 buyer-country=US；callback：先 NaN/负数守卫→DC守卫→decline 分支（422）→成功路径（D2 取整顺序 itemR+taxR+shipR → valueR）；三选项 Free $0（默认）/USPS $7/1-Day $10；税率 5%；响应 id 用 order id（inspect/probe 核实）；Venmo/client-side 回调留 todo
+//   State rules (from shipping_address, check area1 and area2):
+//   DC → 无条件 422 STATE_ERROR（area1==='DC' || area2==='DC'；优先于 decline 参数）
+//   NY → $10 SUMMER_SALE discount（area1==='NY'；**US merchant only**；CN merchant 不触发）；breakdown 加 discount 字段；valueR = fmt(itemR+taxR+shipR-10)
 //   Billing 步（Flexible 新增）：自建 billing- 前缀表单；member-有卡时 #step-billing[hidden] 整步隐藏；getPaymentToken({ billingAddress }) 传 flat 地址对象
 //   member-有卡路径：Shipping visited（profile 地址）→ Billing hidden → Payment 显 renderSelectedCard + watermark；payment-edit → showCardSelector 换卡
 //   member-无卡路径：Shipping visited → Billing active（填账单）→ Payment（渲染卡组件）
@@ -178,3 +183,14 @@ Google Pay 返回 E.164（`+14155552671`），PayPal 需要 `{ country_code: '1'
 - 正确 SDK URL：`...&buyer-country=US&commit=true&components=buttons&currency=${currency}`
 - `create-order` 的 `payment_source` 只需 `{ paypal: { experience_context } }`，**不需要 vault_id**
 - `data-user-id-token` 由后端调 `POST /v1/oauth2/token?response_type=id_token&target_customer_id=<customerId>` 获取
+
+### 规则 20 — Shipping module 用 server-side callback，无状态化靠 callback_url 内嵌
+
+- `order_update_callback_config.callback_url` 须公网可达（`PUBLIC_BASE_URL`）；localhost 回调不触发。
+- 回调是 PayPal **服务器→服务器**调用，无 session、建单时无 order id：把 cart 信息（item_total/currency/decline）**内嵌 callback_url query**，回调无状态重算，不用内存 Map。
+- `shipping_preference` **必须** `GET_FROM_FILE` 才触发 callback；`user_action` 用 `CONTINUE`（ECS 有 review 页选地址，`PAY_NOW` 不适用）；`intent` 用 `CAPTURE`。
+- 回调成功响应须满足金额一致性：`breakdown.shipping` == selected 选项金额；`amount.value` == breakdown 之和；currency 一致；零小数币种取整。
+- **取整顺序（D2）**：明细三项各自先 `fmt` 取整（itemR/taxR/shipR），`value` 由「取整后」三项相加 `fmt(Number(itemR)+Number(taxR)+Number(shipR))` 得出。不能用未取整中间值算 value——否则奇数分税额下 value 与明细之和差 1 分，PayPal 拒。公网 callback 端点对 `item_total` 加 `!isFinite || <=0` 守卫返回 400。
+- 拒绝用 HTTP 422 `{ name:'UNPROCESSABLE_ENTITY', details:[{issue:<REASON>}] }`；ADDRESS_ERRORS（地址类）在地址事件触发；OPTION_ERRORS（选项类）在选项事件触发；事件与错误类型不匹配则走成功路径。
+- 响应顶层 `id` 先用回调请求体的 `id`（order id）；若 PayPal 校验失败再改商户 ID（env）。定稿前 inspect/probe 打印真实回调字段核实。
+- **PayPal callback body 地址字段**：普通州 `admin_area_1` = state 缩写（如 `"NY"`），`admin_area_2` = city。DC 是特例：`admin_area_1="Washington"`，`admin_area_2="DC"`（缩写在 area2）。state-specific 逻辑须同时判断两个字段：`area1 === 'DC' || area2 === 'DC'`，`area1 === 'NY' || area2 === 'NY'`。
