@@ -39,6 +39,7 @@ app.use(v5, require("./routes/paypal/jssdk-v5/fastlane-pui"));
 app.use(v5, require("./routes/paypal/jssdk-v5/fastlane-fp"));
 app.use(v5, require("./routes/paypal/jssdk-v5/shipping-module"));
 app.use(v5, require("./routes/paypal/jssdk-v5/contact-module"));
+app.use(v5, require("./routes/paypal/jssdk-v5/apm-jssdk"));
 
 // ── PayPal JSSDK v6 ──────────────────────────────────────────────────────────
 const v6 = '/paypal/jssdk-v6'

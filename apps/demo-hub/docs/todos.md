@@ -256,6 +256,22 @@
 
 ---
 
+## APM iDEAL（JSSDK v5）
+
+> 需求：`docs/req/2026-06-10-req-jssdk-v5-apm-jssdk.md`
+> 设计：`docs/design/2026-06-10-design-be-jssdk-v5-apm-jssdk.md` + `...-fe-...`
+> 计划：`docs/plans/2026-06-10-plan-jssdk-v5-apm-jssdk-v1.md`
+
+- [x] **Task 1** — `config/constants.js`：新增 `NL_SHIPPING`（荷兰地址）并加入 `module.exports`
+- [x] **Task 2** — 路由 `apm-jssdk.js`（GET 渲染 + create-order + capture-order；CN token；EUR 锁定；`payment_source.ideal`；`NL_SHIPPING`；规则 13 服务端返回完整体）
+- [x] **Task 3** — 视图 `apm-jssdk.ejs`（iDEAL 说明条 + EUR Amount + `#ideal-mark` + `#ideal-btn` + 结果区）
+- [x] **Task 4** — 前端 `apm-ideal.js`（Mark + Button `fundingSource: IDEAL`；createOrder/onApprove 规则 13；onCancel/onError）
+- [x] **Task 5** — `app.js` 挂载（v5 区块 contact-module 之后）
+- [ ] **Task 6** — ⏳ **Supabase INSERT 待用户手动执行** + 重启 demo-hub
+- [ ] **Task 7** — QA + inspect/probe（启动 → 渲染 → 点击 → 跳转银行 → capture → 规则 13；7 项 inspect/probe 逐一核对 → 回填计划 Task 7 §6）
+
+---
+
 ## 待启动（后续讨论）
 
 - [x] PayPal JSSDK v6 — Tasks 12–24 全部完成（含 Task 20 ACDC Vault w/ Purchase，**2026-06-05**）；⏳ Task 20 Supabase INSERT 待用户手动执行

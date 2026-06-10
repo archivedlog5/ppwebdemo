@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-06-10 — APM iDEAL 实现完成（JSSDK v5）
+
+**新增 demo：** `paypal/jssdk-v5/apm-jssdk` — iDEAL 荷兰银行重定向 APM（JSSDK Marks + Buttons + Orders v2，EUR，中国商户）
+
+**本次代码产出（Sonnet 实现）：**
+- `src/config/constants.js`：新增 `NL_SHIPPING`（荷兰地址：Keizersgracht 123, Amsterdam, NL）并加入 `module.exports`
+- `src/routes/paypal/jssdk-v5/apm-jssdk.js`：自定义路由 3 端点（GET 渲染 / create-order / capture-order）；CN token；EUR 锁定；`payment_source.ideal`（country_code:NL / name / experience_context 含 brand_name + locale + return/cancel_url）；`NL_SHIPPING`；inspect/probe console.log；规则 13 服务端返回完整体
+- `src/views/paypal/jssdk-v5/apm-jssdk.ejs`：iDEAL 说明条（英文）+ EUR Amount 输入 + `#ideal-mark` + `#ideal-btn`（sdk-loading 初始态）+ 结果区；`window.DEMO.urls` 注入；引入 `apm-ideal.js`
+- `src/public/js/paypal/jssdk-v5/apm-ideal.js`：IIFE；`paypalSDK.Marks({ fundingSource: IDEAL })` 渲染 Mark；`paypalSDK.Buttons({ fundingSource: IDEAL })` 渲染 Button；createOrder（amount 校验 + fetch）；onApprove（capture + 规则 13）；onCancel/onError
+- `src/app.js`：v5 区块 contact-module 之后追加挂载一行
+
+**关键约束遵守：** 中国商户 getCNToken + PAYPAL_CN_CLIENT_ID；货币锁 EUR；不设 processing_instruction；intent CAPTURE；双重 fundingSource: IDEAL；SDK URL 含 components=buttons,marks&enable-funding=ideal&currency=EUR&buyer-country=NL；规则 13 严格（PENDING→error）
+
+**待办：** ⏳ Supabase INSERT 用户手动执行；Task 7 浏览器端到端 QA + 7 项 inspect/probe 定稿（回填计划 Task 7 §6 + test-cases.md）。
+
+---
+
 ## 2026-06-10 — Contact Module 实现完成（JSSDK v5）
 
 **新增 demo：** `paypal/jssdk-v5/contact-module` — 买家在 PayPal 结账查看/编辑 email 与电话（contact_preference，US only）
