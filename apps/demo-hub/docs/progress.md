@@ -2,6 +2,46 @@
 
 ---
 
+## 2026-06-10 — 全量文档审计：代码 ↔ CLAUDE.md/DESIGN.md 回写（Opus 仅文档）
+
+派 3 个只读 agent 并行审计 v5 层 / v6 层 / 顶层文档，对照全部已建 demo（v5 22 个 + v6 20 个）找文档漂移。symlink 确认：`views/`、`public/js/` 下的 v5/v6 CLAUDE.md 均软链到 `routes/` 同名文件，改一处覆盖三处。
+
+**已回写（现修）：**
+- `apps/demo-hub/CLAUDE.md`：v5「14 个」→「22 个」；目录结构与路由清单补全 jssdk-v6（20 个 demo）
+- `src/routes/paypal/jssdk-v6/CLAUDE.md`（覆盖 symlink）：`plm-js` TBD→✅ 已实现；Vault ACDC Setup-Only「📝 待实现」→✅ 已实现
+- `apps/demo-hub/DESIGN.md`：SDK 深浅色表加「状态」列，标注 PayPal v5/v6 已建、braintree/stripe/adyen 预留未建
+- 根 `CLAUDE.md` + `CLAUDE.en.md`（双语同步）：「新增产品」第五步、「新增 Provider」流程加入 DESIGN.md 颜色登记步骤
+
+**两个标记项后续已完成（同日，派 agent + 复核）：**
+- `CLAUDE.en.md` 全量同步：经逐节比对，64 行差距大半是中文版「`###` 后空行」格式约定，真实内容缺口仅 3 处（运行架构 build:admin + 构建步骤注释、新 App 检查清单 eng-review 描述、新增电商站验证注释），已补；中英 22 个 `##` 标题 1:1 对齐
+- `docs/design/2026-05-18-design-be-jssdk-v5-file-map.md`：补齐 6 个 demo（APM 2 + Fastlane 2 + Shipping + Contact）完整文件映射 + SDK 参数速查表 6 行
+
+---
+
+## 2026-06-10 — 首页视觉层级重构设计（B 色块分区，Opus 仅文档）
+
+**问题：** 首页三层分组（provider → sdk → 卡片）层级倒挂——大类 provider 10px 灰、小类 sdk 9px 更暗灰，反而比卡片标题 12px 亮白还小还灰，导致「看不清分类、颜色不明显、折叠不明显」。
+
+**讨论：** 调用 `superpowers:brainstorming` + `ui-ux-pro-max` 与用户讨论，确认决策：
+- 方向 = **B 色块分区**（保留终端风 + provider 品牌色左边框/淡背景带 + 字体层级翻正）
+- 卡片配色维度 = **按 sdk 小类**
+- sdk 与 provider 品牌色关系 = **同色系深浅变化**（不彩虹化）
+
+**方案要点：**
+- provider 大类：10px→22px、`--fg` 亮白、4px 品牌色左边框 + 极淡背景带、12px 品牌色标记、箭头 ~16px 染色
+- sdk 小类：9px→13px、改 chip（同色系淡底 + 深浅色圆点）、缩进嵌套
+- demo 卡片：顶部渐变条 + 极淡背景调改用 sdk 深浅色、`h3` 12px→13px
+- sdk 深浅色表 + 兜底派生规则；双主题 + 对比度 ≥4.5:1（低对比品牌色只作装饰块不作文字色）
+
+**本次产出（markdown only）：**
+- `docs/design/2026-06-10-design-fe-home-visual-hierarchy.md`：完整前端设计文档
+- `docs/todos.md`：新增「首页视觉层级重构」任务块（HV-0 ~ HV-5）
+- `docs/progress.md`：本条
+
+**状态：** 设计完成，待切换非 Opus 模型实现 `index.ejs` + `layout.css`。
+
+---
+
 ## 2026-06-10 — APM iDEAL 实现完成（JSSDK v5）
 
 **新增 demo：** `paypal/jssdk-v5/apm-jssdk` — iDEAL 荷兰银行重定向 APM（JSSDK Marks + Buttons + Orders v2，EUR，中国商户）

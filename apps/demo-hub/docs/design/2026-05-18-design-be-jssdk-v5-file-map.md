@@ -929,6 +929,142 @@ onApprove({ liabilityShift, vaultSetupToken })
 
 ---
 
+## APM 替代支付方式（自定义路由）
+
+### apm-jssdk — iDEAL（JSSDK Marks + Buttons）
+
+> iDEAL：🇳🇱 荷兰 · EUR only · 银行重定向 · **CN 商户**（`getCNToken`）。SDK URL 用 `PAYPAL_CN_CLIENT_ID`，加 `enable-funding=ideal&buyer-country=NL`；`payment_source.ideal`（country_code NL）。
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 + API | `src/routes/paypal/jssdk-v5/apm-jssdk.js` | **自定义路由**；3 端点（GET / create-order / capture-order）；GET 用 `PAYPAL_CN_CLIENT_ID` 拼 SDK URL（`components=buttons,marks&enable-funding=ideal&currency=EUR&buyer-country=NL`）；`buildBody(amount)` 锁 EUR，`payment_source.ideal`（`country_code:'NL'`、`name:'Cross Wen'`、`experience_context` 含 `locale:'nl-NL'` + return/cancel_url）；shipping 用 `C.NL_SHIPPING`；create-order 带 `PayPal-Request-Id: randomUUID()` 头；capture-order 标准 |
+| EJS 视图 | `src/views/paypal/jssdk-v5/apm-jssdk.ejs` | EUR-only 金额输入框；`#ideal-mark`（Marks 渲染目标）+ `#ideal-btn`（Buttons 渲染目标）；`window.DEMO.urls.createOrder/captureOrder`；`<script src=".../apm-ideal.js">`（**JS 文件名为 `apm-ideal.js`，非 `apm-jssdk.js`**） |
+| SDK JS | `src/public/js/paypal/jssdk-v5/apm-ideal.js` | `paypalSDK.Marks({ fundingSource: paypalSDK.FUNDING.IDEAL }).render('#ideal-mark')`（若 Marks 存在）；`paypalSDK.Buttons({ fundingSource: FUNDING.IDEAL, createOrder, onApprove }).render('#ideal-btn')`；onApprove 内联 capture，校验 `captures[0].status === 'COMPLETED'`（规则 13） |
+
+#### 后端 API（`apm-jssdk.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/apm-jssdk` | GET | 渲染页面；传 `clientId`（CN）+ `sdkUrl`（含 `enable-funding=ideal&buyer-country=NL`）+ `defaultAmount` |
+| `/api/apm-jssdk/create-order` | POST | 读 `{ amount }`；`C.validateAmount(amount, 'EUR')`；`getCNToken()`；`payment_source.ideal`；返回 `{ id }` |
+| `/api/apm-jssdk/capture-order` | POST | 读 `{ orderID }`；capture 并返回完整 order JSON |
+
+---
+
+### apm-ordersv2 — Bancontact（纯 Orders v2 API，无 JSSDK）
+
+> Bancontact：🇧🇪 比利时 · EUR only · 银行重定向 · **CN 商户** · **自动捕获**。**页面不加载 PayPal JSSDK**；点击按钮 → create-order → `window.location.href` 跳转 `payer-action` link → 银行授权 → 回到独立 return 页（服务端读单判定成功）。
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 + API | `src/routes/paypal/jssdk-v5/apm-ordersv2.js` | **自定义路由**；3 端点（GET / create-order / GET return，**无 capture**——自动捕获）；`buildBody(amount, origin)` 锁 EUR，含 `processing_instruction: 'ORDER_COMPLETE_ON_PAYMENT_APPROVAL'`（自动捕获关键）；`payment_source.bancontact`（`country_code:'BE'`、`name:'Cross Wen'`、`experience_context` 含 `brand_name:'CWEN CHINA STORE'`、`shipping_preference:'SET_PROVIDED_ADDRESS'`、`locale:'en-BE'`、动态 return/cancel_url）；shipping 用 `C.BE_SHIPPING`；create-order 从 `order.links` 找 `rel==='payer-action'`，返回 `{ id, payerAction }`；return handler GET order 判定 `status==='COMPLETED' && captures[0].status==='COMPLETED'` |
+| EJS 视图 | `src/views/paypal/jssdk-v5/apm-ordersv2.ejs` | **不传 sdkUrl，页面不加载 PayPal SDK**；EUR-only 金额输入框；`#bancontact-btn`；`window.DEMO.urls.createOrder`（**仅 createOrder，无 captureOrder**）；`<script src=".../apm-ordersv2.js">` |
+| return EJS | `src/views/paypal/jssdk-v5/apm-ordersv2-return.ejs` | 独立结果页；`state` 三态 `success`/`cancelled`/`error`（自带 `.fpr-*` 内联样式）；`orderJson` 完整 order JSON `<pre>`；返回 demo 的 `backUrl` 链接 |
+| SDK JS | `src/public/js/paypal/jssdk-v5/apm-ordersv2.js` | 无 SDK；按钮点击 `fetch(urls.createOrder)` → `if (d.error \|\| !d.payerAction) throw` → `window.location.href = d.payerAction`（整页跳转） |
+
+#### 后端 API（`apm-ordersv2.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/apm-ordersv2` | GET | 渲染页面（无 sdkUrl）；传 `defaultAmount` |
+| `/api/apm-ordersv2/create-order` | POST | 读 `{ amount }`；`C.validateAmount(amount, 'EUR')`；`getCNToken()`；`processing_instruction: ORDER_COMPLETE_ON_PAYMENT_APPROVAL`；从 `links` 取 `payer-action`；返回 `{ id, payerAction }` |
+| `/paypal/jssdk-v5/apm-ordersv2/return` | GET | 银行回跳落点；`?status=cancel` → cancelled；`?token=<orderID>` → GET order 判定（自动捕获已发生）→ render success/error；无 token → error |
+
+---
+
+## Fastlane（自定义路由）
+
+### fastlane-pui — Fastlane Quick Start（Payment UI 组件）
+
+> Fastlane 加速结账：**US 商户**（`getUSToken`）· USD 锁定 · `single_use_token`。SDK 用 `data-sdk-client-token`（`getUSClientToken({ intent: 'sdk_init' })`）。三步表单（Email / Shipping / Payment），CSS 三态 `fl-active`/`fl-visited`/locked。
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 + API | `src/routes/paypal/jssdk-v5/fastlane-pui.js` | **自定义路由**；2 端点（GET / create-order）；GET 调 `getUSClientToken({ intent: 'sdk_init' })` 传 `sdkClientToken`；SDK URL `components=fastlane&buyer-country=US&currency=USD`；`buildFastlaneOrderBody(amount, paymentToken, shippingAddress)` 锁 USD，`payment_source.card.single_use_token = paymentToken.id`；`mapShipping()` camelCase→snake_case（`type:'SHIPPING'`）；create-order 返回完整 order（前端按 `captures[0].status` 判定，规则 13） |
+| EJS 视图 | `src/views/paypal/jssdk-v5/fastlane-pui.ejs` | 传 `sdkClientToken` 给 header（`data-sdk-client-token`）；三步表单（Email / Shipping / Payment）；`window.DEMO`；`<script src=".../fastlane-pui.js">` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/fastlane-pui.js` | `lookupCustomerByEmail` → member（`triggerAuthenticationFlow` OTP）/ guest 分支；FastlanePaymentComponent；`getPaymentToken()` → `single_use_token`；`#shipping-required-checkbox` 控制地址字段显隐；checkout 成功 `'✓ COMPLETED · Capture ID: <id>'`，成功后表单永久锁定 |
+
+#### 后端 API（`fastlane-pui.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/fastlane-pui` | GET | 调 `getUSClientToken({ intent: 'sdk_init' })`；渲染页面；传 `sdkClientToken` + `sdkUrl` + `defaultAmount` + `currency:'USD'` |
+| `/api/fastlane-pui/create-order` | POST | 读 `{ paymentToken, shippingAddress, amount }`；校验 `paymentToken.id`；`C.validateAmount(amount, 'USD')`；`getUSToken()`；`payment_source.card.single_use_token`；返回完整 order |
+
+---
+
+### fastlane-fp — Fastlane Flexible（FastlaneCardComponent + 自建 billing + 3DS）
+
+> Fastlane Flexible：**US 商户** · USD 锁定 · `FastlaneCardComponent`（非 PaymentComponent）。SDK 加 `components=fastlane,three-domain-secure`（`ThreeDomainSecureClient` 必须）。四步表单（Customer / Shipping / Billing / Payment）；3DS Flow 下拉三选项 none / jssdk / api。**API 3DS 流**用模块级 `threeDSSessionStore` Map + 独立 return 页。
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 + API | `src/routes/paypal/jssdk-v5/fastlane-fp.js` | **自定义路由**；3 端点（GET / create-order / GET return）；模块级 `threeDSSessionStore = new Map()`（sessionKey→orderId，API 3DS 回跳查单用，10 分钟自动过期）；GET 调 `getUSClientToken({ intent: 'sdk_init' })`；SDK URL `components=fastlane,three-domain-secure&buyer-country=US&currency=USD`；`buildFastlaneOrderBody({ amount, paymentToken, shippingAddress, threeDSFlow, req, sessionKey })` 锁 USD；`threeDSFlow==='api'` 时 card 加 `attributes.verification.method:'SCA_ALWAYS'` + `experience_context.return_url`（含 `?session=<key>`）/`cancel_url`（含 `?fp_cancel=1`）；`mapShipping()` 本文件自带（规则 1，不跨产品共用） |
+| EJS 视图 | `src/views/paypal/jssdk-v5/fastlane-fp.ejs` | 传 `sdkClientToken` 给 header；四步表单（Customer / Shipping / **Billing** / Payment，billing- 前缀自建账单表单）；3DS Flow 下拉（none/jssdk/api）；`<script src=".../fastlane-fp.js">` |
+| return EJS | `src/views/paypal/jssdk-v5/fastlane-fp-return.ejs` | API 3DS 回跳结果页；`state` 三态 success/cancelled/error；`captureId`；`orderJson` 完整 JSON |
+| SDK JS | `src/public/js/paypal/jssdk-v5/fastlane-fp.js` | none 流直接 create-order；jssdk 流 `ThreeDomainSecureClient.isEligible()` → `show()` → `authenticationState==='succeeded'` + `liabilityShift` → `paymentToken.id = results.nonce`；api 流判 `PAYER_ACTION_REQUIRED` → `window.location.href = payer-action`；member/guest 分支；规则 13 判定 |
+
+#### 后端 API（`fastlane-fp.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/fastlane-fp` | GET | 调 `getUSClientToken({ intent: 'sdk_init' })`；渲染页面；传 `sdkClientToken` + `sdkUrl`（含 `three-domain-secure`）+ `defaultAmount` + `currency:'USD'` |
+| `/api/fastlane-fp/create-order` | POST | 读 `{ paymentToken, shippingAddress, billingAddress, threeDSFlow, amount }`；`api` 流先生成 `sessionKey`（`crypto.randomBytes(16).hex`）嵌入 return_url；`getUSToken()`；建单成功后 `threeDSSessionStore.set(sessionKey, order.id)`（10 分钟 timeout 自删）；返回完整 order |
+| `/paypal/jssdk-v5/fastlane-fp/return` | GET | API 3DS 回跳落点（**PayPal card 3DS 回调参数为 state/code/liability_shift，不含 orderId**）；`?fp_cancel=1` → cancelled；从 `?session=<key>` 反查 `threeDSSessionStore` 取 orderId（单次使用后 `delete`）→ POST capture → render（规则 13；D1：刷新显 ORDER_ALREADY_CAPTURED 为预期） |
+
+---
+
+## Shipping Module（自定义路由）
+
+### shipping-module — 服务端 shipping 回调（server-side callbacks）
+
+> 买家在 PayPal review 页选地址/运送方式 → PayPal **服务器→服务器**回调商户重算金额 + 返回运送选项。**CN/US 商户切换**（`?merchant=us`）· 货币动态。关键：`shipping_preference: GET_FROM_FILE` + `user_action: CONTINUE`（ECS 才有 review 页）+ `order_update_callback_config`。回调 URL 须公网可达（`PUBLIC_BASE_URL`），无状态化靠 callback_url 内嵌 cart 信息（规则 20）。
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 + API | `src/routes/paypal/jssdk-v5/shipping-module.js` | **自定义路由**；4 端点（GET / create-order / **callback** / capture-order）；`?merchant=us` 切 token（`getUSToken`/`getCNToken`）+ clientId；两个商户 SDK URL 均含 `buyer-country=US`；create-order `experience_context` 含 `shipping_preference:'GET_FROM_FILE'`、`user_action:'CONTINUE'`、`order_update_callback_config.callback_events`（`subscribeOptions` → `['SHIPPING_ADDRESS','SHIPPING_OPTIONS']` 或仅 `['SHIPPING_ADDRESS']`）+ `callback_url`（`buildCallbackUrl` 内嵌 item_total/currency/decline/merchant query）；**不传 shipping 对象**（GET_FROM_FILE）；`OPTIONS` 三选项 Free $0（默认）/USPS $7/1-Day $10；税率 5% |
+| EJS 视图 | `src/views/paypal/jssdk-v5/shipping-module.ejs` | merchant（CN/US）+ currency + amount 选择器；subscribeOptions / decline 演示开关；`#paypal-button-container`；`window.DEMO`；`<script src=".../shipping-module.js">` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/shipping-module.js` | `paypalSDK.Buttons({ createOrder, onApprove })`；createOrder 带 `{ amount, currency, merchant, subscribeOptions, decline }`；capture 带 `{ orderID, merchant }`；规则 13 判定 |
+
+#### 后端 API（`shipping-module.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/shipping-module` | GET | `?merchant=us`→US 否则 CN；`resolveCurrency()` 白名单；渲染页面；传 `clientId`/`sdkUrl`（含 `buyer-country=US`）/`currency`/`merchant`/`defaultAmount` |
+| `/api/shipping-module/create-order` | POST | 读 `{ amount, currency, merchant, subscribeOptions, decline }`；零小数币种取整；`getUSToken`/`getCNToken`；`GET_FROM_FILE` + `order_update_callback_config`；返回 `{ id }` |
+| `/api/shipping-module/callback` | POST | **PayPal 服务器→服务器回调**（公网可达）；cart 信息从 query 无状态读取；守卫 `!isFinite(item_total) \|\| <=0`→400；DC→422 `STATE_ERROR`；`decline` 分支→422 `UNPROCESSABLE_ENTITY`；成功路径 D2 取整顺序（itemR+taxR+shipR→valueR）+ 返回 `shipping_options`；NY+US merchant → $10 `SUMMER_SALE` discount |
+| `/api/shipping-module/capture-order` | POST | 读 `{ orderID, merchant }`；按 merchant 取 token；capture 并返回完整 order JSON |
+
+**回调金额一致性（D2 取整顺序）：** 明细三项各自先 `fmt` 取整（itemR/taxR/shipR），`value` 由「取整后」三项相加得出（NY 折扣时再 `-10`）。保证 `amount.value == breakdown 之和`，奇数分税额下也不差 1 分。
+
+**州特殊规则（从 `body.shipping_address` 读，须同判 area1 + area2）：**
+- DC：`area1==='DC' \|\| area2==='DC'` → 无条件 422 `STATE_ERROR`（优先于 decline）；DC 特例缩写在 `admin_area_2`（`admin_area_1="Washington"`）
+- NY：`area1==='NY' \|\| area2==='NY'` 且 `merchant==='us'` → $10 `SUMMER_SALE` discount（breakdown 加 discount 字段）；CN merchant 不触发
+
+---
+
+## Contact Module（自定义路由）
+
+### contact-module — contact_preference（US-only）
+
+> 控制买家在 PayPal 结账流中是否可见/可编辑联系方式。**US-only**（`getUSToken` + `PAYPAL_US_CLIENT_ID`）· 货币锁 USD · 无 CN/US 切换、无 currency 下拉。`contact_preference` 三值下拉，后端白名单校验非法 fallback `UPDATE_CONTACT_INFO`。联系方式经 `purchase_units[0].shipping.email_address` + `phone_number` 传递（须配 `SET_PROVIDED_ADDRESS`）。
+
+| 文件 | 路径 | 关键内容 |
+|------|------|---------|
+| 路由 + API | `src/routes/paypal/jssdk-v5/contact-module.js` | **自定义路由**；3 端点（GET / create-order / capture-order）；US-only；`CONTACT_PREFS = ['NO_CONTACT_INFO','UPDATE_CONTACT_INFO','RETAIN_CONTACT_INFO']`（非法 fallback `UPDATE_CONTACT_INFO`）；内置 `DEMO_CONTACT`（email + phone，页面不可编辑）；SDK URL 固定 `components=buttons&buyer-country=US&currency=USD`；create-order `payment_source.paypal.experience_context` 含 `contact_preference` + `shipping_preference:'SET_PROVIDED_ADDRESS'` + `user_action:'PAY_NOW'`；`shipping` = `...C.SANDBOX_SHIPPING` + `email_address` + `phone_number`；capture-order **Approach A**（先 GET order 读 shipping.email_address/phone_number，再 capture，返回 `{ id, status, captureId, contact, raw }`） |
+| EJS 视图 | `src/views/paypal/jssdk-v5/contact-module.ejs` | USD-only 金额；`#contact-preference` 下拉三选项 + `#pref-hint` 动态英文提示；展示内置 `demoContact`；`window.DEMO.urls.createOrder/captureOrder`；`<script src=".../contact-module.js">` |
+| SDK JS | `src/public/js/paypal/jssdk-v5/contact-module.js` | `updatePrefHint()` 随下拉更新 `#pref-hint`（`PREF_HINTS` 文案表）；`paypalSDK.Buttons({ createOrder, onApprove })`；createOrder 带 `{ amount, contactPreference }`；onApprove 调 captureOrder，用返回的 `raw.purchase_units[0].payments.captures[0].status === 'COMPLETED'` 复判（规则 13） |
+
+#### 后端 API（`contact-module.js` 路由文件）
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/paypal/jssdk-v5/contact-module` | GET | 渲染页面；传 `clientId`（US）+ `sdkUrl`（`buyer-country=US&currency=USD`）+ `defaultAmount` + `demoContact` |
+| `/api/contact-module/create-order` | POST | 读 `{ amount, contactPreference }`；`C.validateAmount(amount, 'USD')`；白名单校验 pref；`getUSToken()`；`experience_context.contact_preference` + `shipping` 含 email/phone；返回 `{ id }` |
+| `/api/contact-module/capture-order` | POST | 读 `{ orderID }`；**先 GET order** 读 `shipping.email_address`/`phone_number`（inspect/probe log）→ 再 capture；返回 `{ id, status, captureId, contact, raw }` |
+
+---
+
 ## SDK 参数速查表
 
 每个产品的 SDK URL 格式：`https://www.paypal.com/sdk/js?client-id=<ID>&<sdkParams>&currency=<CURRENCY>`
@@ -952,6 +1088,12 @@ onApprove({ liabilityShift, vaultSetupToken })
 | **vault-return** | `buyer-country=US&commit=true&components=buttons&currency=${currency}` | GET 时后端获取 id_token 注入 `data-user-id-token`；**`commit=true` 是关键**：缺少此参数会导致 PayPal 弹出登录 popup 而非回头买家一键体验；`buyer-country=US`（沙盒必须）；apple_pay token 禁用（Apple 指南限制） |
 | **plm-div** | `components=messages` | 工厂路由；`buyerCountry` 通过 `data-pp-buyercountry` attribute 注入每个 message div；国家选择器 US/AU/DE/ES/FR/IT/GB/CA；ES/FR/IT 同属 EUR |
 | **plm-js** | `components=messages` | 工厂路由；`buyerCountry` 通过 `Messages()` JS config 传入；金额变化调 `paypalSDK.Messages({...}).render()` 重渲染 |
+| **apm-jssdk** | `components=buttons,marks&enable-funding=ideal&currency=EUR&buyer-country=NL` | 自定义路由；iDEAL（🇳🇱 NL · EUR）· **CN 商户**（`PAYPAL_CN_CLIENT_ID`/`getCNToken`）；`payment_source.ideal`（country_code NL）；JS 文件名 `apm-ideal.js`；Marks + Buttons（fundingSource IDEAL）|
+| **apm-ordersv2** | **无 SDK**（页面不加载 PayPal JSSDK） | 纯 Orders v2 API；Bancontact（🇧🇪 BE · EUR）· **CN 商户** · 自动捕获；`processing_instruction:ORDER_COMPLETE_ON_PAYMENT_APPROVAL`；create-order 返回 `payer-action` link → `window.location.href` 整页跳转 → 独立 return 页判定（无 capture 端点）|
+| **fastlane-pui** | `components=fastlane&buyer-country=US&currency=USD` + `data-sdk-client-token`（`getUSClientToken({intent:'sdk_init'})`）| 自定义路由；Fastlane Quick Start（Payment UI 组件）· **US 商户** · USD 锁定；`payment_source.card.single_use_token`；三步表单 |
+| **fastlane-fp** | `components=fastlane,three-domain-secure&buyer-country=US&currency=USD` + `data-sdk-client-token`（`getUSClientToken({intent:'sdk_init'})`）| 自定义路由；Fastlane Flexible（FastlaneCardComponent）· **US 商户** · USD 锁定；`three-domain-secure` 必须（ThreeDomainSecureClient）；3DS Flow none/jssdk/api；api 流用 `threeDSSessionStore` Map + 独立 return 页 |
+| **shipping-module** | `components=buttons&buyer-country=US&currency=${currency}`（CN 和 US 均加 `buyer-country=US`）| 自定义路由；server-side shipping 回调；**CN/US 切换**（`?merchant=us`）；`GET_FROM_FILE` + `CONTINUE` + `order_update_callback_config`；callback 公网端点（`PUBLIC_BASE_URL`）；DC→STATE_ERROR，NY+US→$10 discount |
+| **contact-module** | `components=buttons&buyer-country=US&currency=USD`（**US-only，固定 USD**）| 自定义路由；`contact_preference` 三值下拉（NO/UPDATE/RETAIN，非法 fallback UPDATE）；`SET_PROVIDED_ADDRESS` + shipping 含 email/phone；capture 端点 Approach A（先 GET order 再 capture）|
 
 ---
 

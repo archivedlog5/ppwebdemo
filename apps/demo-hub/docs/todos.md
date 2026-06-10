@@ -1,12 +1,25 @@
 # demo-hub — Todos
 
-最后更新：2026-06-10
+最后更新：2026-06-10（首页视觉层级重构设计）
 
 ---
 
 ## UI 改进
 
 - [x] **Collapsible Sections** — List 页面 provider/SDK 分组可折叠；Demo 详情页侧边栏 provider/SDK 可折叠；localStorage 持久化；键盘 Enter/Space 支持；`:focus-visible` 焦点环；`prefers-reduced-motion`；**2026-06-01 完成**
+
+### 首页视觉层级重构（B 色块分区）— 2026-06-10
+
+> 设计：`docs/design/2026-06-10-design-fe-home-visual-hierarchy.md`
+> 决策：B 色块分区 + 卡片按 sdk 配色 + sdk 同品牌色系深浅变化
+> ⚠️ 代码实现需切换到非 Opus 模型
+
+- [x] **HV-0** — brainstorm + ui-ux 讨论，确认方向，产出设计文档（**Opus，2026-06-10**）
+- [ ] **HV-1** — provider 大类：字号 10px→22px、`--fg` 亮白、4px 品牌色左边框 + 极淡背景带、12px 品牌色标记、count 升 pill、箭头 ~16px 染色 + hover 圆底（`index.ejs` + `layout.css`）
+- [ ] **HV-2** — sdk 小类：字号 9px→13px、改 chip（同色系淡底 + 深浅色左圆点）、缩进嵌套、箭头放大染色（`index.ejs` + `layout.css`）
+- [ ] **HV-3** — demo 卡片：顶部渐变条 + 极淡背景调改用 sdk 深浅色、`h3` 12px→13px（`index.ejs` + `layout.css`）
+- [ ] **HV-4** — sdk 深浅色表 + 兜底派生规则（见设计文档 §4.4）；coming-soon 段同步新样式
+- [ ] **HV-5** — 双主题 + 对比度验收（设计文档 §5、§6）；`/design-review` 或人工对照
 
 ---
 

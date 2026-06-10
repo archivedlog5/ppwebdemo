@@ -498,7 +498,11 @@ INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, 
 VALUES ('<provider>', '<sdk>', '<product>', '显示名称', '一句话描述', true, <排序号>);
 ```
 
-### 第五步：重启 demo-hub
+### 第五步：登记颜色（新 sdk_version 时）
+
+新增的 `sdk_version` 若 `apps/demo-hub/DESIGN.md`「SDK 深浅色表」中尚无对应行，需登记一档同品牌色系深浅色；已存在则跳过。不登记不会报错，但首页卡片退化为兜底色。
+
+### 第六步：重启 demo-hub
 
 ```bash
 npm run dev:demo-hub     # nodemon 会自动重启，或手动 rs
@@ -514,7 +518,8 @@ npm run dev:demo-hub     # nodemon 会自动重启，或手动 rs
 2. 在 `app.js` 添加：`app.use('/braintree/graphql', require('./routes/braintree/graphql/index'))`
 3. 建 `views/braintree/graphql/` 视图目录
 4. 在 Supabase 插入对应 `sdk_version='graphql'` 的产品行
-5. 重启即可，首页自动分组展示
+5. 在 `apps/demo-hub/DESIGN.md` 的「Provider Color Map」+「SDK 深浅色表」登记品牌色与该 sdk 深浅色（否则首页卡片退化为兜底色）
+6. 重启即可，首页自动分组展示
 
 ---
 

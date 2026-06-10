@@ -330,7 +330,11 @@ node server.js   (PORT=3000 local / PORT=443 production)
 
 Production deploy flow:
 ```bash
+# 1. Build all React apps
 npm run build:fashion    # → apps/store-fashion/dist/
+npm run build:admin      # → apps/admin-console/dist/
+
+# 2. Start the unified gateway
 npm start                # node server.js
 ```
 
@@ -406,7 +410,10 @@ Add scripts to root `package.json`:
 
 ### Step 5: Verify
 ```bash
+# Dev verification
 npm run dev:<name>          # standalone: http://localhost:5173
+
+# Production verification
 npm run build:<name>
 npm start                   # via gateway: http://localhost:3000/<name>/
 ```
@@ -445,7 +452,11 @@ INSERT INTO demohub.products (provider, sdk_version, product_key, display_name, 
 VALUES ('<provider>', '<sdk>', '<product>', 'Display Name', 'Short description', true, <order>);
 ```
 
-### Step 5: Restart demo-hub
+### Step 5: Register color (only for a new sdk_version)
+
+If the new `sdk_version` has no row yet in the "SDK 深浅色表" (SDK shade table) of `apps/demo-hub/DESIGN.md`, register a shade within the provider's brand-color family; skip if it already exists. Missing it is not an error, but the homepage card falls back to a default color.
+
+### Step 6: Restart demo-hub
 ```bash
 npm run dev:demo-hub     # nodemon auto-restarts, or type 'rs'
 ```
@@ -460,7 +471,8 @@ The homepage will automatically show the new product card.
 2. Add in `app.js`: `app.use('/braintree/graphql', require('./routes/braintree/graphql/index'))`
 3. Create view directory: `views/braintree/graphql/`
 4. Insert rows in Supabase with `sdk_version='graphql'`
-5. Restart — homepage auto-groups the new provider
+5. Register the brand color + sdk shade in the "Provider Color Map" + "SDK 深浅色表" of `apps/demo-hub/DESIGN.md` (otherwise homepage cards fall back to a default color)
+6. Restart — homepage auto-groups the new provider
 
 ---
 
@@ -492,7 +504,7 @@ Run this checklist in order every time a new app is started (e.g., `store-fashio
 - [ ] Invoke `/writing-plans` to generate implementation plan
 - [ ] Create `docs/plans/YYYY-MM-DD-plan-<app>-v1.md`
 - [ ] Invoke `/plan-ceo-review` to review direction (requires plan file)
-- [ ] Invoke `/plan-eng-review` to review architecture (requires plan file)
+- [ ] Invoke `/plan-eng-review` to review architecture and technical feasibility (requires plan file)
 - [ ] Invoke `/plan-design-review` to review UI/UX completeness (requires plan file)
 - [ ] Populate `docs/todos.md` from the plan (categorized checkboxes)
 - [ ] Run find-skills: search implementation/testing skills → evaluate → install → **invoke to assist project initialization**

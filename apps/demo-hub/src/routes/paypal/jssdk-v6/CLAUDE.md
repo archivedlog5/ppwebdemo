@@ -375,7 +375,7 @@ paypal-credit-button {
 | vault-acdc-setup-only | `['card-fields']` | ✅ 已实现 |
 | vault-acdc-with-purchase | `['card-fields']` | ✅ 已实现 |
 | plm-html | `['paypal-messages']` | ✅ 已实现 |
-| plm-js | TBD | 等 markdown |
+| plm-js | `['paypal-messages']` | ✅ 已实现 |
 
 ---
 
@@ -1030,7 +1030,7 @@ confirm 响应 `{ paymentTokenId, customerId }`，展示到 `#payment-token-id` 
 
 ## Vault ACDC Setup-Only 专属规则
 
-> 状态：📝 待实现（设计+计划已就绪，2026-06-05 过 eng review）。文件：`vault-acdc-setup-only.{js,ejs}` + 路由。
+> 状态：✅ 已实现。文件：`vault-acdc-setup-only.{js,ejs}` + 路由。
 > 模型 = v6 Card Fields **Save Session** + Vault v3 两步 token。本质是 v6 `acdc`（card-fields）+ v5 `vault-acdc-setup-only`（vault 流程 + 严格门）的组合。
 > 与 v6 `vault-paypal-setup-only` 的区别：入口是 Card Fields（非 paypal-button），approve 走 `submit()` 状态机（非 onApprove 回调），且多一个 GET setup-token 端点（严格门用）。
 
