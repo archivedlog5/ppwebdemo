@@ -118,7 +118,7 @@
 修改 UI 样式      → src/public/css/sandbox.css
 ```
 
-完整文件映射：`docs/design/2026-05-18-design-be-jssdk-v5-file-map.md`
+完整文件映射：`docs/design/paypal/2026-05-18-design-be-jssdk-v5-file-map.md`
 
 ---
 

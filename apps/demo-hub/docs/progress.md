@@ -14,7 +14,7 @@
 
 **两个标记项后续已完成（同日，派 agent + 复核）：**
 - `CLAUDE.en.md` 全量同步：经逐节比对，64 行差距大半是中文版「`###` 后空行」格式约定，真实内容缺口仅 3 处（运行架构 build:admin + 构建步骤注释、新 App 检查清单 eng-review 描述、新增电商站验证注释），已补；中英 22 个 `##` 标题 1:1 对齐
-- `docs/design/2026-05-18-design-be-jssdk-v5-file-map.md`：补齐 6 个 demo（APM 2 + Fastlane 2 + Shipping + Contact）完整文件映射 + SDK 参数速查表 6 行
+- `docs/design/paypal/2026-05-18-design-be-jssdk-v5-file-map.md`：补齐 6 个 demo（APM 2 + Fastlane 2 + Shipping + Contact）完整文件映射 + SDK 参数速查表 6 行
 
 ---
 
@@ -79,7 +79,7 @@
 ## 2026-06-10 — Contact Module 设计 + 计划（JSSDK v5，仅文档）
 
 **本次产出（Opus 只写 markdown）：**
-- `docs/req/2026-06-10-req-jssdk-v5-contact-module.md`、`docs/design/2026-06-10-design-be-...`、`docs/design/2026-06-10-design-fe-...`、`docs/plans/2026-06-10-plan-jssdk-v5-contact-module-v1.md`
+- `docs/req/paypal/2026-06-10-req-jssdk-v5-contact-module.md`、`docs/design/paypal/2026-06-10-design-be-...`、`docs/design/paypal/2026-06-10-design-fe-...`、`docs/plans/paypal/2026-06-10-plan-jssdk-v5-contact-module-v1.md`
 
 ---
 
@@ -238,10 +238,10 @@
 - 3DS 兜底（GET order + decide3DSAndCapture GET 分支）**保留**（对齐 v6 acdc/v5，近 dead 但作安全网）。
 
 **新建文件（4 个 markdown）：**
-- `docs/req/2026-06-05-req-jssdk-v6-vault-acdc-with-purchase.md`
-- `docs/design/2026-06-05-design-be-jssdk-v6-vault-acdc-with-purchase.md`
-- `docs/design/2026-06-05-design-fe-jssdk-v6-vault-acdc-with-purchase.md`
-- `docs/plans/2026-06-05-plan-jssdk-v6-vault-acdc-with-purchase-v1.md`（含 Eng Review Report + GSTACK REVIEW REPORT）
+- `docs/req/paypal/2026-06-05-req-jssdk-v6-vault-acdc-with-purchase.md`
+- `docs/design/paypal/2026-06-05-design-be-jssdk-v6-vault-acdc-with-purchase.md`
+- `docs/design/paypal/2026-06-05-design-fe-jssdk-v6-vault-acdc-with-purchase.md`
+- `docs/plans/paypal/2026-06-05-plan-jssdk-v6-vault-acdc-with-purchase-v1.md`（含 Eng Review Report + GSTACK REVIEW REPORT）
 
 **Eng Review 结论：** CLEARED — 按计划实现。5 代码文件、0 新服务（footprint 同 vault-acdc-setup-only）。1 个 watch-item：探针 **P1** —— 确认 `createCardFieldsOneTimePaymentSession()` 无参是否真存卡（PayPal 按钮 vault 当年用 `savePayment: true`）；集成文档示例为无参 + server `store_in_vault`，故无参为正确默认，万一不存卡再加选项并记 debug-log。
 
@@ -300,7 +300,7 @@
 - **国家选择器**：保留 8 国（US/AU/DE/ES/FR/IT/GB/CA），映射到 `currency-code` 属性；切换时刷页传 `?country=XX&currency=YYY`，无 `buyercountry` override（v6 不支持）。
 
 **新建文档（2 个）：**
-- `docs/design/2026-06-04-design-fe-plm-html-v6.md`（设计文档）
+- `docs/design/paypal/2026-06-04-design-fe-plm-html-v6.md`（设计文档）
 - `docs/superpowers/plans/2026-06-04-plm-html-v6.md`（实现计划，4 Tasks）
 
 **修改文档（2 个）：**

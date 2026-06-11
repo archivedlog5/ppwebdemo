@@ -25,7 +25,7 @@
 
 ## JSSDK v5（当前阶段）
 
-> 完整计划：`docs/plans/2026-05-15-plan-jssdk-v5-v1.md`
+> 完整计划：`docs/plans/paypal/2026-05-15-plan-jssdk-v5-v1.md`
 
 ### 基础设施
 
@@ -79,8 +79,8 @@
 
 ### 动态金额 + 常量文件 + 币种选择器
 
-> 设计文档：`docs/design/2026-05-18-design-be-dynamic-amount-and-constants.md`
-> 币种设计：`docs/design/2026-05-18-design-be-currency-selector.md`
+> 设计文档：`docs/design/paypal/2026-05-18-design-be-dynamic-amount-and-constants.md`
+> 币种设计：`docs/design/paypal/2026-05-18-design-be-currency-selector.md`
 
 - [x] **新建** `src/config/constants.js`（INTENT、CURRENCY、DEMO_ITEM、SANDBOX_SHIPPING、SANDBOX_BILLING、buildOrderBody、validateAmount）
 - [x] 更新 `_factory.js`、`buttons.js`、`acdc.js`、`vault-return.js`：用 `buildOrderBody` + 读 `req.body.amount`
@@ -168,14 +168,14 @@
 - [x] **Task 18** — PayPal Vault w/ Purchase（`vault-paypal-with-purchase.js/ejs`；clientId 认证、`paymentFlow:'VAULT_WITH_PAYMENT'`、`savePayment:true`、capture 提取 vaultId/customerId；route+view+js 已建并挂载；**2026-06-05 完成**）
 - [x] **Task 19** — PayPal Vault Setup-only（`vault-paypal-setup-only.js/ejs`；`createPayPalSavePaymentSession` + Vault v3 两步 token（setup-token → payment-token）；`paymentFlow:'VAULT_WITHOUT_PAYMENT'`；route+view+js 已建并挂载；**2026-06-05 完成**）
 - [x] **Task 20** — ACDC Vault w/ Purchase（`vault-acdc-with-purchase.js/ejs`）
-  - 需求：`docs/req/2026-06-05-req-jssdk-v6-vault-acdc-with-purchase.md` ✅
-  - 设计：`docs/design/2026-06-05-design-be-jssdk-v6-vault-acdc-with-purchase.md` + `...-fe-...` ✅
-  - 计划：`docs/plans/2026-06-05-plan-jssdk-v6-vault-acdc-with-purchase-v1.md` ✅（**2026-06-05 过 eng review，CLEARED**）
+  - 需求：`docs/req/paypal/2026-06-05-req-jssdk-v6-vault-acdc-with-purchase.md` ✅
+  - 设计：`docs/design/paypal/2026-06-05-design-be-jssdk-v6-vault-acdc-with-purchase.md` + `...-fe-...` ✅
+  - 计划：`docs/plans/paypal/2026-06-05-plan-jssdk-v6-vault-acdc-with-purchase-v1.md` ✅（**2026-06-05 过 eng review，CLEARED**）
   - 模型 = v6 acdc（card-fields 一次性 session）+ v5 vault-acdc-with-purchase（vault 层）；create-order body 与 v5 逐字一致，仅 orderId 小写 d；3DS 镜像 v5（SCA 禁用）
   - **2026-06-05 实现完成**（route + EJS + JS 已建，app.js 已挂载，CLAUDE.md 已更新规则）；⏳ **Supabase INSERT 待用户手动执行**
 - [x] **Task 21** — ACDC Vault Setup-only（`vault-acdc-setup-only.js/ejs`；`createCardFieldsSavePaymentSession` + Vault v3 两步 token（3 端点，含 GET setup-token）；v5 严格 3DS 门；route+view+js 已建并挂载；**2026-06-05 完成**）
 - [x] **Task 23** — PLM HTML（`plm-html.js/ejs`）
-  - 设计文档：`docs/design/2026-06-04-design-fe-plm-html-v6.md` ✅
+  - 设计文档：`docs/design/paypal/2026-06-04-design-fe-plm-html-v6.md` ✅
   - 实现计划：`docs/superpowers/plans/2026-06-04-plm-html-v6.md` ✅
   - 实现：**2026-06-04 完成**（GET-only 路由 + EJS 3 placements + 8 行 Style Gallery + 前端 JS）
 - [x] **Task 24** — PLM JS（`plm-js.js/ejs`；JS API `createPayPalMessages` + `fetchContent`；国家/币种切换；route+view+js 已建并挂载；**2026-06-05 完成**）
@@ -184,9 +184,9 @@
 
 ## Fastlane（JSSDK v5）
 
-> 需求：`docs/req/2026-06-08-req-fastlane-pui.md`
-> 设计：`docs/design/2026-06-08-design-fe-fastlane-pui.md` + `...-be-...`
-> 计划：`docs/plans/2026-06-08-plan-fastlane-pui-v1.md`
+> 需求：`docs/req/paypal/2026-06-08-req-fastlane-pui.md`
+> 设计：`docs/design/paypal/2026-06-08-design-fe-fastlane-pui.md` + `...-be-...`
+> 计划：`docs/plans/paypal/2026-06-08-plan-fastlane-pui-v1.md`
 
 - [x] **Task FL-1** — fastlane-pui（Fastlane Quick Start / Payment UI 组件）**2026-06-08 代码完成**
   - 决策：纯 Fastlane Quick Start；US 账户（`PAYPAL_US_*`）；币种锁 USD；intent CAPTURE；仅 create-order（`payment_source.card.single_use_token`）
@@ -201,9 +201,9 @@
 
 ### Fastlane Flexible (fastlane-fp)
 
-> 需求：`docs/req/2026-06-09-req-fastlane-fp.md`
-> 设计：`docs/design/2026-06-09-design-fe-fastlane-fp.md` + `...-be-...`
-> 计划：`docs/plans/2026-06-09-plan-fastlane-fp-v1.md`
+> 需求：`docs/req/paypal/2026-06-09-req-fastlane-fp.md`
+> 设计：`docs/design/paypal/2026-06-09-design-fe-fastlane-fp.md` + `...-be-...`
+> 计划：`docs/plans/paypal/2026-06-09-plan-fastlane-fp-v1.md`
 
 - [x] **Task FL-2** — fastlane-fp（Fastlane Flexible / `FastlaneCardComponent`）**2026-06-09 代码完成**
   - 决策：Flexible 卡组件 + 自建 Billing 表单；3DS **三套** flow（None/When Required + JSSDK + API）；API flow 独立 return 页 + 服务端 capture；US 账户；币种锁 USD；intent CAPTURE；多 funding 不做（留 todo）
@@ -225,9 +225,9 @@
 
 ## Shipping Module（JSSDK v5）
 
-> 需求：`docs/req/2026-06-09-req-jssdk-v5-shipping-module.md`
-> 设计：`docs/design/2026-06-09-design-be-jssdk-v5-shipping-module.md` + `...-fe-...`
-> 计划：`docs/plans/2026-06-09-plan-jssdk-v5-shipping-module-v1.md`
+> 需求：`docs/req/paypal/2026-06-09-req-jssdk-v5-shipping-module.md`
+> 设计：`docs/design/paypal/2026-06-09-design-be-jssdk-v5-shipping-module.md` + `...-fe-...`
+> 计划：`docs/plans/paypal/2026-06-09-plan-jssdk-v5-shipping-module-v1.md`
 
 - [x] **Task SM-1** — 路由 `shipping-module.js`（GET + create-order + callback + capture-order；CN/US 切换；buildCallbackUrl 内嵌 item_total/currency/decline；D2 取整顺序；422 拒绝逻辑；inspect/probe console.log）
 - [x] **Task SM-2** — 视图 `shipping-module.ejs`（Merchant/Currency/Amount/Subscribe/Decline 控件；sticky selected；info notice；sdk-loading）
@@ -248,9 +248,9 @@
 
 ## Contact Module（JSSDK v5）
 
-> 需求：`docs/req/2026-06-10-req-jssdk-v5-contact-module.md`
-> 设计：`docs/design/2026-06-10-design-be-jssdk-v5-contact-module.md` + `...-fe-...`
-> 计划：`docs/plans/2026-06-10-plan-jssdk-v5-contact-module-v1.md`
+> 需求：`docs/req/paypal/2026-06-10-req-jssdk-v5-contact-module.md`
+> 设计：`docs/design/paypal/2026-06-10-design-be-jssdk-v5-contact-module.md` + `...-fe-...`
+> 计划：`docs/plans/paypal/2026-06-10-plan-jssdk-v5-contact-module-v1.md`
 > 状态：设计 + 计划完成（Opus 只写文档）；代码待切换非 Opus 模型实现
 
 - [x] **Task CM-1** — 路由 `contact-module.js`（GET + create-order + capture-order；US-only `getUSToken`；内置 `CONTACT_PREFS` 白名单 + `DEMO_CONTACT`；contact_preference + shipping 联系方式；Approach A：capture 内 GET Order 读联系方式；inspect/probe console.log）
@@ -271,9 +271,9 @@
 
 ## APM iDEAL（JSSDK v5）
 
-> 需求：`docs/req/2026-06-10-req-jssdk-v5-apm-jssdk.md`
-> 设计：`docs/design/2026-06-10-design-be-jssdk-v5-apm-jssdk.md` + `...-fe-...`
-> 计划：`docs/plans/2026-06-10-plan-jssdk-v5-apm-jssdk-v1.md`
+> 需求：`docs/req/paypal/2026-06-10-req-jssdk-v5-apm-jssdk.md`
+> 设计：`docs/design/paypal/2026-06-10-design-be-jssdk-v5-apm-jssdk.md` + `...-fe-...`
+> 计划：`docs/plans/paypal/2026-06-10-plan-jssdk-v5-apm-jssdk-v1.md`
 
 - [x] **Task 1** — `config/constants.js`：新增 `NL_SHIPPING`（荷兰地址）并加入 `module.exports`
 - [x] **Task 2** — 路由 `apm-jssdk.js`（GET 渲染 + create-order + capture-order；CN token；EUR 锁定；`payment_source.ideal`；`NL_SHIPPING`；规则 13 服务端返回完整体）
@@ -300,11 +300,11 @@
 ## 已完成
 
 - [x] 需求讨论（/office-hours）→ `docs/req/2026-05-15-req-demo-hub.md`
-- [x] JSSDK v5 产品清单确认 → `docs/req/2026-05-15-req-jssdk-v5.md`
+- [x] JSSDK v5 产品清单确认 → `docs/req/paypal/2026-05-15-req-jssdk-v5.md`
 - [x] 路由三层结构设计 → `docs/design/2026-05-15-design-be-routing.md`
 - [x] UI/UX 设计（Dark OLED，双主题，响应式）→ `DESIGN.md`
 - [x] Supabase 多 schema 数据库设计 → `docs/design/2026-05-15-design-db-supabase.md`（全局）
-- [x] JSSDK v5 实现计划 → `docs/plans/2026-05-15-plan-jssdk-v5-v1.md`
+- [x] JSSDK v5 实现计划 → `docs/plans/paypal/2026-05-15-plan-jssdk-v5-v1.md`
 - [x] CEO Review + Eng Review + Design Review → 计划全部 CLEAR
 - [x] 全栈实现：CSS + EJS partials + 首页 + 14 个路由 + 工厂函数
 - [x] EJS/JS 分离重构：`window.DEMO` 模式，静态 JS 文件复用

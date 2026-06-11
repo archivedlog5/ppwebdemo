@@ -65,6 +65,10 @@ app.use(v6, require('./routes/paypal/jssdk-v6/vault-paypal-setup-only'))
 app.use(v6, require('./routes/paypal/jssdk-v6/vault-acdc-setup-only'))
 app.use(v6, require('./routes/paypal/jssdk-v6/vault-acdc-with-purchase'))
 
+// ── Braintree server-sdk ─────────────────────────────────────────────
+const btSdk = '/braintree/server-sdk'
+app.use(btSdk, require('./routes/braintree/server-sdk/dropin-ui'))
+
 app.use((req, res) => res.status(404).send("Route not found"));
 
 // ── 导出供 gateway 复用 ──────────────────────────────────────────────
