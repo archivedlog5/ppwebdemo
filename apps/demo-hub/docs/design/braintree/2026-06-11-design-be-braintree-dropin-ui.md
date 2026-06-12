@@ -134,9 +134,13 @@ function buildTransaction(nonce, amount, extra) {
         : process.env.BRAINTREE_US_USD_MERCHANT_ACCOUNT_ID,
     orderId: 'DEMO-BT-' + Date.now(),
     customer: {
-      firstName: C.BILLING_FIRST_NAME,
-      lastName:  C.BILLING_LAST_NAME,
-      email:     C.BILLING_EMAIL,
+      firstName:  C.BILLING_FIRST_NAME,
+      lastName:   C.BILLING_LAST_NAME,
+      email:      C.BILLING_EMAIL,
+      internationalPhone: {                         // 所有支付方式默认用常量；PayPal 分支后覆盖
+        countryCode:    C.COUNTRY_DIAL_MAP[C.BILLING_COUNTRY_CODE] || '1',
+        nationalNumber: C.BILLING_PHONE,
+      },
     },
     billing: {
       firstName:         C.BILLING_FIRST_NAME,
@@ -158,6 +162,10 @@ function buildTransaction(nonce, amount, extra) {
       postalCode:        C.SHIPPING_POSTAL_CODE,
       countryCodeAlpha2: C.SHIPPING_COUNTRY_CODE,
       shippingMethod:    C.SHIPPING_METHOD,
+      internationalPhone: {                         // 所有支付方式默认用常量；PayPal 分支后覆盖
+        countryCode:    C.COUNTRY_DIAL_MAP[C.SHIPPING_COUNTRY_CODE] || '1',
+        nationalNumber: C.BILLING_PHONE,
+      },
     },
     lineItems: [{
       name:          C.LINE_ITEM_NAME,
@@ -222,42 +230,21 @@ function buildTransaction(nonce, amount, extra) {
 
 ## 6. POST 响应
 
-工厂从 `result.transaction` 提取字段返回，按支付方式追加具体信息：
+工厂精简为直接返回必要标识 + 完整 `tx` 对象，不再按支付方式分拆：
 
-```json
-// 成功（result.success === true）— 通用字段
-{
-  "transactionId":         "abc123def",
-  "status":                "submitted_for_settlement",
-  "amount":                "10.00",
-  "currencyIsoCode":       "USD",
-  "orderId":               "DEMO-BT-1749734400000",
-  "merchantAccountId":     "cwen",
-  "paymentInstrumentType": "credit_card",
-  "createdAt":             "2026-06-12T10:00:00.000Z",
-  // 按支付方式追加（互斥，只出现其中一个）：
-  "card": { "cardType": "Visa", "last4": "1111", "bin": "411111", "expirationDate": "12/2026" },
-  "paypal": { "payerEmail": "buyer@example.com", "payerId": "...", "authorizationId": "..." },
-  "venmo": { "username": "...", "venmoUserId": "..." },
-  "applePay": { "cardType": "Visa", "last4": "...", "paymentInstrumentName": "..." },
-  "googlePay": { "cardType": "Visa", "last4": "...", "sourceCardType": "...", "sourceCardLast4": "..." }
-}
+```js
+res.json({
+  transactionId:         tx.id,
+  status:                tx.status,
+  paymentInstrumentType: tx.paymentInstrumentType,
+  transaction:           tx,   // 完整 Braintree transaction 对象（前端 inspect + showResponseData 用）
+})
 
 // 失败
 { "error": "..." }
 ```
 
-| 字段 | 来源 | 说明 |
-|------|------|------|
-| `transactionId` | `tx.id` | Braintree transaction ID |
-| `status` | `tx.status` | `submitted_for_settlement` / `authorized` 等 |
-| `amount` | `tx.amount` | 实际扣款金额（字符串） |
-| `currencyIsoCode` | `tx.currencyIsoCode` | 币种 |
-| `orderId` | `tx.orderId` | 我们传的 `DEMO-BT-<timestamp>` |
-| `merchantAccountId` | `tx.merchantAccountId` | 实际扣款账户（`cwen` / `cwenEUR`） |
-| `paymentInstrumentType` | `tx.paymentInstrumentType` | `credit_card` / `paypal_account` / `venmo_account` 等 |
-| `createdAt` | `tx.createdAt` | 交易创建时间 |
-| `card` / `paypal` / ... | `tx.creditCard` 等 | 按 `paymentInstrumentType` 条件追加，字段不存在时不返回 |
+**为什么精简：** 按支付方式手动挑字段维护成本高，且总会遗漏新字段。直接透传 `tx` 让前端 `inspect` 和 `#response-data` 展示所有内容，开发者可直接在浏览器控制台看到完整结构。
 
 前端收到 `error` 时调 `clearSelectedPaymentMethod()` 让用户重选支付方式。
 

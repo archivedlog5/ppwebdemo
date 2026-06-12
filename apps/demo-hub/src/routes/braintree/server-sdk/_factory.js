@@ -61,56 +61,12 @@ function createBraintreeRoute({ productKey, view, buildTransaction, region = 'us
         return res.status(400).json({ error: result.message })
       }
       const tx = result.transaction
-      const resp = {
-        transactionId:       tx.id,
-        status:              tx.status,
-        amount:              tx.amount,
-        currencyIsoCode:     tx.currencyIsoCode,
-        orderId:             tx.orderId,
-        merchantAccountId:   tx.merchantAccountId,
+      res.json({
+        transactionId:         tx.id,
+        status:                tx.status,
         paymentInstrumentType: tx.paymentInstrumentType,
-        createdAt:           tx.createdAt,
-      }
-
-      // 按支付方式追加具体信息
-      if (tx.creditCard && tx.creditCard.last4) {
-        resp.card = {
-          cardType: tx.creditCard.cardType,
-          last4:    tx.creditCard.last4,
-          bin:      tx.creditCard.bin,
-          expirationDate: tx.creditCard.expirationDate,
-        }
-      }
-      if (tx.paypalAccount && tx.paypalAccount.payerEmail) {
-        resp.paypal = {
-          payerEmail:    tx.paypalAccount.payerEmail,
-          payerId:       tx.paypalAccount.payerId,
-          authorizationId: tx.paypalAccount.authorizationId,
-        }
-      }
-      if (tx.venmoAccount && tx.venmoAccount.username) {
-        resp.venmo = {
-          username:    tx.venmoAccount.username,
-          venmoUserId: tx.venmoAccount.venmoUserId,
-        }
-      }
-      if (tx.applePayCard && tx.applePayCard.cardType) {
-        resp.applePay = {
-          cardType:       tx.applePayCard.cardType,
-          last4:          tx.applePayCard.last4,
-          paymentInstrumentName: tx.applePayCard.paymentInstrumentName,
-        }
-      }
-      if (tx.androidPayCard && tx.androidPayCard.cardType) {
-        resp.googlePay = {
-          cardType:    tx.androidPayCard.cardType,
-          last4:       tx.androidPayCard.last4,
-          sourceCardType: tx.androidPayCard.sourceCardType,
-          sourceCardLast4: tx.androidPayCard.sourceCardLast4,
-        }
-      }
-
-      res.json(resp)
+        transaction:           tx,  // 完整 transaction 对象，前端 showResponseData + inspect 用
+      })
     } catch (err) {
       console.error(`[braintree/${productKey}] transaction error:`, err.message)
       res.status(500).json({ error: err.message })

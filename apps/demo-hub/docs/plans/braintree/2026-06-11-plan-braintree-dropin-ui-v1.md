@@ -689,3 +689,100 @@ PayPal 授权完成 → payload.details
 **后端 `buildTransaction` 新增（`PayPalAccount` 分支内）：**
 - `customer.internationalPhone` / `shipping.internationalPhone` = `{ countryCode, nationalNumber }` |
 - fallback: `COUNTRY_DIAL_MAP[payerCountry] || '1'`（未知国家默认 US 区号）
+
+---
+
+## Round 10 — Google Pay Drop-in 参数扩充（2026-06-12）
+
+### 新增前端常量（6 个）
+
+| 常量 | 值 | 来源 | 说明 |
+|------|-----|------|------|
+| `GP_COUNTRY_CODE` | `'US'` | v5 ECM demo | 收单行国家码；EEA 必须，其他建议填 |
+| `GP_TOTAL_LABEL` | `'Total'` | Google Pay docs | `transactionInfo.totalPriceLabel`，金额旁标签 |
+| `GP_CHECKOUT_OPTION` | `'COMPLETE_IMMEDIATE_PURCHASE'` | Google Pay docs | sheet 按钮显示 "Pay now"（仅 `totalPriceStatus=FINAL` 时可用） |
+| `GP_BUTTON_COLOR` | `'black'` | Drop-in module | `button.buttonColor`：`black` / `white` / `white-outline` |
+| `GP_BUTTON_TYPE` | `'pay'` | Drop-in module + v5 ECM | `button.buttonType`：Google Pay 标准 Pay 按钮 |
+| `GP_BUTTON_SIZE` | `'fill'` | Drop-in module + v5 ECM | `button.buttonSizeMode`：宽度填满容器 |
+
+### `googlePay` 配置扩充
+
+```js
+// 扩充前（3 字段）
+googlePay: { googlePayVersion: 2, transactionInfo: { totalPriceStatus, totalPrice, currencyCode } }
+
+// 扩充后（transactionInfo 6 字段 + 新增 button 3 字段）
+googlePay: {
+  googlePayVersion: 2,
+  transactionInfo: {
+    countryCode, currencyCode, totalPriceStatus: 'FINAL',
+    totalPrice, totalPriceLabel: GP_TOTAL_LABEL, checkoutOption: GP_CHECKOUT_OPTION,
+  },
+  button: { buttonColor: GP_BUTTON_COLOR, buttonType: GP_BUTTON_TYPE, buttonSizeMode: GP_BUTTON_SIZE },
+}
+```
+
+`updateConfiguration('googlePay', 'transactionInfo', ...)` 也同步补齐 `countryCode`、`totalPriceLabel`、`checkoutOption`。
+
+### 参数来源
+
+| 参数 | 文档 |
+|------|------|
+| `transactionInfo.countryCode` | v5 ECM demo（`googlepay-ecm.js` 第 157 行） |
+| `transactionInfo.totalPriceLabel` | `googlepay-request-objects.md` § TransactionInfo |
+| `transactionInfo.checkoutOption` | `googlepay-request-objects.md` § TransactionInfo |
+| `button.*` | `braintree-web-drop-in-module.md` § googlePayCreateOptions + v5 ECM demo |
+
+---
+
+## Round 11 — 结果展示精简 + internationalPhone 全量 + Google Pay 限制说明（2026-06-13）
+
+### POST 响应精简（`_factory.js`）
+
+移除按支付方式分拆的 20+ 行代码，直接返回：
+
+```js
+res.json({
+  transactionId, status, paymentInstrumentType,
+  transaction: tx,  // 完整 Braintree transaction 对象
+})
+```
+
+**原因：** 按支付方式手动挑字段维护成本高、易遗漏；直接透传 `tx` 让前端 inspect 和 `#response-data` 展示一切。
+
+### 前端结果展示更新
+
+- `inspect('transaction', data.transaction || data)` — 浏览器控制台展示完整 tx，不分支付方式
+- `showResponseData(data.transaction || data)` — `#response-data` 显示完整 transaction JSON
+- `#response-data` 加 `max-height: 280px; overflow-y: auto` — 避免长 JSON 撑开页面
+
+### `customer` / `shipping` 全量加 `internationalPhone`（非 PayPal 支付方式）
+
+所有支付方式（信用卡、Apple Pay、Google Pay、Venmo）的 `buildTransaction` base params 直接从常量构建 `internationalPhone`：
+
+```js
+customer: {
+  ...
+  internationalPhone: {
+    countryCode:    C.COUNTRY_DIAL_MAP[C.BILLING_COUNTRY_CODE] || '1',
+    nationalNumber: C.BILLING_PHONE,
+  },
+},
+shipping: {
+  ...
+  internationalPhone: {
+    countryCode:    C.COUNTRY_DIAL_MAP[C.SHIPPING_COUNTRY_CODE] || '1',
+    nationalNumber: C.BILLING_PHONE,
+  },
+},
+```
+
+PayPal 分支后续仍覆盖为真实买家电话（`payload.details.phone`）。
+
+### Google Pay Drop-in 买家信息限制（确认）
+
+Braintree Drop-in `googlePay` config 仅暴露 `googlePayVersion` / `transactionInfo` / `button`，**不支持** `emailRequired` / `billingAddressRequired` / `phoneNumberRequired`。
+
+Drop-in Google Pay **只能拿到**：`cardType`、`lastFour`、`bin`、`isNetworkTokenized`、`rawPaymentData`（含 `paymentMethodData.info`），**拿不到** email / phone / billing address。
+
+如需这些数据，必须使用独立 Google Pay 集成（绕开 Drop-in，参考 v5 `googlepay-ecm.js`）。

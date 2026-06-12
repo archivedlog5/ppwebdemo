@@ -38,32 +38,47 @@ const SHIPPING_METHOD = "ground";
 // phone: digits only
 // url: max 13 chars, letters/numbers/slashes/periods only
 const DESCRIPTOR_NAME = "CWEN5BT*DROPIN"; // 7 + * + 6 = 14 chars
-const DESCRIPTOR_PHONE = "3125551212";
+const DESCRIPTOR_PHONE = "2407808080";
 const DESCRIPTOR_URL = "cwen5.com";
 
 // ── Demo 商品行项（transaction.sale lineItems，Level 3 数据）─────────────
 // unitAmount / totalAmount 是动态值（等于 transaction amount），在路由里注入
 // kind: "debit"（扣款）| "credit"（退款/折扣）
-const LINE_ITEM_NAME          = "Demo Product";
-const LINE_ITEM_KIND          = "debit";
-const LINE_ITEM_QUANTITY      = "1";
+const LINE_ITEM_NAME = "Demo Product";
+const LINE_ITEM_KIND = "debit";
+const LINE_ITEM_QUANTITY = "1";
 const LINE_ITEM_UNIT_OF_MEASURE = "each";
-const LINE_ITEM_DESCRIPTION   = "Braintree Drop-in Demo Purchase";
-const LINE_ITEM_PRODUCT_CODE  = "BT-DEMO-001"; // max 12 chars
-const LINE_ITEM_COMMODITY_CODE = "43231500";   // UNSPSC: e-commerce software
-const LINE_ITEM_URL           = "https://cwen5.com";
+const LINE_ITEM_DESCRIPTION = "Braintree Drop-in Demo Purchase";
+const LINE_ITEM_PRODUCT_CODE = "BT-DEMO-001"; // max 12 chars
+const LINE_ITEM_COMMODITY_CODE = "43231500"; // UNSPSC: e-commerce software
+const LINE_ITEM_URL = "https://cwen5.com";
 
 // ── 国家码 → 电话区号映射（用于 internationalPhone.countryCode）────────────
 // PayPal payload.details.countryCode 是 ISO 3166-1 alpha-2，需转换为 1-3 位数字区号
 const COUNTRY_DIAL_MAP = {
-  US: "1",  CA: "1",  GB: "44", AU: "61", DE: "49", FR: "33",
-  ES: "34", IT: "39", NL: "31", JP: "81", CN: "86", KR: "82",
-  BR: "55", MX: "52", IN: "91", SG: "65", HK: "852", AE: "971",
+  US: "1",
+  CA: "1",
+  GB: "44",
+  AU: "61",
+  DE: "49",
+  FR: "33",
+  ES: "34",
+  IT: "39",
+  NL: "31",
+  JP: "81",
+  CN: "86",
+  KR: "82",
+  BR: "55",
+  MX: "52",
+  IN: "91",
+  SG: "65",
+  HK: "852",
+  AE: "971",
 };
 
 // ── Level 2 税务与采购单 ──────────────────────────────────────────────────
 // taxAmount 对应前端 paypal.amountBreakdown.taxTotal
-const TAX_AMOUNT            = "0.00"; // Level 2，与 amountBreakdown.taxTotal 一致
+const TAX_AMOUNT = "0.00"; // Level 2，与 amountBreakdown.taxTotal 一致
 const PURCHASE_ORDER_NUMBER = "PO-DEMO-001"; // Level 2，max 17 chars (non-PayPal) / 12 chars (AIB)
 
 // ── PayPal（Braintree Drop-in PayPal 专属选项）───────────────────────────

@@ -2,6 +2,32 @@
 
 ---
 
+## 2026-06-13 — 子域名路由隔离 + Braintree 多轮优化
+
+### 子域名路由（`src/app.js`）
+
+在 `express.static` 之后、路由之前加 hostname 中间件，实现三个子域名隔离：
+
+| 域名 | 职责 |
+|------|------|
+| `demo.cwen5.com` | 首页；访问 `/paypal/…` → 302 `pp.cwen5.com`；`/braintree/…` → 302 `bt.cwen5.com` |
+| `pp.cwen5.com` | PayPal demos；其他路径 → 302 `demo.cwen5.com/` |
+| `bt.cwen5.com` | Braintree demos；其他路径 → 302 `demo.cwen5.com/`；Apple Pay 注册域名 |
+
+**动机：** Apple Pay merchant certificate 必须与访问域名一致；PayPal 和 Braintree 用不同商户账户，各自注册独立子域名避免证书冲突。Apple Pay Braintree sandbox 通过注册 `bt.cwen5.com` + sandbox tester 账号验证成功。
+
+### Braintree Drop-in UI 持续优化（Rounds 9–11）
+
+- **PayPal config 全量化**：`paypalConfig` 共享对象（paypal + paypalCredit）；完整 13 个参数（flow/intent/offerCredit/displayName/enableShippingAddress/shippingAddressEditable/landingPageType/userAction/shippingAddressOverride/lineItems/amountBreakdown）
+- **买家联系方式回传**：PayPal `payload.details.email/phone/countryCode` → `customer.email` + `customer/shipping.internationalPhone`（`COUNTRY_DIAL_MAP`）
+- **`internationalPhone` 全量**：所有支付方式（信用卡/Apple Pay/Google Pay/Venmo）base params 加 `internationalPhone`，PayPal 分支后覆盖
+- **POST 响应精简**：`{ transactionId, status, paymentInstrumentType, transaction: tx }` 直接透传完整 tx
+- **Google Pay 参数扩充**：`transactionInfo` 加 `countryCode/totalPriceLabel/checkoutOption`；新增 `button`（`buttonColor/buttonType/buttonSizeMode`）
+- **UI 改进**：`#response-data` 加 `max-height:280px; overflow-y:auto` 滚动条
+- **`_factory.js` console**：`inspect('transaction', data.transaction)` 浏览器控制台展示完整 tx
+
+---
+
 ## 2026-06-12 — Braintree Drop-in UI 实现完成
 
 **路由：** `/braintree/server-sdk/dropin-ui`  

@@ -28,9 +28,13 @@ module.exports = createBraintreeRoute({
           : process.env.BRAINTREE_US_USD_MERCHANT_ACCOUNT_ID,
       orderId: "DEMO-BT-" + Date.now(),
       customer: {
-        firstName: C.BILLING_FIRST_NAME,
-        lastName:  C.BILLING_LAST_NAME,
-        email:     C.BILLING_EMAIL,
+        firstName:         C.BILLING_FIRST_NAME,
+        lastName:          C.BILLING_LAST_NAME,
+        email:             C.BILLING_EMAIL,
+        internationalPhone: {
+          countryCode:    C.COUNTRY_DIAL_MAP[C.BILLING_COUNTRY_CODE] || "1",
+          nationalNumber: C.BILLING_PHONE,
+        },
       },
       billing: {
         firstName:         C.BILLING_FIRST_NAME,
@@ -52,6 +56,10 @@ module.exports = createBraintreeRoute({
         postalCode:        C.SHIPPING_POSTAL_CODE,
         countryCodeAlpha2: C.SHIPPING_COUNTRY_CODE,
         shippingMethod:    C.SHIPPING_METHOD,
+        internationalPhone: {
+          countryCode:    C.COUNTRY_DIAL_MAP[C.SHIPPING_COUNTRY_CODE] || "1",
+          nationalNumber: C.BILLING_PHONE,
+        },
       },
       taxAmount:           C.TAX_AMOUNT,           // Level 2；与前端 amountBreakdown.taxTotal 对应
       purchaseOrderNumber: C.PURCHASE_ORDER_NUMBER, // Level 2

@@ -100,6 +100,49 @@ apps/demo-hub/
 └── package.json
 ```
 
+## 域名路由规则
+
+demo-hub 通过 `src/app.js` 中的 hostname 中间件实现子域名隔离：
+
+| 域名 | 服务内容 | 说明 |
+|------|---------|------|
+| `demo.cwen5.com` | 首页（`/`） | 点击 PayPal demo → 302 到 `pp.cwen5.com`；点击 Braintree → 302 到 `bt.cwen5.com` |
+| `pp.cwen5.com` | PayPal demos（`/paypal/…`） | 访问 `/braintree/…` 或 `/` → 302 到 `demo.cwen5.com/` |
+| `bt.cwen5.com` | Braintree demos（`/braintree/…`） | 访问 `/paypal/…` 或 `/` → 302 到 `demo.cwen5.com/`；Apple Pay 使用此域名注册 |
+| `localhost` | 全部不限制 | 本地开发，无 hostname 过滤 |
+
+静态资源（`/css/`、`/js/`、`/img/`、`/favicon`）在所有子域名下均放行。
+
+**为什么要隔离子域名：** Apple Pay 要求 merchant identity certificate 与访问域名一致。PayPal Apple Pay 用 `pp.cwen5.com`，Braintree Apple Pay 用 `bt.cwen5.com`，避免证书冲突。
+
+**middleware 实现（`src/app.js`）：**
+
+```js
+app.use(function (req, res, next) {
+  const host = req.hostname, p = req.path
+  function isAsset(p) { return p.startsWith('/css/') || p.startsWith('/js/') || p.startsWith('/img/') || p.startsWith('/favicon') }
+
+  if (host === 'pp.cwen5.com') {
+    if (!p.startsWith('/paypal') && !isAsset(p)) return res.redirect(302, 'https://demo.cwen5.com/')
+    return next()
+  }
+  if (host === 'bt.cwen5.com') {
+    if (!p.startsWith('/braintree') && !isAsset(p)) return res.redirect(302, 'https://demo.cwen5.com/')
+    return next()
+  }
+  if (host === 'demo.cwen5.com') {
+    if (p.startsWith('/paypal'))    return res.redirect(302, 'https://pp.cwen5.com' + req.originalUrl)
+    if (p.startsWith('/braintree')) return res.redirect(302, 'https://bt.cwen5.com' + req.originalUrl)
+    return next()
+  }
+  next() // localhost / 其他不限制
+})
+```
+
+**新增 provider 时**：在中间件 `RULES` 里登记对应子域名和路径前缀。
+
+---
+
 ## 路由规范
 
 **三层路由结构（所有 provider 统一）：`/{provider}/{sdk_version}/{product_key}`**

@@ -15,6 +15,41 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 
+// ── Hostname-based routing ───────────────────────────────────────────
+// pp.cwen5.com   → PayPal demos only
+// bt.cwen5.com   → Braintree demos only
+// demo.cwen5.com → home page (all demos listed)
+// localhost/*    → unrestricted (dev)
+app.use(function (req, res, next) {
+  const host = req.hostname
+  const p    = req.path
+  function isAsset(p) {
+    return p.startsWith('/css/') || p.startsWith('/js/') || p.startsWith('/img/') || p.startsWith('/favicon')
+  }
+
+  // pp.cwen5.com → 只服务 PayPal + 静态资源
+  if (host === 'pp.cwen5.com') {
+    if (!p.startsWith('/paypal') && !isAsset(p)) return res.redirect(302, 'https://demo.cwen5.com/')
+    return next()
+  }
+
+  // bt.cwen5.com → 只服务 Braintree + 静态资源
+  if (host === 'bt.cwen5.com') {
+    if (!p.startsWith('/braintree') && !isAsset(p)) return res.redirect(302, 'https://demo.cwen5.com/')
+    return next()
+  }
+
+  // demo.cwen5.com → 首页；点击 demo 跳到对应子域名
+  if (host === 'demo.cwen5.com') {
+    if (p.startsWith('/paypal'))    return res.redirect(302, 'https://pp.cwen5.com' + req.originalUrl)
+    if (p.startsWith('/braintree')) return res.redirect(302, 'https://bt.cwen5.com' + req.originalUrl)
+    return next()
+  }
+
+  // localhost / 其他 → 不限制（本地开发）
+  next()
+})
+
 // ── Routes ──────────────────────────────────────────────────────────
 app.use("/", require("./routes/index"));
 

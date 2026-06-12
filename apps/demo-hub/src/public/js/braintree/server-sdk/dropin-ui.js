@@ -39,6 +39,14 @@
   var PP_ITEM_PRODUCT_CODE = "BT-DEMO-001";
   var PP_ITEM_URL = "https://cwen5.com";
 
+  // Google Pay Drop-in 专属配置常量
+  var GP_COUNTRY_CODE    = "US";
+  var GP_TOTAL_LABEL     = "Total";
+  var GP_CHECKOUT_OPTION = "COMPLETE_IMMEDIATE_PURCHASE"; // 按钮显示 "Pay now"
+  var GP_BUTTON_COLOR    = "black";  // 'black' | 'white' | 'white-outline'
+  var GP_BUTTON_TYPE     = "pay";    // 'pay' | 'buy' | 'checkout' | ...
+  var GP_BUTTON_SIZE     = "fill";   // 'fill' | 'static'
+
   var currentAmount = DEMO.amount;
   var currentCurrency = DEMO.currency;
   var dropinInstance = null;
@@ -140,9 +148,17 @@
       googlePay: {
         googlePayVersion: 2,
         transactionInfo: {
+          countryCode:      GP_COUNTRY_CODE,
+          currencyCode:     currentCurrency,
           totalPriceStatus: "FINAL",
-          totalPrice: currentAmount,
-          currencyCode: currentCurrency,
+          totalPrice:       currentAmount,
+          totalPriceLabel:  GP_TOTAL_LABEL,
+          checkoutOption:   GP_CHECKOUT_OPTION,
+        },
+        button: {
+          buttonColor:    GP_BUTTON_COLOR,
+          buttonType:     GP_BUTTON_TYPE,
+          buttonSizeMode: GP_BUTTON_SIZE,
         },
       },
     };
@@ -219,9 +235,12 @@
           currencyCode: currentCurrency,
         });
         dropinInstance.updateConfiguration("googlePay", "transactionInfo", {
+          countryCode:      GP_COUNTRY_CODE,
+          currencyCode:     currentCurrency,
           totalPriceStatus: "FINAL",
-          totalPrice: currentAmount,
-          currencyCode: currentCurrency,
+          totalPrice:       currentAmount,
+          totalPriceLabel:  GP_TOTAL_LABEL,
+          checkoutOption:   GP_CHECKOUT_OPTION,
         });
       });
 
@@ -338,12 +357,7 @@
           return r.json();
         })
         .then(function (data) {
-          console.group("[dropin-PROBE] transaction response");
-          console.log("transactionId:", data.transactionId);
-          console.log("status       :", data.status);
-          console.log("error        :", data.error);
-          console.log("full response:", data);
-          console.groupEnd();
+          inspect("transaction", data.transaction || data);
           if (data.error) {
             showResult("✗ " + data.error, "error");
             clearResponseData();
@@ -351,15 +365,10 @@
             payBtn.disabled = false;
           } else {
             showResult(
-              "✓ " +
-                data.status +
-                " · TX: " +
-                data.transactionId +
-                " · " +
-                payload.type,
+              "✓ " + data.status + " · TX: " + data.transactionId + " · " + payload.type,
               "success",
             );
-            showResponseData(data);
+            showResponseData(data.transaction || data);
             payBtn.style.display = "none";
             document.getElementById("reset-btn").style.display = "block";
           }
