@@ -288,7 +288,15 @@
 ## 待启动（后续讨论）
 
 - [x] PayPal JSSDK v6 — Tasks 12–24 全部完成（含 Task 20 ACDC Vault w/ Purchase，**2026-06-05**）；⏳ Task 20 Supabase INSERT 待用户手动执行
-- [ ] Braintree Web SDK — Drop-in UI、Hosted Fields
+- [x] **Braintree server-sdk / Drop-in UI** — `/braintree/server-sdk/dropin-ui` **2026-06-12 完成**
+  - 4 文件：`_factory.js`（clientTokenOptions + currency）、`dropin-ui.js`（路由）、`dropin-ui.ejs`、`public/js/.../dropin-ui.js`
+  - 支付方式：信用卡 / PayPal checkout / Venmo / Apple Pay / Google Pay（Drop-in 全量）
+  - USD/EUR 双币种各走正确 merchantAccountId（generate + sale 两处一致）
+  - deviceData 收集 + 完整 transaction.sale 参数（billing/shipping/customer/descriptor）
+  - 3DS：checkbox 控制，create 时 `threeDSecure: true`，requestPaymentMethod 时传 threeDSecureParameters
+  - 结果展示：状态行 + JSON 响应块（#response-data）
+  - 成功后 Pay Now → New Payment 按钮切换，点击 teardown+recreate 回到选择界面
+- [ ] **Braintree server-sdk / Hosted Fields** — 待启动
 - [ ] Braintree GraphQL — 产品待定
 - [ ] Stripe stripe-js — 产品待定
 - [ ] Adyen Web Components — 产品待定

@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-06-12 — Braintree Drop-in UI 实现完成
+
+**路由：** `/braintree/server-sdk/dropin-ui`  
+**改动文件：** 4 个
+
+| 文件 | 动作 |
+|------|------|
+| `src/routes/braintree/server-sdk/_factory.js` | 新增 `clientTokenOptions(req)` 可选回调；GET handler 传 `currency` 给 EJS |
+| `src/routes/braintree/server-sdk/dropin-ui.js` | 替换占位符：`createBraintreeRoute` + `clientTokenOptions`（merchantAccountId 按 currency）+ 完整 `buildTransaction`（含 billing/shipping/customer/descriptor；PayPal/Venmo 专属参数；console.log）|
+| `src/views/braintree/server-sdk/dropin-ui.ejs` | 新建：amount-row（USD/EUR select + amount + Update）+ 3DS toggle + Drop-in 容器 + Pay Now + New Payment + result 状态行 + response-data JSON 块 + test-hint |
+| `src/public/js/braintree/server-sdk/dropin-ui.js` | 新建：IIFE；buildDropInOptions（含 3DS toggle 检测）；recreateDropIn / teardownAndRecreate；wireControls（Update→reload if currency changed；3DS toggle→teardown+recreate；reset-btn→清空+teardown+recreate）；wireDropIn（payBtn.onclick 赋值）；onPayClick（3DS requestOpts + fetch + clearSelectedPaymentMethod）；showResult / showResponseData / clearResponseData |
+
+**实现后修正（Round 3）：**
+
+1. **cardholderName 移除**：`card: { cardholderName: { required: true } }` → `card: {}`（用户不需要姓名字段）
+2. **CVV 字段**：Drop-in CVV 显示由 merchant account AVS/CVV 设置决定，非前端参数；需在 Braintree 控制台 Settings → Processing → CVV 开启
+3. **descriptor.url 超长**：`demo.paypal.com`（15 字符）超出 13 字符限制 → 改为 `cwen5.com`
+4. **showResult CSS 类名 bug**：`result-msg--success` 无法匹配 `.result-msg.success` → 改为 `result-msg success`
+5. **成功后 Pay Now 仍可点击**：nonce 重用报错 → 成功后隐藏 Pay Now + 显示 "New Payment"（Braintree 紫色）；点击 teardown+recreate 回到支付方式选择界面
+
+**结果展示：** 状态行（#result）+ JSON 响应块（#response-data `<pre>`，成功后展示 transactionId/status）
+
+---
+
 ## 2026-06-10 — 全量文档审计：代码 ↔ CLAUDE.md/DESIGN.md 回写（Opus 仅文档）
 
 派 3 个只读 agent 并行审计 v5 层 / v6 层 / 顶层文档，对照全部已建 demo（v5 22 个 + v6 20 个）找文档漂移。symlink 确认：`views/`、`public/js/` 下的 v5/v6 CLAUDE.md 均软链到 `routes/` 同名文件，改一处覆盖三处。

@@ -72,9 +72,10 @@ BRAINTREE_PRIVATE_KEY=
 - capture 成功判断：`transaction.status === 'submitted_for_settlement'` 或 `'settled'`
 
 ### Drop-in UI（`dropin-ui`）
-- 默认启用：卡、PayPal、Venmo、Apple Pay、Google Pay
-- 提供 3DS 选项下拉（SCA_WHEN_REQUIRED / SCA_ALWAYS / 无）
-- 3DS 由 Drop-in UI 内置配置（`threeDSecure` 参数传入），无需手动调用 `verifyCard()`
+- 支付方式：信用卡、PayPal（checkout 流）、Venmo、Apple Pay、Google Pay 全量
+- 币种：USD / EUR，各对应不同 merchantAccountId
+- 设备指纹：`dataCollector: true`
+- 详细需求见：`docs/req/braintree/2026-06-11-req-braintree-dropin-ui.md`
 
 ### Hosted Fields（`hosted-fields`）
 - 自定义卡号 / 有效期 / CVV 输入域（`braintree-web` Hosted Fields 组件）

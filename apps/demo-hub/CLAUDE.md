@@ -263,7 +263,10 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
 6. 新增产品：写路由代码 → 在 Supabase 插入行（含 sdk_version） → 重启 app
 7. Access token 由 `config/paypal.js` 的 `getCNToken()` / `getUSToken()` 统一管理，8h 缓存
 7a. 工厂 GET handler 透传 `country: req.query.country || ''` 给所有 EJS（非破坏性，普通产品忽略；PLM demo 用此区分同属 EUR 的 DE/ES/FR/IT）
-8. **API 常量引入方式**：路由文件用 `const C = require('../../../config/constants')` 整个引入，用 `C.INTENT`、`C.SANDBOX_SHIPPING` 等，不逐个解构
+8. **API 常量引入方式**：路由文件整体引入常量文件，不逐个解构：
+   - **PayPal 路由**：`const C = require('../../../config/constants')`，用 `C.INTENT`、`C.SANDBOX_SHIPPING` 等
+   - **Braintree 路由**：`const C = require('../../../config/bt-constants')`，用 `C.FIRST_NAME`、`C.STREET_ADDRESS`、`C.DESCRIPTOR_NAME` 等
+   - **前端 JS（`public/js/`）**：运行在浏览器，无法 `require()`；常量以 `var` 声明在 IIFE 顶部的「常量块」中，与服务端各自维护一份
 9. **Order body 规范**：所有工厂路由产品（`createStandardRoute` / `createVaultWithPurchaseRoute`）**必须**提供 `buildBody(amount, currency)` 函数；自定义路由（buttons/acdc/googlepay-ecm/vault-setup-only/vault-return）直接在 POST handler 里控制 body
 10. **金额动态传递**：前端从 `#demo-amount` 读值 → fetch body `{ amount, currency }` → 后端 `req.body.amount` / `req.body.currency`
 11. **币种选择**：`#demo-currency` 下拉框切换时刷新页面（`?currency=EUR&amount=xxx`）；服务端读 `req.query.currency` 并注入 SDK URL；零小数位货币（JPY/KRW/TWD/CLP/IDR）金额自动取整
@@ -280,7 +283,83 @@ demo-hub 与 admin-console 通过 Supabase `demohub.products` 表交互：
       return
     }
     ```
-> JSSDK v5 专属规则（14–19：Google Pay、Apple Pay、Vault Return）→ `src/routes/paypal/jssdk-v5/CLAUDE.md`
+14. **Inspect/Probe 调试规范**：每个新 demo 的静态 JS 文件都必须包含 `inspect()` 函数和关键探针，帮助在沙盒阶段确认 SDK 对象结构、返回值和实际 API 行为。详见下方「Inspect/Probe 调试规范」章节。
+
+> JSSDK v5 专属规则（15–20：Google Pay、Apple Pay、Vault Return）→ `src/routes/paypal/jssdk-v5/CLAUDE.md`
+
+---
+
+## Inspect/Probe 调试规范
+
+**目的：** 新集成的 SDK 对象结构往往与文档描述有出入（方法名、返回类型、是否 Promise 等）。每个 demo 在实现阶段必须埋探针，实测确认后再定型，不要凭文档假设。
+
+### `inspect()` 函数（每个 demo 的 JS 文件必须包含）
+
+```js
+function inspect(label, obj) {
+  try {
+    console.group('[<DEMO>-PROBE] ' + label)
+    console.log('value:', obj)
+    console.dir(obj)
+    if (obj && typeof obj === 'object') {
+      console.log('own keys     :', Object.keys(obj))
+      console.log('own props    :', Object.getOwnPropertyNames(obj))
+      var proto = Object.getPrototypeOf(obj)
+      console.log('proto        :', proto)
+      if (proto) console.log('proto methods:', Object.getOwnPropertyNames(proto))
+    }
+  } finally { console.groupEnd() }
+}
+```
+
+`<DEMO>` 用 `ACDC` / `dropin` / `APPLEPAY` 等前缀区分来源。
+
+### 必须埋探针的时机
+
+| 时机 | 探针内容 |
+|------|---------|
+| JS 文件加载 | `console.log('[<demo>] <file>.js loaded')` |
+| SDK 实例/会话创建后 | `inspect('instance', instance)` / `inspect('session', session)` |
+| 资格检查返回后 | `inspect('eligibility', eligibility)` |
+| 核心 API 调用前 | `console.log('[<demo>] 调用名 opts:', opts)` |
+| 核心 API 回调/resolve 后 | `console.group` 打印所有关键字段 + `console.log('full:', obj)` |
+| 服务端响应后 | `console.group` 打印 transactionId / status / error / full |
+
+### 探针格式规范
+
+```js
+// 单行 log
+console.log('[demo-id] 动作描述:', value)
+
+// 多字段分组（用于 payload / response / 3DS 结果等）
+console.group('[demo-PROBE] 标签')
+console.log('field1 :', value1)
+console.log('field2 :', value2)
+console.log('full   :', fullObj)
+console.groupEnd()
+
+// 对象结构探查（方法集、是否 Promise 等）
+inspect('标签', sdkObject)
+```
+
+### deviceData 打印规范
+
+`deviceData` 是长字符串，打印截断前 40 字符：
+
+```js
+console.log('deviceData :', payload.deviceData ? payload.deviceData.slice(0, 40) + '…' : undefined)
+```
+
+### 定型后处理
+
+探针只用于开发/调试阶段。当某个探针的结论已确认（例如「instance 确实有 `teardown` 方法」），**保留探针代码，但结论记入对应 `docs/debug-log.md`**。不要删除探针代码——下次修改这个 demo 时仍有参考价值。
+
+### 参考实现
+
+- PayPal JSSDK v6 ACDC：`src/public/js/paypal/jssdk-v6/acdc.js`（`inspect` 函数 + session/instance/payload 探针）
+- Braintree Drop-in UI：`src/public/js/braintree/server-sdk/dropin-ui.js`（`inspect` 函数 + Drop-in instance/payload/transaction 探针）
+
+---
 
 ## EJS/JS 分离模式
 

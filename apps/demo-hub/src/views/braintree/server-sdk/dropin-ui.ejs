@@ -1,0 +1,144 @@
+<%- include('../../partials/header', {
+  title, provider, sdkVersion, currentProductKey, currentSdkVersion,
+  sidebarProducts, showSidebar
+}) %>
+
+<div class="sandbox-page">
+  <div class="sandbox-header">
+    <span class="provider-badge badge-braintree">Braintree · server-sdk · Drop-in UI</span>
+    <h1><%= title %></h1>
+    <p>Pre-built payment UI — card, PayPal, Venmo, Apple Pay, Google Pay</p>
+  </div>
+
+  <div class="sandbox-card">
+    <div class="amount-row">
+      <div class="currency-group">
+        <label class="field-label" for="demo-currency">Currency</label>
+        <select id="demo-currency" class="currency-select" aria-label="Select currency">
+          <% ['USD', 'EUR'].forEach(function (c) { %>
+            <option value="<%= c %>" <%= currency === c ? 'selected' : '' %>><%= c %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="amount-group">
+        <label class="field-label" for="demo-amount">Amount</label>
+        <div class="amount-input-wrapper">
+          <input id="demo-amount" class="amount-input" type="text" inputmode="decimal"
+            value="<%= defaultAmount %>" placeholder="0.00" aria-label="Payment amount" />
+        </div>
+      </div>
+    </div>
+
+    <div class="threeds-row">
+      <%# input 放在 label 前；label 只包裹视觉开关，文字是独立 span，点文字不触发 toggle %>
+      <input type="checkbox" id="threeds-toggle" class="threeds-input" />
+      <label for="threeds-toggle" class="threeds-switch" aria-label="Enable 3DS Verification"></label>
+      <span class="threeds-label">Enable 3DS Verification</span>
+    </div>
+
+    <span class="sandbox-mode-badge" style="display:inline-block;margin-bottom:16px">⚡ Sandbox Mode</span>
+
+    <div id="dropin-container"></div>
+
+    <button id="pay-btn" class="pay-btn pay-btn-paypal" type="button" disabled>Pay Now</button>
+    <button id="reset-btn" class="pay-btn pay-btn-braintree" type="button" style="display:none">New Payment</button>
+
+    <div class="result-msg" id="result" role="alert" aria-live="polite"></div>
+    <pre id="response-data" style="display:none;margin-top:8px;padding:10px 14px;border-radius:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--fg-muted);white-space:pre-wrap;word-break:break-all"></pre>
+
+    <div class="test-hint">
+      No 3DS: <strong>4111 1111 1111 1111</strong> &nbsp;·&nbsp;
+      3DS Mastercard: <strong>5200000000002151</strong> &nbsp;·&nbsp;
+      3DS Amex: <strong>340000000002534</strong>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* ── Drop-in 标题占位元素（translations 清空文字后仍保留空白） ─────── */
+  .braintree-placeholder { display: none; }
+
+  /* ── 3DS toggle switch ──────────────────────────────────────────────── */
+  .threeds-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  /* 隐藏原生 checkbox，但保留可访问性 */
+  .threeds-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+  }
+
+  /* pill 开关：label 只覆盖视觉元素，点文字不触发 */
+  .threeds-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    background: rgba(128, 128, 128, 0.12);
+    border: 1.5px solid var(--border-hi);
+    border-radius: 20px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  /* 滑块 */
+  .threeds-switch::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: var(--fg-muted, #94a3b8);
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s ease, background 0.2s ease;
+  }
+
+  /* checked 状态 */
+  .threeds-input:checked + .threeds-switch {
+    background: rgba(34, 197, 94, 0.18);
+    border-color: var(--accent, #22c55e);
+  }
+  .threeds-input:checked + .threeds-switch::after {
+    transform: translateX(16px);
+    background: var(--accent, #22c55e);
+  }
+
+  /* focus ring 可访问性 */
+  .threeds-input:focus-visible + .threeds-switch {
+    outline: 2px solid var(--accent, #22c55e);
+    outline-offset: 2px;
+  }
+
+  /* 文字标签：独立 span，不关联 input，点击不触发 toggle */
+  .threeds-label {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    color: var(--fg-muted, #94a3b8);
+    user-select: none;
+    letter-spacing: 0.3px;
+  }
+</style>
+
+<script>
+  window.DEMO = {
+    clientToken: '<%- clientToken %>',
+    amount: '<%= defaultAmount %>',
+    currency: '<%= currency %>',
+    urls: {
+      transaction: '/braintree/server-sdk/api/dropin-ui/transaction',
+    },
+  }
+</script>
+<script src="https://js.braintreegateway.com/web/dropin/1.46.1/js/dropin.min.js"></script>
+<script src="/js/braintree/server-sdk/dropin-ui.js"></script>
+
+<%- include('../../partials/footer', { showSidebar }) %>
